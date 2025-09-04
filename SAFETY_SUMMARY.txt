@@ -1,0 +1,57 @@
+AYSO ROSTER PRO - SAFETY & PRIVACY SUMMARY
+==========================================
+
+Dear AYSO Parents and Coaches,
+
+AYSO Roster Pro is a FREE, SAFE, and PRIVATE tool for managing youth soccer lineups.
+
+KEY SAFETY POINTS:
+------------------
+✓ NO data is collected or stored - everything stays in your browser
+✓ NO accounts or passwords needed - nothing to hack
+✓ NO tracking, cookies, or analytics - completely anonymous
+✓ NO ads or third-party services - just a simple lineup tool
+✓ NO player data is sent over the internet - 100% local processing
+
+HOW IT WORKS:
+-------------
+1. You enter player names (we recommend first names only)
+2. The tool generates fair lineups following AYSO rotation rules
+3. Everything happens in your browser - like using a calculator
+4. When you close the tab, all data disappears
+5. Export/import features save to YOUR computer only
+
+PARENT PEACE OF MIND:
+---------------------
+• Built specifically for youth sports with child safety in mind
+• No social features or communication between users
+• No photos, contact info, or personal data collected
+• Simpler than a spreadsheet, safer than paper lists
+• You can verify it's safe - the code is open and transparent
+
+COACH BEST PRACTICES:
+--------------------
+• Use first names only or nicknames
+• Keep exported roster files secure
+• Close browser tab when done
+• Share this safety summary with concerned parents
+
+TECHNICAL VERIFICATION:
+----------------------
+Tech-savvy parents can verify our claims:
+• No external API calls after page load
+• No database connections
+• No localStorage or cookies
+• View Source shows simple, readable code
+• Network tab in browser shows no data transmission
+
+BOTTOM LINE:
+-----------
+This tool is as safe as using a calculator website - it does math 
+(lineup generation) in your browser and nothing else. Your team's 
+information never leaves your computer.
+
+Questions? Consult with your AYSO Regional Board.
+
+Remember: The safest data is data that's never collected.
+That's exactly how AYSO Roster Pro works.
