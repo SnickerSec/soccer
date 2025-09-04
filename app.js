@@ -38,6 +38,9 @@ class SoccerLineupGenerator {
             if (e.key === 'Enter') this.addPlayerManually();
         });
         
+        // Demo button
+        document.getElementById('demoButton').addEventListener('click', () => this.populateDemo());
+        
         // Generate lineup
         document.getElementById('generateLineup').addEventListener('click', () => this.generateLineup());
         
@@ -98,6 +101,26 @@ class SoccerLineupGenerator {
             });
             this.updatePlayerList();
         }
+    }
+
+    populateDemo() {
+        const demoNames = [
+            'Alex Martinez', 'Sam Johnson', 'Jordan Chen', 'Taylor Brown', 'Casey Rivera',
+            'Morgan Davis', 'Avery Thompson', 'Riley Kim', 'Cameron Wilson', 'Sage Anderson',
+            'Quinn Rodriguez', 'Emery Williams', 'River Patel', 'Skyler Garcia', 'Rowan Clark',
+            'Phoenix Lee', 'Sage Mitchell', 'Harley Cooper', 'Justice Turner', 'Cameron Hill'
+        ];
+
+        // Clear existing players first
+        this.players = [];
+        
+        // Shuffle the demo names array to ensure randomness
+        const shuffledNames = [...demoNames];
+        this.shuffleArray(shuffledNames);
+        
+        // Take the first 10 names and add them
+        const selectedNames = shuffledNames.slice(0, 10);
+        selectedNames.forEach(name => this.addPlayer(name));
     }
 
     removePlayer(name) {
