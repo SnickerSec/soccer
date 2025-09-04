@@ -1,0 +1,521 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: 30px;
+    text-align: center;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.main-content {
+    padding: 30px;
+}
+
+section {
+    margin-bottom: 30px;
+    padding: 25px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+
+h3 {
+    color: #34495e;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+/* Player Management */
+.import-section {
+    margin-bottom: 25px;
+}
+
+.file-label {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #3498db;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.file-label:hover {
+    background: #2980b9;
+}
+
+#fileInput {
+    display: none;
+}
+
+small {
+    display: block;
+    margin-top: 8px;
+    color: #666;
+}
+
+.player-input {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+#playerName {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+#addPlayer {
+    padding: 10px 25px;
+    background: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+}
+
+#addPlayer:hover {
+    background: #229954;
+}
+
+.player-list {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#playerList {
+    list-style: none;
+}
+
+#playerList li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    background: #ecf0f1;
+    border-radius: 5px;
+    transition: background 0.2s;
+}
+
+#playerList li:hover {
+    background: #d5dbdd;
+}
+
+.remove-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: background 0.3s;
+}
+
+.remove-btn:hover {
+    background: #c0392b;
+}
+
+/* Settings */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setting-item label {
+    font-weight: 600;
+    color: #555;
+}
+
+.setting-item input {
+    padding: 8px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+.setting-item span {
+    padding: 8px;
+    background: #ecf0f1;
+    border-radius: 5px;
+    text-align: center;
+}
+
+/* Generate Section */
+.generate-section {
+    text-align: center;
+    background: white;
+}
+
+.btn-primary, .btn-secondary {
+    padding: 15px 40px;
+    margin: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: #95a5a6;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #7f8c8d;
+}
+
+/* Lineup Display */
+.lineup-section {
+    background: white;
+}
+
+.hidden {
+    display: none;
+}
+
+.validation-messages {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+
+.validation-messages.has-issues {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.validation-messages p {
+    margin: 5px 0;
+}
+
+.validation-messages .success {
+    color: #155724;
+    font-weight: 600;
+}
+
+.lineup-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+}
+
+.quarter-lineup {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px solid #dee2e6;
+    min-width: 250px;
+}
+
+.quarter-lineup h3 {
+    background: #34495e;
+    color: white;
+    padding: 10px;
+    margin: -15px -15px 15px;
+    border-radius: 8px 8px 0 0;
+    text-align: center;
+}
+
+.quarter-lineup table {
+    width: 100%;
+}
+
+.quarter-lineup tr {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.quarter-lineup td {
+    padding: 8px;
+}
+
+.position {
+    font-weight: 600;
+    color: #495057;
+    width: 40%;
+}
+
+.player-name {
+    color: #212529;
+}
+
+.keeper-row {
+    background: #fff3cd;
+}
+
+.sitting-row {
+    background: #f8d7da;
+    font-style: italic;
+}
+
+.player-summary {
+    grid-column: 1 / -1;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.player-summary table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.player-summary thead {
+    background: #34495e;
+    color: white;
+}
+
+.player-summary th,
+.player-summary td {
+    padding: 10px;
+    text-align: left;
+    border: 1px solid #dee2e6;
+}
+
+.player-summary tbody tr:nth-child(even) {
+    background: #ecf0f1;
+}
+
+.player-summary tbody tr:hover {
+    background: #d5dbdd;
+}
+
+/* Action Buttons */
+.action-buttons {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.btn-export, .btn-print {
+    padding: 12px 30px;
+    margin: 0 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s;
+}
+
+.btn-export {
+    background: #3498db;
+    color: white;
+}
+
+.btn-export:hover {
+    background: #2980b9;
+}
+
+.btn-print {
+    background: #9b59b6;
+    color: white;
+}
+
+.btn-print:hover {
+    background: #8e44ad;
+}
+
+/* Soccer Field Visualization */
+.field-container {
+    margin: 15px 0;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.soccer-field {
+    width: 100%;
+    height: auto;
+    max-width: 250px;
+    margin: 0 auto;
+    display: block;
+}
+
+.player-marker {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.player-marker:hover {
+    transform: scale(1.1);
+}
+
+.field-legend {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.legend-color {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid #333;
+}
+
+.legend-color.keeper {
+    background: #ffcc00;
+}
+
+.legend-color.defensive {
+    background: #3498db;
+}
+
+.legend-color.offensive {
+    background: #e74c3c;
+}
+
+/* Footer */
+footer {
+    background: #34495e;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+footer p {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* Print Styles */
+@media print {
+    body {
+        background: white;
+        padding: 0;
+    }
+    
+    .container {
+        box-shadow: none;
+        border-radius: 0;
+    }
+    
+    .player-section,
+    .settings-section,
+    .generate-section,
+    .action-buttons,
+    header {
+        display: none;
+    }
+    
+    .lineup-section {
+        background: white;
+    }
+    
+    .quarter-lineup {
+        page-break-inside: avoid;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .lineup-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    h1 {
+        font-size: 1.8rem;
+    }
+    
+    .main-content {
+        padding: 20px;
+    }
+    
+    .lineup-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .player-input {
+        flex-direction: column;
+    }
+    
+    #playerName {
+        width: 100%;
+    }
+    
+    #addPlayer {
+        width: 100%;
+    }
+}

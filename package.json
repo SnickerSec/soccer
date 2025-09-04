@@ -1,0 +1,24 @@
+{
+  "name": "ayso-roster-pro",
+  "version": "1.0.0",
+  "description": "AYSO Roster Pro - Smart lineup generator for youth soccer teams",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "keywords": [
+    "soccer",
+    "lineup",
+    "ayso",
+    "sports",
+    "team-management"
+  ],
+  "author": "",
+  "license": "MIT"
+}
