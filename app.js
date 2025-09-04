@@ -1,9 +1,10 @@
 class SoccerLineupGenerator {
     constructor() {
         this.players = [];
-        this.positions = ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Midfield', 'Striker'];
+        this.formation = '2-3-1';
         this.quarters = 4;
         this.playersOnField = 7;
+        this.positions = [];
         this.lineup = [];
         
         this.init();
@@ -11,6 +12,20 @@ class SoccerLineupGenerator {
 
     init() {
         this.setupEventListeners();
+        this.initializeDefaults();
+    }
+    
+    initializeDefaults() {
+        // Get the current values from the dropdowns
+        const fieldPlayersSelect = document.getElementById('fieldPlayers');
+        const formationSelect = document.getElementById('formation');
+        
+        // Set the values from the HTML defaults
+        this.playersOnField = parseInt(fieldPlayersSelect.value);
+        this.formation = formationSelect.value;
+        
+        // Initialize positions based on defaults
+        this.updatePositions();
     }
 
     setupEventListeners() {
@@ -32,11 +47,19 @@ class SoccerLineupGenerator {
         // Export and print
         document.getElementById('exportLineup').addEventListener('click', () => this.exportLineup());
         document.getElementById('printLineup').addEventListener('click', () => this.printLineup());
+        document.getElementById('exportPlayers').addEventListener('click', () => this.exportPlayers());
         
         // Field players setting
         document.getElementById('fieldPlayers').addEventListener('change', (e) => {
             this.playersOnField = parseInt(e.target.value);
             this.updatePositions();
+        });
+        
+        // Formation setting
+        document.getElementById('formation').addEventListener('change', (e) => {
+            this.formation = e.target.value;
+            this.updatePositions();
+            this.updateFormationDescription();
         });
     }
 
@@ -85,9 +108,17 @@ class SoccerLineupGenerator {
     updatePlayerList() {
         const list = document.getElementById('playerList');
         const count = document.getElementById('playerCount');
+        const exportBtn = document.getElementById('exportPlayers');
         
         count.textContent = this.players.length;
         list.innerHTML = '';
+        
+        // Show/hide export button based on whether there are players
+        if (this.players.length > 0) {
+            exportBtn.style.display = 'block';
+        } else {
+            exportBtn.style.display = 'none';
+        }
         
         this.players.forEach(player => {
             const li = document.createElement('li');
@@ -99,57 +130,127 @@ class SoccerLineupGenerator {
         });
     }
 
-    updatePositions() {
-        // Adjust positions based on number of players on field
-        if (this.playersOnField === 5) {
-            this.positions = ['Keeper', 'Left Back', 'Right Back', 'Midfield', 'Striker'];
-        } else if (this.playersOnField === 6) {
-            this.positions = ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Striker'];
-        } else if (this.playersOnField === 7) {
-            this.positions = ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Midfield', 'Striker'];
+    getPositionsForFormation(formation) {
+        // For 7v7 (10U standard)
+        if (this.playersOnField === 7 || this.playersOnField === 6) {
+            switch(formation) {
+                case '2-3-1':
+                    if (this.playersOnField === 6) {
+                        return ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'];
+                    }
+                    return ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Center Mid', 'Striker'];
+                case '3-2-1':
+                    if (this.playersOnField === 6) {
+                        return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Striker'];
+                    }
+                    return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'];
+                case '2-2-2':
+                    if (this.playersOnField === 6) {
+                        return ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'];
+                    }
+                    return ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Left Striker', 'Right Striker'];
+                default:
+                    return this.getPositionsForFormation('2-3-1');
+            }
+        }
+        // For other field sizes, use default formations
+        else if (this.playersOnField === 5) {
+            return ['Keeper', 'Left Back', 'Right Back', 'Midfield', 'Striker'];
         } else if (this.playersOnField === 9) {
-            this.positions = ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid', 'Right Mid', 'Left Forward', 'Right Forward'];
+            return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid', 'Right Mid', 'Left Forward', 'Right Forward'];
         } else if (this.playersOnField === 11) {
-            this.positions = ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back', 
-                            'Left Mid', 'Center Mid', 'Right Mid', 'Left Wing', 'Striker', 'Right Wing'];
+            return ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back', 
+                    'Left Mid', 'Center Mid', 'Right Mid', 'Left Wing', 'Striker', 'Right Wing'];
+        }
+        // Default fallback to 7v7 2-3-1 formation
+        return ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Center Mid', 'Striker'];
+    }
+    
+    updatePositions() {
+        this.positions = this.getPositionsForFormation(this.formation);
+    }
+    
+    updateFormationDescription() {
+        const descriptions = {
+            '2-3-1': '<strong>2-3-1 Formation:</strong> Provides a solid balance between defense and offense. Easy for players to understand with clear roles: 2 defenders (LB, RB), 3 midfielders (LW, Mid, RW), and 1 striker.',
+            '3-2-1': '<strong>3-2-1 Formation:</strong> More defensive formation with an extra defender. Useful against stronger opponents or to develop defensive skills. Can leave the striker isolated if not managed well.',
+            '2-2-2': '<strong>2-2-2 Formation:</strong> Creates two lines of paired players. Good for teams with strong partnerships. May lack natural width, requiring midfielders to cover more ground.'
+        };
+        
+        const descDiv = document.getElementById('formationDescription');
+        if (descDiv) {
+            descDiv.innerHTML = `<p>${descriptions[this.formation] || descriptions['2-3-1']}</p>`;
         }
     }
 
-    generateLineup() {
+    async generateLineup() {
         if (this.players.length < this.playersOnField) {
             alert(`Need at least ${this.playersOnField} players to generate a lineup. Currently have ${this.players.length}.`);
             return;
         }
 
-        // Reset player stats
-        this.players.forEach(player => {
-            player.quartersPlayed = [];
-            player.quartersSitting = [];
-            player.positionsPlayed = [];
-            player.goalieQuarter = null;
-            player.defensiveQuarters = 0;
-            player.offensiveQuarters = 0;
-        });
-
-        this.lineup = [];
-
-        // Calculate how many quarters each player should sit
-        const totalPlayerQuarters = this.players.length * this.quarters;
-        const totalFieldQuarters = this.playersOnField * this.quarters;
-        const totalSittingQuarters = totalPlayerQuarters - totalFieldQuarters;
-        const avgSittingPerPlayer = totalSittingQuarters / this.players.length;
+        const maxAttempts = 100; // Maximum number of attempts to prevent infinite loops
+        let attempts = 0;
+        let validation = [];
         
-        // Determine sitting distribution
-        const sittingSchedule = this.determineSittingSchedule();
+        // Show loading indicator
+        const generateBtn = document.getElementById('generateLineup');
+        const originalText = generateBtn.textContent;
+        generateBtn.disabled = true;
         
-        // Generate lineup for each quarter
-        for (let quarter = 1; quarter <= this.quarters; quarter++) {
-            const quarterLineup = this.generateQuarterLineup(quarter, sittingSchedule);
-            this.lineup.push(quarterLineup);
+        // Keep trying until we get a valid lineup or hit max attempts
+        do {
+            attempts++;
+            generateBtn.textContent = `Generating... (Attempt ${attempts})`;
+            
+            // Add a small delay to allow UI to update
+            if (attempts > 1) {
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            
+            // Reset player stats
+            this.players.forEach(player => {
+                player.quartersPlayed = [];
+                player.quartersSitting = [];
+                player.positionsPlayed = [];
+                player.goalieQuarter = null;
+                player.defensiveQuarters = 0;
+                player.offensiveQuarters = 0;
+            });
+
+            this.lineup = [];
+
+            // Calculate how many quarters each player should sit
+            const totalPlayerQuarters = this.players.length * this.quarters;
+            const totalFieldQuarters = this.playersOnField * this.quarters;
+            const totalSittingQuarters = totalPlayerQuarters - totalFieldQuarters;
+            const avgSittingPerPlayer = totalSittingQuarters / this.players.length;
+            
+            // Determine sitting distribution
+            const sittingSchedule = this.determineSittingSchedule();
+            
+            // Generate lineup for each quarter
+            for (let quarter = 1; quarter <= this.quarters; quarter++) {
+                const quarterLineup = this.generateQuarterLineup(quarter, sittingSchedule);
+                this.lineup.push(quarterLineup);
+            }
+
+            // Validate the generated lineup
+            validation = this.validateLineup();
+            
+        } while (validation.length > 0 && attempts < maxAttempts);
+        
+        // Reset button
+        generateBtn.textContent = originalText;
+        generateBtn.disabled = false;
+        
+        // If we hit max attempts, show a warning
+        if (attempts >= maxAttempts && validation.length > 0) {
+            console.warn(`Generated lineup after ${attempts} attempts but still has ${validation.length} issues.`);
+            validation.unshift(`⚠️ Best lineup found after ${attempts} attempts. Some rules may not be perfectly satisfied.`);
+        } else if (attempts > 1) {
+            console.log(`Successfully generated valid lineup after ${attempts} attempts.`);
         }
-
-        // Validate the generated lineup
-        const validation = this.validateLineup();
         
         this.displayLineup(validation);
     }
@@ -648,6 +749,27 @@ class SoccerLineupGenerator {
         window.print();
     }
 
+    exportPlayers() {
+        if (this.players.length === 0) {
+            alert('No players to export');
+            return;
+        }
+        
+        // Create text content with one player name per line
+        const playerNames = this.players.map(p => p.name).join('\n');
+        
+        // Create blob and download
+        const blob = new Blob([playerNames], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `players_${new Date().toISOString().split('T')[0]}.txt`;
+        a.click();
+        
+        // Clean up
+        URL.revokeObjectURL(url);
+    }
+    
     clearAll() {
         if (confirm('Clear all players and lineup? This cannot be undone.')) {
             this.players = [];
@@ -661,21 +783,26 @@ class SoccerLineupGenerator {
     createFieldVisualization(quarter) {
         const positions = quarter.positions;
         
-        // Position coordinates for 7v7 formation (percentage-based)
+        // Position coordinates for all formations (percentage-based)
         const positionCoords = {
             'Keeper': { x: 50, y: 90 },
+            // 2-3-1 Formation positions
             'Left Back': { x: 25, y: 70 },
             'Right Back': { x: 75, y: 70 },
             'Left Wing': { x: 15, y: 40 },
             'Right Wing': { x: 85, y: 40 },
-            'Midfield': { x: 50, y: 50 },
-            'Striker': { x: 50, y: 20 },
-            // 5v5 positions
-            'Left Mid': { x: 35, y: 50 },
-            'Right Mid': { x: 65, y: 50 },
-            // 9v9 positions
-            'Center Back': { x: 50, y: 75 },
             'Center Mid': { x: 50, y: 45 },
+            'Striker': { x: 50, y: 20 },
+            // 3-2-1 Formation positions
+            'Center Back': { x: 50, y: 72 },
+            'Left Mid': { x: 30, y: 45 },
+            'Right Mid': { x: 70, y: 45 },
+            // 2-2-2 Formation positions
+            'Left Striker': { x: 35, y: 20 },
+            'Right Striker': { x: 65, y: 20 },
+            // Legacy/Other formations
+            'Midfield': { x: 50, y: 50 },
+            // 9v9 positions
             'Left Forward': { x: 35, y: 25 },
             'Right Forward': { x: 65, y: 25 },
             // 11v11 positions

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AYSO Roster Pro</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -35,6 +36,7 @@
                 <div class="player-list">
                     <h3>Current Players (<span id="playerCount">0</span>)</h3>
                     <ul id="playerList"></ul>
+                    <button id="exportPlayers" class="btn-export-players" style="display: none;">Export Players</button>
                 </div>
             </section>
 
@@ -44,12 +46,26 @@
                 <div class="settings-grid">
                     <div class="setting-item">
                         <label for="fieldPlayers">Players on Field:</label>
-                        <input type="number" id="fieldPlayers" value="7" min="5" max="11">
+                        <select id="fieldPlayers">
+                            <option value="6">6 (10U Small-sided)</option>
+                            <option value="7" selected>7 (10U Standard)</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="formation">Formation:</label>
+                        <select id="formation">
+                            <option value="2-3-1" selected>2-3-1 (Balanced)</option>
+                            <option value="3-2-1">3-2-1 (Defensive)</option>
+                            <option value="2-2-2">2-2-2 (Paired)</option>
+                        </select>
                     </div>
                     <div class="setting-item">
                         <label>Quarters:</label>
                         <span>4 (AYSO Standard)</span>
                     </div>
+                </div>
+                <div class="formation-description" id="formationDescription">
+                    <p><strong>2-3-1 Formation:</strong> Provides a solid balance between defense and offense. Easy for players to understand with clear roles: 2 defenders (LB, RB), 3 midfielders (LW, Mid, RW), and 1 striker.</p>
                 </div>
             </section>
 
