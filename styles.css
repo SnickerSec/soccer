@@ -506,6 +506,7 @@ footer p {
     .container {
         box-shadow: none;
         border-radius: 0;
+        max-width: 100%;
     }
     
     .player-section,
@@ -518,10 +519,49 @@ footer p {
     
     .lineup-section {
         background: white;
+        padding: 10px;
+    }
+    
+    /* Ensure all quarters fit on one page */
+    .lineup-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        page-break-inside: avoid;
+        margin-bottom: 10px;
     }
     
     .quarter-lineup {
         page-break-inside: avoid;
+        padding: 10px;
+        font-size: 0.9em;
+    }
+    
+    .quarter-lineup h3 {
+        margin: -10px -10px 10px;
+        padding: 8px;
+        font-size: 1em;
+    }
+    
+    .quarter-lineup td {
+        padding: 5px;
+        font-size: 0.85em;
+    }
+    
+    /* Keep the entire game lineup section on one page */
+    #lineupResult {
+        page-break-inside: avoid;
+    }
+    
+    /* Reduce spacing for print */
+    section {
+        margin-bottom: 15px;
+        padding: 15px;
+    }
+    
+    h2 {
+        font-size: 1.3em;
+        margin-bottom: 10px;
     }
 }
 
