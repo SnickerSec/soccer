@@ -537,6 +537,13 @@ footer p {
         padding: 10px;
     }
     
+    /* Hide soccer field visualizations when printing */
+    .field-container,
+    .soccer-field,
+    .field-legend {
+        display: none !important;
+    }
+    
     /* Ensure all quarters fit on one page */
     .lineup-grid {
         display: grid;
