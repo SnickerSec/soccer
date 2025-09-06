@@ -516,12 +516,19 @@ footer p {
     body {
         background: white;
         padding: 0;
+        overflow: hidden !important;
+    }
+    
+    html, body {
+        overflow: hidden !important;
+        height: auto !important;
     }
     
     .container {
         box-shadow: none;
         border-radius: 0;
         max-width: 100%;
+        overflow: hidden !important;
     }
     
     .player-section,
@@ -535,6 +542,7 @@ footer p {
     .lineup-section {
         background: white;
         padding: 10px;
+        overflow: hidden !important;
     }
     
     /* Hide soccer field visualizations when printing */
@@ -551,12 +559,14 @@ footer p {
         gap: 10px;
         page-break-inside: avoid;
         margin-bottom: 10px;
+        overflow: hidden !important;
     }
     
     .quarter-lineup {
         page-break-inside: avoid;
         padding: 10px;
         font-size: 0.9em;
+        overflow: hidden !important;
     }
     
     .quarter-lineup h3 {
@@ -584,6 +594,17 @@ footer p {
     h2 {
         font-size: 1.3em;
         margin-bottom: 10px;
+    }
+    
+    /* Hide all scrollbars when printing */
+    * {
+        overflow: visible !important;
+        -ms-overflow-style: none !important;
+        scrollbar-width: none !important;
+    }
+    
+    *::-webkit-scrollbar {
+        display: none !important;
     }
 }
 
