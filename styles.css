@@ -27,6 +27,12 @@ header {
     text-align: center;
 }
 
+.keyboard-help {
+    margin-top: 10px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.85rem;
+}
+
 h1 {
     font-size: 2.5rem;
     margin-bottom: 10px;
@@ -547,6 +553,92 @@ footer p {
     opacity: 0.9;
 }
 
+/* Notification Styles */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    z-index: 1000;
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-width: 350px;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification-success {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+    color: white;
+}
+
+.notification-error {
+    background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+    color: white;
+}
+
+.notification-warning {
+    background: linear-gradient(135deg, #e67e22 0%, #f39c12 100%);
+    color: white;
+}
+
+.notification-info {
+    background: linear-gradient(135deg, #2980b9 0%, #3498db 100%);
+    color: white;
+}
+
+/* Loading Animation */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.btn-primary:disabled {
+    animation: pulse 1.5s ease-in-out infinite;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Smooth Transitions */
+button {
+    transition: all 0.3s ease;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+/* Keyboard Shortcut Hints */
+.kbd-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    padding: 10px 15px;
+    background: rgba(52, 73, 94, 0.9);
+    color: white;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    z-index: 100;
+    display: none;
+}
+
+.kbd-hint.show {
+    display: block;
+}
+
+.kbd-hint kbd {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin: 0 2px;
+    font-family: monospace;
+}
+
 /* Print Styles */
 @media print {
     body {
@@ -642,6 +734,17 @@ footer p {
     *::-webkit-scrollbar {
         display: none !important;
     }
+    
+    /* Captain indicators in print */
+    .captain-star {
+        color: #ffd700;
+        font-weight: bold;
+    }
+    
+    /* Ensure captain summary shows in print */
+    .player-summary table {
+        font-size: 0.8em;
+    }
 }
 
 /* Responsive Design */
@@ -652,12 +755,25 @@ footer p {
 }
 
 @media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
     h1 {
         font-size: 1.8rem;
     }
     
+    .subtitle {
+        font-size: 0.95rem;
+    }
+    
     .main-content {
-        padding: 20px;
+        padding: 15px;
+    }
+    
+    section {
+        padding: 15px;
+        margin-bottom: 20px;
     }
     
     .lineup-grid {
@@ -666,13 +782,90 @@ footer p {
     
     .player-input {
         flex-direction: column;
+        gap: 10px;
     }
     
     #playerName {
         width: 100%;
     }
     
-    #addPlayer {
+    #addPlayer, .btn-demo {
         width: 100%;
+    }
+    
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .btn-primary, .btn-secondary {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .action-buttons button {
+        width: 100%;
+    }
+    
+    /* Notification adjustments for mobile */
+    .notification {
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    /* Field visualization for mobile */
+    .field-container {
+        max-width: 100%;
+    }
+    
+    /* Quarter lineup tables */
+    .quarter-lineup {
+        min-width: auto;
+    }
+    
+    .quarter-lineup td {
+        font-size: 0.9em;
+    }
+    
+    /* Player summary table */
+    .player-summary {
+        overflow-x: auto;
+    }
+    
+    .player-summary table {
+        font-size: 0.75em;
+    }
+    
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.5rem;
+    }
+    
+    h2 {
+        font-size: 1.2rem;
+    }
+    
+    .main-content {
+        padding: 10px;
+    }
+    
+    section {
+        padding: 12px;
+    }
+    
+    .quarter-lineup h3 {
+        font-size: 1rem;
+    }
+    
+    footer {
+        padding: 15px;
+        font-size: 0.8rem;
     }
 }
