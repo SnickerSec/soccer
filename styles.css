@@ -673,6 +673,12 @@ button:active {
         overflow: hidden !important;
     }
     
+    /* Hide the Game Lineup header and validation messages */
+    .lineup-section h2,
+    .validation-messages {
+        display: none !important;
+    }
+    
     /* Hide soccer field visualizations when printing */
     .field-container,
     .soccer-field,
