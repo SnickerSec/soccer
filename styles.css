@@ -663,7 +663,8 @@ button:active {
     .settings-section,
     .generate-section,
     .action-buttons,
-    header {
+    header,
+    footer {
         display: none;
     }
     
@@ -748,6 +749,11 @@ button:active {
     }
     
     /* Ensure captain summary shows in print */
+    .player-summary {
+        page-break-before: always;
+        padding-top: 20px;
+    }
+    
     .player-summary table {
         font-size: 0.8em;
     }
