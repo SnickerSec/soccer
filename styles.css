@@ -196,6 +196,42 @@ small {
     background: #2980b9;
 }
 
+/* Captain selection styles */
+.player-item {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    gap: 8px;
+}
+
+.captain-checkbox {
+    margin-right: 8px;
+    transform: scale(1.2);
+    accent-color: #ffd700;
+}
+
+.player-name-display {
+    flex: 1;
+    font-weight: 500;
+}
+
+/* Style for captain items */
+#playerList li:has(.captain-checkbox:checked) {
+    background: linear-gradient(135deg, #fff9c4 0%, #fef7d6 100%);
+    border-left: 4px solid #ffd700;
+}
+
+.captain-checkbox:checked + .player-name-display::before {
+    content: '⭐ ';
+    font-size: 1.1em;
+}
+
+/* Hover effect for captain items */
+#playerList li:has(.captain-checkbox:checked):hover {
+    background: linear-gradient(135deg, #fff8b3 0%, #fef0c4 100%);
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+}
+
 /* Settings */
 .settings-grid {
     display: grid;

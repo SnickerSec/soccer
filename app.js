@@ -1,6 +1,7 @@
 class SoccerLineupGenerator {
     constructor() {
         this.players = [];
+        this.captains = []; // Track selected captains
         this.formation = '2-3-1';
         this.quarters = 4;
         this.playersOnField = 7;
@@ -94,6 +95,7 @@ class SoccerLineupGenerator {
         if (!this.players.find(p => p.name === name)) {
             this.players.push({
                 name: name,
+                isCaptain: false,
                 quartersPlayed: [],
                 quartersSitting: [],
                 positionsPlayed: [],
@@ -124,6 +126,11 @@ class SoccerLineupGenerator {
     }
 
     removePlayer(name) {
+        // Remove from captains if they were a captain
+        const captainIndex = this.captains.indexOf(name);
+        if (captainIndex > -1) {
+            this.captains.splice(captainIndex, 1);
+        }
         this.players = this.players.filter(p => p.name !== name);
         this.updatePlayerList();
     }
@@ -145,12 +152,53 @@ class SoccerLineupGenerator {
         
         this.players.forEach(player => {
             const li = document.createElement('li');
+            const isCaptain = this.captains.includes(player.name);
+            const captainIcon = isCaptain ? '⭐' : '';
             li.innerHTML = `
-                <span>${player.name}</span>
+                <label class="player-item">
+                    <input type="checkbox" class="captain-checkbox" ${isCaptain ? 'checked' : ''}
+                           onchange="lineupGenerator.toggleCaptain('${player.name}')" />
+                    <span class="player-name-display">${captainIcon} ${player.name}</span>
+                </label>
                 <button class="remove-btn" onclick="lineupGenerator.removePlayer('${player.name}')">×</button>
             `;
             list.appendChild(li);
         });
+    }
+
+    toggleCaptain(playerName) {
+        const player = this.players.find(p => p.name === playerName);
+        if (!player) return;
+
+        const checkbox = event.target;
+        const isChecked = checkbox.checked;
+
+        if (isChecked) {
+            // Adding captain
+            if (this.captains.length >= 2) {
+                // Remove the first captain and add the new one
+                const removedCaptain = this.captains.shift();
+                const removedPlayer = this.players.find(p => p.name === removedCaptain);
+                if (removedPlayer) {
+                    removedPlayer.isCaptain = false;
+                }
+                // Update the UI for the removed captain
+                this.updatePlayerList();
+                alert(`Captain limit reached (max 2). Replaced ${removedCaptain} with ${playerName}.`);
+            }
+            this.captains.push(playerName);
+            player.isCaptain = true;
+        } else {
+            // Removing captain
+            const index = this.captains.indexOf(playerName);
+            if (index > -1) {
+                this.captains.splice(index, 1);
+            }
+            player.isCaptain = false;
+        }
+
+        // Refresh the player list to update checkboxes and icons
+        this.updatePlayerList();
     }
 
     getPositionsForFormation(formation) {
@@ -273,6 +321,26 @@ class SoccerLineupGenerator {
             validation.unshift(`⚠️ Best lineup found after ${attempts} attempts. Some rules may not be perfectly satisfied.`);
         } else if (attempts > 1) {
             console.log(`Successfully generated valid lineup after ${attempts} attempts.`);
+        }
+        
+        // Automatically mark 2 random players as captains after lineup generation
+        this.captains = [];
+        this.players.forEach(p => p.isCaptain = false);
+        
+        if (this.players.length >= 2) {
+            // Shuffle players to randomize selection
+            const shuffledPlayers = [...this.players];
+            this.shuffleArray(shuffledPlayers);
+            
+            // Select first 2 as captains
+            for (let i = 0; i < 2; i++) {
+                const player = shuffledPlayers[i];
+                player.isCaptain = true;
+                this.captains.push(player.name);
+            }
+            
+            // Update player list to reflect new captains
+            this.updatePlayerList();
         }
         
         this.displayLineup(validation);
@@ -707,15 +775,17 @@ class SoccerLineupGenerator {
     }
 
     getPlayerSummary() {
-        let html = '<table><thead><tr><th>Player</th><th>Quarters Played</th><th>Quarters Sitting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Player</th><th>Captain</th><th>Quarters Played</th><th>Quarters Sitting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>';
         
         this.players.forEach(player => {
+            const captainIndicator = player.isCaptain ? '⭐ Yes' : 'No';
             const positions = player.positionsPlayed.map(p => `Q${p.quarter}: ${p.position}`).join(', ');
             const defensive = player.defensiveQuarters || 0;
             const offensive = player.offensiveQuarters || 0;
             html += `
                 <tr>
                     <td>${player.name}</td>
+                    <td>${captainIndicator}</td>
                     <td>${player.quartersPlayed.join(', ') || 'None'}</td>
                     <td>${player.quartersSitting.join(', ') || 'None'}</td>
                     <td>D: ${defensive} / O: ${offensive}</td>
@@ -737,13 +807,19 @@ class SoccerLineupGenerator {
             text += '---------\n';
             
             this.positions.forEach(position => {
-                const player = quarter.positions[position] || 'TBD';
-                text += `${position}: ${player}\n`;
+                const playerName = quarter.positions[position] || 'TBD';
+                const player = this.players.find(p => p.name === playerName);
+                const captainIndicator = player && player.isCaptain ? '⭐ ' : '';
+                text += `${position}: ${captainIndicator}${playerName}\n`;
             });
             
             const sittingPlayers = this.players.filter(p => p.quartersSitting.includes(quarter.quarter));
             if (sittingPlayers.length > 0) {
-                text += `Sitting: ${sittingPlayers.map(p => p.name).join(', ')}\n`;
+                const sittingText = sittingPlayers.map(p => {
+                    const captainIndicator = p.isCaptain ? '⭐ ' : '';
+                    return `${captainIndicator}${p.name}`;
+                }).join(', ');
+                text += `Sitting: ${sittingText}\n`;
             }
             
             text += '\n';
@@ -752,11 +828,13 @@ class SoccerLineupGenerator {
         text += '\nPlayer Summary\n';
         text += '--------------\n';
         this.players.forEach(player => {
-            text += `${player.name}:\n`;
+            const captainIndicator = player.isCaptain ? '⭐ ' : '';
+            text += `${captainIndicator}${player.name}:\n`;
             text += `  Played: Quarters ${player.quartersPlayed.join(', ') || 'None'}\n`;
             text += `  Sitting: Quarters ${player.quartersSitting.join(', ') || 'None'}\n`;
             const positions = player.positionsPlayed.map(p => `Q${p.quarter}-${p.position}`).join(', ');
-            text += `  Positions: ${positions || 'None'}\n\n`;
+            text += `  Positions: ${positions || 'None'}\n`;
+            text += `  Captain: ${player.isCaptain ? 'Yes' : 'No'}\n\n`;
         });
         
         // Download file
@@ -778,11 +856,18 @@ class SoccerLineupGenerator {
             return;
         }
         
-        // Create text content with one player name per line
-        const playerNames = this.players.map(p => p.name).join('\n');
+        let text = 'AYSO Roster Pro - Player Roster\n';
+        text += '=============================\n\n';
+        text += 'Captains marked with ⭐\n\n';
+        
+        // Create text content with captain indicators
+        this.players.forEach(p => {
+            const captainIndicator = p.isCaptain ? '⭐ ' : '';
+            text += `${captainIndicator}${p.name}\n`;
+        });
         
         // Create blob and download
-        const blob = new Blob([playerNames], { type: 'text/plain' });
+        const blob = new Blob([text], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
