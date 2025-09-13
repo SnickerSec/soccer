@@ -1047,15 +1047,12 @@ class SoccerLineupGenerator {
             return;
         }
         
-        let text = 'AYSO Roster Pro - Player Roster\n';
-        text += '=============================\n\n';
-        text += 'Captains marked with ⭐\n\n';
-        
-        // Create text content with captain indicators and player numbers
+        // Create text content in a format compatible with import
+        // Using "Name #Number" format
+        let text = '';
         this.players.forEach(p => {
-            const captainIndicator = p.isCaptain ? '⭐ ' : '';
             const numberStr = p.number ? ` #${p.number}` : '';
-            text += `${captainIndicator}${p.name}${numberStr}\n`;
+            text += `${p.name}${numberStr}\n`;
         });
         
         // Create blob and download
@@ -1068,6 +1065,8 @@ class SoccerLineupGenerator {
         
         // Clean up
         URL.revokeObjectURL(url);
+        
+        this.showNotification('Players exported successfully. File can be re-imported later.', 'success');
     }
     
     clearAll() {
