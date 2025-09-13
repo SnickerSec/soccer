@@ -2,6 +2,7 @@ class SoccerLineupGenerator {
     constructor() {
         this.players = [];
         this.captains = []; // Track selected captains
+        this.ageDivision = '10U';
         this.formation = '2-3-1';
         this.quarters = 4;
         this.playersOnField = 7;
@@ -21,15 +22,28 @@ class SoccerLineupGenerator {
     
     initializeDefaults() {
         // Get the current values from the dropdowns
+        const ageDivisionSelect = document.getElementById('ageDivision');
         const fieldPlayersSelect = document.getElementById('fieldPlayers');
         const formationSelect = document.getElementById('formation');
         
-        // Set the values from the HTML defaults
+        // Set the age division
+        this.ageDivision = ageDivisionSelect.value;
+        
+        // Update field options based on age division
+        this.updateFieldOptions();
+        
+        // Set the values from the updated dropdowns
         this.playersOnField = parseInt(fieldPlayersSelect.value);
         this.formation = formationSelect.value;
         
+        // Update formation options based on field size
+        this.updateFormationOptions();
+        
         // Initialize positions based on defaults
         this.updatePositions();
+        
+        // Update age-specific rules
+        this.updateAgeRules();
     }
 
     setupEventListeners() {
@@ -56,9 +70,20 @@ class SoccerLineupGenerator {
         document.getElementById('printLineup').addEventListener('click', () => this.printLineup());
         document.getElementById('exportPlayers').addEventListener('click', () => this.exportPlayers());
         
+        // Age division setting
+        document.getElementById('ageDivision').addEventListener('change', (e) => {
+            this.ageDivision = e.target.value;
+            this.updateFieldOptions();
+            this.updateFormationOptions();
+            this.updatePositions();
+            this.updateAgeRules();
+            this.saveSettings();
+        });
+        
         // Field players setting
         document.getElementById('fieldPlayers').addEventListener('change', (e) => {
             this.playersOnField = parseInt(e.target.value);
+            this.updateFormationOptions();
             this.updatePositions();
             this.saveSettings();
         });
@@ -230,8 +255,18 @@ class SoccerLineupGenerator {
         const shuffledNames = [...demoNames];
         this.shuffleArray(shuffledNames);
         
-        // Take the first 10 names and add them with random numbers
-        const selectedNames = shuffledNames.slice(0, 10);
+        // Determine how many players to add based on field size
+        let playerCount = 10; // Default for 7v7
+        if (this.playersOnField === 11) {
+            playerCount = 18; // More players for 11v11
+        } else if (this.playersOnField === 9) {
+            playerCount = 14; // More players for 9v9
+        } else if (this.playersOnField === 6) {
+            playerCount = 8; // Fewer players for 6v6
+        }
+        
+        // Take the appropriate number of names and add them with random numbers
+        const selectedNames = shuffledNames.slice(0, playerCount);
         const usedNumbers = [];
         selectedNames.forEach(name => {
             // Generate a unique random number
@@ -348,8 +383,55 @@ class SoccerLineupGenerator {
     }
 
     getPositionsForFormation(formation) {
+        // For 11v11 (14U-19U)
+        if (this.playersOnField === 11) {
+            switch(formation) {
+                case '4-3-3':
+                    return ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back',
+                            'Left Mid', 'Center Mid', 'Right Mid',
+                            'Left Wing', 'Striker', 'Right Wing'];
+                case '4-4-2':
+                    return ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back',
+                            'Left Mid', 'Left Center Mid', 'Right Center Mid', 'Right Mid',
+                            'Left Striker', 'Right Striker'];
+                case '4-2-3-1':
+                    return ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back',
+                            'Left Defensive Mid', 'Right Defensive Mid',
+                            'Left Wing', 'Attacking Mid', 'Right Wing',
+                            'Striker'];
+                case '3-5-2':
+                    return ['Keeper', 'Left Center Back', 'Center Back', 'Right Center Back',
+                            'Left Wing Back', 'Left Mid', 'Center Mid', 'Right Mid', 'Right Wing Back',
+                            'Left Striker', 'Right Striker'];
+                case '5-3-2':
+                    return ['Keeper', 'Left Wing Back', 'Left Center Back', 'Center Back', 'Right Center Back', 'Right Wing Back',
+                            'Left Mid', 'Center Mid', 'Right Mid',
+                            'Left Striker', 'Right Striker'];
+                default:
+                    return this.getPositionsForFormation('4-4-2');
+            }
+        }
+        // For 9v9 (12U standard)
+        else if (this.playersOnField === 9) {
+            switch(formation) {
+                case '3-3-2':
+                    return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 
+                            'Left Mid', 'Center Mid', 'Right Mid', 
+                            'Left Forward', 'Right Forward'];
+                case '3-2-3':
+                    return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 
+                            'Left Mid', 'Right Mid', 
+                            'Left Wing', 'Striker', 'Right Wing'];
+                case '2-3-3':
+                    return ['Keeper', 'Left Back', 'Right Back', 
+                            'Left Mid', 'Center Mid', 'Right Mid', 
+                            'Left Wing', 'Striker', 'Right Wing'];
+                default:
+                    return this.getPositionsForFormation('3-3-2');
+            }
+        }
         // For 7v7 (10U standard)
-        if (this.playersOnField === 7 || this.playersOnField === 6) {
+        else if (this.playersOnField === 7 || this.playersOnField === 6) {
             switch(formation) {
                 case '2-3-1':
                     if (this.playersOnField === 6) {
@@ -373,11 +455,6 @@ class SoccerLineupGenerator {
         // For other field sizes, use default formations
         else if (this.playersOnField === 5) {
             return ['Keeper', 'Left Back', 'Right Back', 'Midfield', 'Striker'];
-        } else if (this.playersOnField === 9) {
-            return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid', 'Right Mid', 'Left Forward', 'Right Forward'];
-        } else if (this.playersOnField === 11) {
-            return ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back', 
-                    'Left Mid', 'Center Mid', 'Right Mid', 'Left Wing', 'Striker', 'Right Wing'];
         }
         // Default fallback to 7v7 2-3-1 formation
         return ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Center Mid', 'Striker'];
@@ -387,11 +464,117 @@ class SoccerLineupGenerator {
         this.positions = this.getPositionsForFormation(this.formation);
     }
     
+    updateFieldOptions() {
+        const fieldSelect = document.getElementById('fieldPlayers');
+        fieldSelect.innerHTML = '';
+        
+        switch(this.ageDivision) {
+            case '10U':
+                fieldSelect.innerHTML = `
+                    <option value="7">7v7 (Standard)</option>
+                    <option value="6">6v6 (Small-sided)</option>
+                `;
+                this.playersOnField = 7;
+                break;
+            case '12U':
+                fieldSelect.innerHTML = `
+                    <option value="9">9v9 (Standard)</option>
+                `;
+                this.playersOnField = 9;
+                break;
+            case '14U':
+            case '16U':
+            case '19U':
+                fieldSelect.innerHTML = `
+                    <option value="11">11v11 (Full Field)</option>
+                `;
+                this.playersOnField = 11;
+                break;
+        }
+        
+        fieldSelect.value = this.playersOnField;
+    }
+    
+    updateFormationOptions() {
+        const formationSelect = document.getElementById('formation');
+        const currentValue = formationSelect.value;
+        
+        // Clear existing options
+        formationSelect.innerHTML = '';
+        
+        if (this.playersOnField === 11) {
+            // 11v11 formations for 14U-19U
+            formationSelect.innerHTML = `
+                <option value="4-3-3">4-3-3 (Attacking)</option>
+                <option value="4-4-2">4-4-2 (Balanced)</option>
+                <option value="4-2-3-1">4-2-3-1 (Modern)</option>
+                <option value="3-5-2">3-5-2 (Midfield Heavy)</option>
+                <option value="5-3-2">5-3-2 (Defensive)</option>
+            `;
+            // Set default formation for 11v11 if current is not valid
+            if (!['4-3-3', '4-4-2', '4-2-3-1', '3-5-2', '5-3-2'].includes(currentValue)) {
+                this.formation = '4-4-2';
+            }
+        } else if (this.playersOnField === 9) {
+            // 9v9 formations for 12U
+            formationSelect.innerHTML = `
+                <option value="3-3-2">3-3-2 (Balanced)</option>
+                <option value="3-2-3">3-2-3 (Attacking)</option>
+                <option value="2-3-3">2-3-3 (Very Attacking)</option>
+            `;
+            // Set default formation for 9v9 if current is not valid
+            if (!['3-3-2', '3-2-3', '2-3-3'].includes(currentValue)) {
+                this.formation = '3-3-2';
+            }
+        } else {
+            // 7v7 and 6v6 formations for 10U
+            formationSelect.innerHTML = `
+                <option value="2-3-1">2-3-1 (Balanced)</option>
+                <option value="3-2-1">3-2-1 (Defensive)</option>
+                <option value="2-2-2">2-2-2 (Paired)</option>
+            `;
+            // Set default formation for 7v7 if current is not valid
+            if (!['2-3-1', '3-2-1', '2-2-2'].includes(currentValue)) {
+                this.formation = '2-3-1';
+            }
+        }
+        
+        // Set the selected value
+        formationSelect.value = this.formation;
+        this.updateFormationDescription();
+    }
+    
+    updateAgeRules() {
+        const rulesDiv = document.getElementById('ageRules');
+        if (!rulesDiv) return;
+        
+        const rules = {
+            '10U': '<strong>10U Rules:</strong> 7v7 format with build-out line. No heading allowed. Offside enforced with build-out line. Substitutions at quarters. Small-sided field.',
+            '12U': '<strong>12U Rules:</strong> 9v9 format. Full offside rule (no build-out line). No heading allowed. Larger small-sided field. Players develop tactical understanding.',
+            '14U': '<strong>14U Rules:</strong> 11v11 format on full-size field. All FIFA laws apply including offside. Heading permitted in games and practices. More complex tactics.',
+            '16U': '<strong>16U Rules:</strong> 11v11 format on full-size field. All standard soccer rules apply. Faster-paced, more physical play. Often combined with 19U.',
+            '19U': '<strong>19U Rules:</strong> 11v11 format on full-size field. All standard soccer rules apply. Highest youth level with competitive, physical play.'
+        };
+        
+        rulesDiv.innerHTML = `<p>${rules[this.ageDivision] || rules['10U']}</p>`;
+    }
+    
     updateFormationDescription() {
         const descriptions = {
+            // 7v7 formations
             '2-3-1': '<strong>2-3-1 Formation:</strong> Provides a solid balance between defense and offense. Easy for players to understand with clear roles: 2 defenders (LB, RB), 3 midfielders (LW, Mid, RW), and 1 striker.',
             '3-2-1': '<strong>3-2-1 Formation:</strong> More defensive formation with an extra defender. Useful against stronger opponents or to develop defensive skills. Can leave the striker isolated if not managed well.',
-            '2-2-2': '<strong>2-2-2 Formation:</strong> Creates two lines of paired players. Good for teams with strong partnerships. May lack natural width, requiring midfielders to cover more ground.'
+            '2-2-2': '<strong>2-2-2 Formation:</strong> Creates two lines of paired players. Good for teams with strong partnerships. May lack natural width, requiring midfielders to cover more ground.',
+            // 9v9 formations
+            '3-3-2': '<strong>3-3-2 Formation:</strong> Balanced 9v9 formation with strong defense and midfield. Three defenders provide width and security, three midfielders control the center, and two forwards maintain attacking threat.',
+            '3-2-3': '<strong>3-2-3 Formation:</strong> Attacking 9v9 formation with three forwards. Good for teams with strong offensive players. Requires disciplined midfielders to cover defensive gaps.',
+            '2-3-3': '<strong>2-3-3 Formation:</strong> Very attacking 9v9 formation. Strong midfield presence with three forwards. Best for teams with pacey defenders who can cover ground quickly.',
+            // 11v11 formations
+            '4-3-3': '<strong>4-3-3 Formation:</strong> Classic attacking formation with width from wingers. Four defenders provide solid base, three midfielders control the center, and three forwards offer multiple attacking options.',
+            '4-4-2': '<strong>4-4-2 Formation:</strong> Traditional balanced formation. Four defenders, four midfielders in a line, and two strikers. Simple to understand and provides good coverage across the field.',
+            '4-2-3-1': '<strong>4-2-3-1 Formation:</strong> Modern formation with two defensive midfielders providing protection. Three attacking midfielders support a lone striker. Flexible and allows for quick transitions.',
+            '3-5-2': '<strong>3-5-2 Formation:</strong> Midfield-heavy formation with wing backs providing width. Three center backs, five midfielders including wing backs, and two strikers. Dominates midfield battles.',
+            '5-3-2': '<strong>5-3-2 Formation:</strong> Defensive formation with five at the back including wing backs. Three midfielders and two strikers. Solid defensively while maintaining counter-attacking threat.'
         };
         
         const descDiv = document.getElementById('formationDescription');
@@ -1109,8 +1292,15 @@ class SoccerLineupGenerator {
             'Left Forward': { x: 35, y: 25 },
             'Right Forward': { x: 65, y: 25 },
             // 11v11 positions
-            'Left Center Back': { x: 40, y: 75 },
-            'Right Center Back': { x: 60, y: 75 }
+            'Left Center Back': { x: 35, y: 75 },
+            'Right Center Back': { x: 65, y: 75 },
+            'Left Wing Back': { x: 15, y: 55 },
+            'Right Wing Back': { x: 85, y: 55 },
+            'Left Center Mid': { x: 35, y: 50 },
+            'Right Center Mid': { x: 65, y: 50 },
+            'Left Defensive Mid': { x: 40, y: 60 },
+            'Right Defensive Mid': { x: 60, y: 60 },
+            'Attacking Mid': { x: 50, y: 35 }
         };
         
         let svg = `
@@ -1218,13 +1408,22 @@ class SoccerLineupGenerator {
         const savedSettings = localStorage.getItem('ayso_settings');
         if (savedSettings) {
             const settings = JSON.parse(savedSettings);
+            this.ageDivision = settings.ageDivision || this.ageDivision;
             this.playersOnField = settings.playersOnField || this.playersOnField;
             this.formation = settings.formation || this.formation;
 
             // Update UI with loaded settings
+            const ageDivisionSelect = document.getElementById('ageDivision');
+            if (ageDivisionSelect) {
+                ageDivisionSelect.value = this.ageDivision;
+                this.updateFieldOptions();
+            }
             const fieldPlayersSelect = document.getElementById('fieldPlayers');
+            if (fieldPlayersSelect) {
+                fieldPlayersSelect.value = this.playersOnField;
+                this.updateFormationOptions();
+            }
             const formationSelect = document.getElementById('formation');
-            if (fieldPlayersSelect) fieldPlayersSelect.value = this.playersOnField;
             if (formationSelect) formationSelect.value = this.formation;
         }
 
@@ -1232,6 +1431,7 @@ class SoccerLineupGenerator {
         this.updatePlayerList();
         this.updatePositions();
         this.updateFormationDescription();
+        this.updateAgeRules();
     }
 
     savePlayers() {
@@ -1240,6 +1440,7 @@ class SoccerLineupGenerator {
 
     saveSettings() {
         const settings = {
+            ageDivision: this.ageDivision,
             playersOnField: this.playersOnField,
             formation: this.formation
         };

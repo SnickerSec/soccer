@@ -52,10 +52,20 @@
                 <h2>Game Settings</h2>
                 <div class="settings-grid">
                     <div class="setting-item">
+                        <label for="ageDivision">Age Division:</label>
+                        <select id="ageDivision" aria-label="Select age division">
+                            <option value="10U" selected>10U (Under 10)</option>
+                            <option value="12U">12U (Under 12)</option>
+                            <option value="14U">14U (Under 14)</option>
+                            <option value="16U">16U (Under 16)</option>
+                            <option value="19U">19U (Under 19)</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
                         <label for="fieldPlayers">Players on Field:</label>
                         <select id="fieldPlayers" aria-label="Select number of players on the field">
-                            <option value="6">6 (10U Small-sided)</option>
-                            <option value="7" selected>7 (10U Standard)</option>
+                            <option value="7" selected>7v7 (Standard)</option>
+                            <option value="6">6v6 (Small-sided)</option>
                         </select>
                     </div>
                     <div class="setting-item">
@@ -73,6 +83,9 @@
                 </div>
                 <div class="formation-description" id="formationDescription">
                     <p><strong>2-3-1 Formation:</strong> Provides a solid balance between defense and offense. Easy for players to understand with clear roles: 2 defenders (LB, RB), 3 midfielders (LW, Mid, RW), and 1 striker.</p>
+                </div>
+                <div class="age-rules" id="ageRules">
+                    <p><strong>10U Rules:</strong> 7v7 format with build-out line. No heading allowed. Offside enforced with build-out line. Substitutions at quarters.</p>
                 </div>
             </section>
 
@@ -96,7 +109,12 @@
         </div>
 
         <footer>
-            <p>AYSO 10U Rotation Rules: Max 1 quarter as goalie | No sitting more than 1 quarter in a row | No sitting more than twice</p>
+            <p>AYSO Core Program: 10U-19U Support | Fair Play & Everyone Plays Philosophy</p>
+            <p style="margin-top: 5px; font-size: 0.9rem;">
+                <strong>Formats:</strong> 10U (7v7) | 12U (9v9) | 14U-19U (11v11) | 
+                <strong>Heading:</strong> Not allowed 10U-12U, Permitted 14U+
+            </p>
+            <p style="margin-top: 5px; font-size: 0.9rem;">All players must play at least 50% of every game | Balanced teams | Positive coaching</p>
             <p style="margin-top: 10px; font-size: 0.85rem; opacity: 0.8;">
                 🔒 Privacy First: All data stays in your browser | No tracking | No storage | No accounts required | 
                 <a href="PRIVACY_AND_SAFETY.md" style="color: white; text-decoration: underline;">Learn More</a>
