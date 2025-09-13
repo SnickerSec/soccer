@@ -111,6 +111,15 @@ small {
     font-size: 16px;
 }
 
+#playerNumber {
+    width: 70px;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    text-align: center;
+}
+
 #addPlayer {
     padding: 10px 25px;
     background: #27ae60;
@@ -214,6 +223,22 @@ small {
     margin-right: 8px;
     transform: scale(1.2);
     accent-color: #ffd700;
+}
+
+.player-number-edit {
+    width: 50px;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.player-number-edit:focus {
+    outline: none;
+    border-color: #3498db;
+    background-color: #f0f8ff;
 }
 
 .player-name-display {
@@ -402,6 +427,17 @@ small {
 
 .player-name {
     color: #212529;
+}
+
+.player-number {
+    display: inline-block;
+    background: #007bff;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: bold;
+    margin-right: 5px;
 }
 
 .keeper-row {
@@ -798,6 +834,10 @@ button:active {
     }
     
     #playerName {
+        width: 100%;
+    }
+    
+    #playerNumber {
         width: 100%;
     }
     

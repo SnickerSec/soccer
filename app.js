@@ -87,23 +87,52 @@ class SoccerLineupGenerator {
         reader.onload = (e) => {
             try {
                 const content = e.target.result;
-                const names = content.split('\n').map(name => name.trim()).filter(name => name);
+                const lines = content.split('\n').map(line => line.trim()).filter(line => line);
                 
-                if (names.length === 0) {
+                if (lines.length === 0) {
                     this.showNotification('No player names found in file', 'warning');
                     return;
                 }
                 
-                if (names.length > 30) {
+                if (lines.length > 30) {
                     this.showNotification('Too many players in file (max 30)', 'error');
                     return;
                 }
                 
                 let addedCount = 0;
-                names.forEach(name => {
+                lines.forEach(line => {
                     if (this.players.length < 30) {
                         const beforeCount = this.players.length;
-                        this.addPlayer(name);
+                        
+                        // Check if line has a number (format: "Name #Number" or "Number Name" or "Name,Number")
+                        let name = line;
+                        let number = null;
+                        
+                        // Try to parse different formats
+                        // Format 1: "Name #Number" (e.g., "John Smith #10")
+                        const hashMatch = line.match(/^(.+?)\s*#(\d+)$/);
+                        // Format 2: "Number Name" (e.g., "10 John Smith")
+                        const prefixMatch = line.match(/^(\d+)\s+(.+)$/);
+                        // Format 3: "Name,Number" (e.g., "John Smith,10")
+                        const commaMatch = line.match(/^(.+?),\s*(\d+)$/);
+                        
+                        if (hashMatch) {
+                            name = hashMatch[1].trim();
+                            number = parseInt(hashMatch[2]);
+                        } else if (prefixMatch) {
+                            number = parseInt(prefixMatch[1]);
+                            name = prefixMatch[2].trim();
+                        } else if (commaMatch) {
+                            name = commaMatch[1].trim();
+                            number = parseInt(commaMatch[2]);
+                        }
+                        
+                        // Validate number range
+                        if (number !== null && (number < 1 || number > 99)) {
+                            number = null;
+                        }
+                        
+                        this.addPlayer(name, number);
                         if (this.players.length > beforeCount) addedCount++;
                     }
                 });
@@ -128,17 +157,20 @@ class SoccerLineupGenerator {
     }
 
     addPlayerManually() {
-        const input = document.getElementById('playerName');
-        const name = input.value.trim();
+        const nameInput = document.getElementById('playerName');
+        const numberInput = document.getElementById('playerNumber');
+        const name = nameInput.value.trim();
+        const number = numberInput.value ? parseInt(numberInput.value) : null;
         
         if (name) {
-            this.addPlayer(name);
-            input.value = '';
-            input.focus();
+            this.addPlayer(name, number);
+            nameInput.value = '';
+            numberInput.value = '';
+            nameInput.focus();
         }
     }
 
-    addPlayer(name) {
+    addPlayer(name, number = null) {
         const safeName = this.sanitizeHtml(name.trim());
         
         // Validation
@@ -157,6 +189,12 @@ class SoccerLineupGenerator {
             return;
         }
         
+        // Check for duplicate number if provided
+        if (number !== null && this.players.find(p => p.number === number)) {
+            this.showNotification(`Player number ${number} is already taken`, 'warning');
+            return;
+        }
+        
         if (this.players.length >= 30) {
             this.showNotification('Maximum roster size reached (30 players)', 'error');
             return;
@@ -164,6 +202,7 @@ class SoccerLineupGenerator {
         
         this.players.push({
             name: safeName,
+            number: number,
             isCaptain: false,
             quartersPlayed: [],
             quartersSitting: [],
@@ -173,7 +212,7 @@ class SoccerLineupGenerator {
         
         this.updatePlayerList();
         this.savePlayers();
-        this.showNotification(`Added ${safeName} to roster`, 'success');
+        this.showNotification(`Added ${safeName}${number ? ' #' + number : ''} to roster`, 'success');
     }
 
     populateDemo() {
@@ -191,9 +230,18 @@ class SoccerLineupGenerator {
         const shuffledNames = [...demoNames];
         this.shuffleArray(shuffledNames);
         
-        // Take the first 10 names and add them
+        // Take the first 10 names and add them with random numbers
         const selectedNames = shuffledNames.slice(0, 10);
-        selectedNames.forEach(name => this.addPlayer(name));
+        const usedNumbers = [];
+        selectedNames.forEach(name => {
+            // Generate a unique random number
+            let number;
+            do {
+                number = Math.floor(Math.random() * 99) + 1;
+            } while (usedNumbers.includes(number));
+            usedNumbers.push(number);
+            this.addPlayer(name, number);
+        });
     }
 
     removePlayer(name) {
@@ -222,7 +270,7 @@ class SoccerLineupGenerator {
             exportBtn.style.display = 'none';
         }
         
-        this.players.forEach(player => {
+        this.players.forEach((player, index) => {
             const li = document.createElement('li');
             const isCaptain = this.captains.includes(player.name);
             const captainIcon = isCaptain ? '⭐' : '';
@@ -230,6 +278,12 @@ class SoccerLineupGenerator {
                 <label class="player-item">
                     <input type="checkbox" class="captain-checkbox" ${isCaptain ? 'checked' : ''}
                            onchange="lineupGenerator.toggleCaptain('${player.name}')" />
+                    <input type="number" class="player-number-edit" 
+                           value="${player.number || ''}" 
+                           placeholder="#"
+                           min="1" max="99"
+                           onchange="lineupGenerator.updatePlayerNumber(${index}, this.value)"
+                           onclick="event.stopPropagation()" />
                     <span class="player-name-display">${captainIcon} ${player.name}</span>
                 </label>
                 <button class="remove-btn" onclick="lineupGenerator.removePlayer('${player.name}')">×</button>
@@ -275,6 +329,22 @@ class SoccerLineupGenerator {
         // Refresh the player list to update checkboxes and icons
         this.updatePlayerList();
         this.savePlayers();
+    }
+
+    updatePlayerNumber(playerIndex, value) {
+        const number = value ? parseInt(value) : null;
+        
+        // Check if number is already taken by another player
+        if (number !== null && this.players.some((p, idx) => idx !== playerIndex && p.number === number)) {
+            this.showNotification(`Number ${number} is already taken`, 'warning');
+            // Reset the input value
+            this.updatePlayerList();
+            return;
+        }
+        
+        this.players[playerIndex].number = number;
+        this.savePlayers();
+        this.showNotification(`Updated player number`, 'success');
     }
 
     getPositionsForFormation(formation) {
@@ -851,11 +921,12 @@ class SoccerLineupGenerator {
                 const playerName = quarter.positions[position] || 'TBD';
                 const player = this.players.find(p => p.name === playerName);
                 const captainIndicator = player && player.isCaptain ? '<span class="captain-star">⭐</span> ' : '';
+                const numberStr = player && player.number ? `<span class="player-number">#${player.number}</span> ` : '';
                 const isKeeper = position === 'Keeper';
                 html += `
                     <tr class="${isKeeper ? 'keeper-row' : ''}">
                         <td class="position">${position}:</td>
-                        <td class="player-name">${captainIndicator}${playerName}</td>
+                        <td class="player-name">${numberStr}${captainIndicator}${playerName}</td>
                     </tr>
                 `;
             });
@@ -865,7 +936,8 @@ class SoccerLineupGenerator {
             if (sittingPlayers.length > 0) {
                 const sittingText = sittingPlayers.map(p => {
                     const captainIndicator = p.isCaptain ? '<span class="captain-star">⭐</span> ' : '';
-                    return `${captainIndicator}${p.name}`;
+                    const numberStr = p.number ? `<span class="player-number">#${p.number}</span> ` : '';
+                    return `${numberStr}${captainIndicator}${p.name}`;
                 }).join(', ');
                 html += `
                     <tr class="sitting-row">
@@ -897,9 +969,10 @@ class SoccerLineupGenerator {
             const positions = player.positionsPlayed.map(p => `Q${p.quarter}: ${p.position}`).join(', ');
             const defensive = player.defensiveQuarters || 0;
             const offensive = player.offensiveQuarters || 0;
+            const numberStr = player.number ? ` #${player.number}` : '';
             html += `
                 <tr>
-                    <td>${player.name}</td>
+                    <td>${player.name}${numberStr}</td>
                     <td>${captainIndicator}</td>
                     <td>${player.quartersPlayed.join(', ') || 'None'}</td>
                     <td>${player.quartersSitting.join(', ') || 'None'}</td>
@@ -925,14 +998,16 @@ class SoccerLineupGenerator {
                 const playerName = quarter.positions[position] || 'TBD';
                 const player = this.players.find(p => p.name === playerName);
                 const captainIndicator = player && player.isCaptain ? '⭐ ' : '';
-                text += `${position}: ${captainIndicator}${playerName}\n`;
+                const numberStr = player && player.number ? ` #${player.number}` : '';
+                text += `${position}: ${captainIndicator}${playerName}${numberStr}\n`;
             });
             
             const sittingPlayers = this.players.filter(p => p.quartersSitting.includes(quarter.quarter));
             if (sittingPlayers.length > 0) {
                 const sittingText = sittingPlayers.map(p => {
                     const captainIndicator = p.isCaptain ? '⭐ ' : '';
-                    return `${captainIndicator}${p.name}`;
+                    const numberStr = p.number ? ` #${p.number}` : '';
+                    return `${captainIndicator}${p.name}${numberStr}`;
                 }).join(', ');
                 text += `Sitting: ${sittingText}\n`;
             }
@@ -944,7 +1019,8 @@ class SoccerLineupGenerator {
         text += '--------------\n';
         this.players.forEach(player => {
             const captainIndicator = player.isCaptain ? '⭐ ' : '';
-            text += `${captainIndicator}${player.name}:\n`;
+            const numberStr = player.number ? ` #${player.number}` : '';
+            text += `${captainIndicator}${player.name}${numberStr}:\n`;
             text += `  Played: Quarters ${player.quartersPlayed.join(', ') || 'None'}\n`;
             text += `  Sitting: Quarters ${player.quartersSitting.join(', ') || 'None'}\n`;
             const positions = player.positionsPlayed.map(p => `Q${p.quarter}-${p.position}`).join(', ');
@@ -975,10 +1051,11 @@ class SoccerLineupGenerator {
         text += '=============================\n\n';
         text += 'Captains marked with ⭐\n\n';
         
-        // Create text content with captain indicators
+        // Create text content with captain indicators and player numbers
         this.players.forEach(p => {
             const captainIndicator = p.isCaptain ? '⭐ ' : '';
-            text += `${captainIndicator}${p.name}\n`;
+            const numberStr = p.number ? ` #${p.number}` : '';
+            text += `${captainIndicator}${p.name}${numberStr}\n`;
         });
         
         // Create blob and download
@@ -1082,6 +1159,10 @@ class SoccerLineupGenerator {
                 const isDefensive = position.includes('Back') || position === 'Keeper';
                 const isKeeper = position === 'Keeper';
                 
+                // Get player info for displaying number or initials
+                const playerInfo = this.players.find(p => p.name === player);
+                const displayText = playerInfo && playerInfo.number ? playerInfo.number : this.getPlayerInitials(player);
+                
                 svg += `
                     <g class="player-marker">
                         <circle cx="${x}" cy="${y}" r="18" 
@@ -1089,8 +1170,8 @@ class SoccerLineupGenerator {
                             stroke="white" stroke-width="2"/>
                         <text x="${x}" y="${y}" 
                             text-anchor="middle" dominant-baseline="middle" 
-                            fill="white" font-size="10" font-weight="bold">
-                            ${this.getPlayerInitials(player)}
+                            fill="white" font-size="${playerInfo && playerInfo.number ? '12' : '10'}" font-weight="bold">
+                            ${displayText}
                         </text>
                     </g>
                 `;
