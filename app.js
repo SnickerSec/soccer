@@ -1150,7 +1150,8 @@ class SoccerLineupGenerator {
         if (actionButtons && !document.getElementById('regenerateLineup')) {
             const regenerateBtn = document.createElement('button');
             regenerateBtn.id = 'regenerateLineup';
-            regenerateBtn.className = 'btn-primary';
+            regenerateBtn.className = 'btn-export';  // Use same styling as export/print buttons
+            regenerateBtn.style.background = '#3498db';  // Primary blue color
             regenerateBtn.setAttribute('aria-label', 'Generate a new lineup');
             regenerateBtn.textContent = 'Generate Lineup';
             regenerateBtn.addEventListener('click', () => this.generateLineup());
