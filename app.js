@@ -1139,21 +1139,25 @@ class SoccerLineupGenerator {
             grid.appendChild(quarterDiv);
         });
 
-        // Add regenerate button just above the player summary
-        const regenerateDiv = document.createElement('div');
-        regenerateDiv.className = 'regenerate-section';
-        regenerateDiv.style.cssText = 'margin: 20px 0; text-align: center;';
-        regenerateDiv.innerHTML = '<button id="regenerateLineup" class="btn-primary" aria-label="Generate a new lineup">Generate New Lineup</button>';
-        grid.appendChild(regenerateDiv);
-
-        // Add event listener for the regenerate button
-        document.getElementById('regenerateLineup').addEventListener('click', () => this.generateLineup());
-
         // Add player summary
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'player-summary';
         summaryDiv.innerHTML = '<h3>Player Summary</h3>' + this.getPlayerSummary();
         grid.appendChild(summaryDiv);
+
+        // Add regenerate button to the action buttons area
+        const actionButtons = document.querySelector('.action-buttons');
+        if (actionButtons && !document.getElementById('regenerateLineup')) {
+            const regenerateBtn = document.createElement('button');
+            regenerateBtn.id = 'regenerateLineup';
+            regenerateBtn.className = 'btn-primary';
+            regenerateBtn.setAttribute('aria-label', 'Generate a new lineup');
+            regenerateBtn.textContent = 'Generate Lineup';
+            regenerateBtn.addEventListener('click', () => this.generateLineup());
+
+            // Insert as the first button in the action-buttons div
+            actionButtons.insertBefore(regenerateBtn, actionButtons.firstChild);
+        }
 
         display.classList.remove('hidden');
     }
