@@ -1079,31 +1079,31 @@ class SoccerLineupGenerator {
         const display = document.getElementById('lineupDisplay');
         const grid = document.getElementById('lineupGrid');
         const validationDiv = document.getElementById('validationMessages');
-        
+
         // Show validation messages
         if (validationIssues.length > 0) {
-            validationDiv.innerHTML = '<h3>Rotation Issues:</h3>' + 
+            validationDiv.innerHTML = '<h3>Rotation Issues:</h3>' +
                 validationIssues.map(issue => `<p>${issue}</p>`).join('');
             validationDiv.classList.add('has-issues');
         } else {
             validationDiv.innerHTML = '<p class="success">✓ All rotation rules satisfied!</p>';
             validationDiv.classList.remove('has-issues');
         }
-        
+
         // Display lineup grid
         grid.innerHTML = '';
-        
+
         this.lineup.forEach(quarter => {
             const quarterDiv = document.createElement('div');
             quarterDiv.className = 'quarter-lineup';
-            
+
             let html = `<h3>Quarter ${quarter.quarter}</h3>`;
-            
+
             // Add soccer field visualization
             html += this.createFieldVisualization(quarter);
-            
+
             html += '<table>';
-            
+
             this.positions.forEach(position => {
                 const playerName = quarter.positions[position] || 'TBD';
                 const player = this.players.find(p => p.name === playerName);
@@ -1117,7 +1117,7 @@ class SoccerLineupGenerator {
                     </tr>
                 `;
             });
-            
+
             // Show sitting players
             const sittingPlayers = this.players.filter(p => p.quartersSitting.includes(quarter.quarter));
             if (sittingPlayers.length > 0) {
@@ -1128,28 +1128,38 @@ class SoccerLineupGenerator {
                 }).join(', ');
                 html += `
                     <tr class="sitting-row">
-                        <td class="position">Sitting:</td>
+                        <td class="position">Resting:</td>
                         <td class="player-name">${sittingText}</td>
                     </tr>
                 `;
             }
-            
+
             html += '</table>';
             quarterDiv.innerHTML = html;
             grid.appendChild(quarterDiv);
         });
-        
+
+        // Add regenerate button just above the player summary
+        const regenerateDiv = document.createElement('div');
+        regenerateDiv.className = 'regenerate-section';
+        regenerateDiv.style.cssText = 'margin: 20px 0; text-align: center;';
+        regenerateDiv.innerHTML = '<button id="regenerateLineup" class="btn-primary" aria-label="Generate a new lineup">Generate New Lineup</button>';
+        grid.appendChild(regenerateDiv);
+
+        // Add event listener for the regenerate button
+        document.getElementById('regenerateLineup').addEventListener('click', () => this.generateLineup());
+
         // Add player summary
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'player-summary';
         summaryDiv.innerHTML = '<h3>Player Summary</h3>' + this.getPlayerSummary();
         grid.appendChild(summaryDiv);
-        
+
         display.classList.remove('hidden');
     }
 
     getPlayerSummary() {
-        let html = '<table><thead><tr><th>Player</th><th>Captain</th><th>Quarters Played</th><th>Quarters Sitting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Player</th><th>Captain</th><th>Quarters Played</th><th>Quarters Resting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>'
         
         this.players.forEach(player => {
             const captainIndicator = player.isCaptain ? '⭐ Yes' : 'No';
@@ -1196,7 +1206,7 @@ class SoccerLineupGenerator {
                     const numberStr = p.number ? ` #${p.number}` : '';
                     return `${captainIndicator}${p.name}${numberStr}`;
                 }).join(', ');
-                text += `Sitting: ${sittingText}\n`;
+                text += `Resting: ${sittingText}\n`;
             }
             
             text += '\n';
@@ -1209,7 +1219,7 @@ class SoccerLineupGenerator {
             const numberStr = player.number ? ` #${player.number}` : '';
             text += `${captainIndicator}${player.name}${numberStr}:\n`;
             text += `  Played: Quarters ${player.quartersPlayed.join(', ') || 'None'}\n`;
-            text += `  Sitting: Quarters ${player.quartersSitting.join(', ') || 'None'}\n`;
+            text += `  Resting: Quarters ${player.quartersSitting.join(', ') || 'None'}\n`;
             const positions = player.positionsPlayed.map(p => `Q${p.quarter}-${p.position}`).join(', ');
             text += `  Positions: ${positions || 'None'}\n`;
             text += `  Captain: ${player.isCaptain ? 'Yes' : 'No'}\n\n`;
