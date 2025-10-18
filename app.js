@@ -1037,31 +1037,31 @@ class SoccerLineupGenerator {
 
     validateLineup() {
         const issues = [];
-        
+
         this.players.forEach(player => {
             // Check goalie rule (max 1 quarter)
             const goalieQuarters = player.positionsPlayed.filter(p => p.position === 'Keeper').length;
             if (goalieQuarters > 1) {
                 issues.push(`⚠️ ${player.name} is playing goalie for ${goalieQuarters} quarters (max 1)`);
             }
-            
+
             // Check consecutive sitting
             for (let i = 0; i < player.quartersSitting.length - 1; i++) {
                 if (player.quartersSitting[i + 1] === player.quartersSitting[i] + 1) {
                     issues.push(`⚠️ ${player.name} sits consecutively in quarters ${player.quartersSitting[i]} and ${player.quartersSitting[i + 1]}`);
                 }
             }
-            
+
             // Check total sitting (max 2 quarters)
             if (player.quartersSitting.length > 2) {
                 issues.push(`⚠️ ${player.name} sits for ${player.quartersSitting.length} quarters (max 2)`);
             }
-            
+
             // Check offensive/defensive balance
             const defensiveQuarters = player.defensiveQuarters || 0;
             const offensiveQuarters = player.offensiveQuarters || 0;
             const totalPlayed = player.quartersPlayed.length;
-            
+
             if (totalPlayed > 0) {
                 if (defensiveQuarters === 0) {
                     issues.push(`⚠️ ${player.name} never played defense`);
@@ -1069,21 +1069,27 @@ class SoccerLineupGenerator {
                 if (offensiveQuarters === 0) {
                     issues.push(`⚠️ ${player.name} never played offense`);
                 }
+
+                // Check D/O imbalance - difference should not exceed 1
+                const doImbalance = Math.abs(defensiveQuarters - offensiveQuarters);
+                if (doImbalance > 1) {
+                    issues.push(`⚠️ ${player.name} has D/O imbalance of ${doImbalance} (D:${defensiveQuarters} / O:${offensiveQuarters})`);
+                }
             }
-            
+
             // Check for duplicate positions
             const positionCounts = {};
             player.positionsPlayed.forEach(p => {
                 positionCounts[p.position] = (positionCounts[p.position] || 0) + 1;
             });
-            
+
             for (const [pos, count] of Object.entries(positionCounts)) {
                 if (count > 1) {
                     issues.push(`⚠️ ${player.name} plays ${pos} ${count} times (should play each position only once)`);
                 }
             }
         });
-        
+
         return issues;
     }
 
