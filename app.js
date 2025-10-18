@@ -1199,7 +1199,7 @@ class SoccerLineupGenerator {
         // Add action buttons container before player summary
         const actionButtonsContainer = document.createElement('div');
         actionButtonsContainer.className = 'action-buttons-inline';
-        actionButtonsContainer.style.cssText = 'margin: 30px 0 20px 0; text-align: center;';
+        actionButtonsContainer.style.cssText = 'margin: 30px 0 20px 0; text-align: center; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;';
 
         // Create or update the regenerate button
         let regenerateBtn = document.getElementById('regenerateLineup');
