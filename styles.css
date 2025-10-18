@@ -891,9 +891,17 @@ button:active {
         flex-direction: column;
         gap: 10px;
     }
-    
+
     .action-buttons button {
         width: 100%;
+    }
+
+    .action-buttons-inline {
+        flex-direction: row !important;
+    }
+
+    .action-buttons-inline button {
+        width: auto !important;
     }
     
     /* Notification adjustments for mobile */
