@@ -71,16 +71,21 @@ h3 {
 /* Player Management */
 .import-section {
     margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .file-label {
     display: inline-block;
-    padding: 10px 20px;
+    padding: 15px 40px;
     background: #3498db;
     color: white;
-    border-radius: 5px;
+    border-radius: 8px;
     cursor: pointer;
     transition: background 0.3s;
+    font-size: 18px;
 }
 
 .file-label:hover {
