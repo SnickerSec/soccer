@@ -1196,10 +1196,14 @@ class SoccerLineupGenerator {
             grid.appendChild(quarterDiv);
         });
 
-        // Remove any existing inline action buttons
+        // Remove any existing inline action buttons and player summary
         const existingInlineButtons = display.querySelector('.action-buttons-inline');
         if (existingInlineButtons) {
             existingInlineButtons.remove();
+        }
+        const existingSummary = display.querySelector('.player-summary');
+        if (existingSummary) {
+            existingSummary.remove();
         }
 
         // Create action buttons container
