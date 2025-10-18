@@ -79,13 +79,13 @@ h3 {
 
 .file-label {
     display: inline-block;
-    padding: 15px 40px;
+    padding: 10px 25px;
     background: #3498db;
     color: white;
-    border-radius: 8px;
+    border-radius: 5px;
     cursor: pointer;
     transition: background 0.3s;
-    font-size: 18px;
+    font-size: 16px;
 }
 
 .file-label:hover {
@@ -336,11 +336,11 @@ small {
 }
 
 .btn-primary, .btn-secondary {
-    padding: 15px 40px;
+    padding: 10px 25px;
     margin: 10px;
     border: none;
-    border-radius: 8px;
-    font-size: 18px;
+    border-radius: 5px;
+    font-size: 16px;
     cursor: pointer;
     transition: all 0.3s;
 }
