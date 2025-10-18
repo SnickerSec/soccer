@@ -229,6 +229,7 @@ class SoccerLineupGenerator {
             name: safeName,
             number: number,
             isCaptain: false,
+            mustRest: false,
             quartersPlayed: [],
             quartersSitting: [],
             positionsPlayed: [],
@@ -370,9 +371,23 @@ class SoccerLineupGenerator {
         this.savePlayers();
     }
 
+    toggleRestPreference(playerName) {
+        const player = this.players.find(p => p.name === playerName);
+        if (!player) return;
+
+        player.mustRest = !player.mustRest;
+        this.savePlayers();
+
+        if (player.mustRest) {
+            this.showNotification(`${playerName} will rest at least 1 quarter`, 'success');
+        } else {
+            this.showNotification(`${playerName} may play all quarters`, 'info');
+        }
+    }
+
     updatePlayerNumber(playerIndex, value) {
         const number = value ? parseInt(value) : null;
-        
+
         // Check if number is already taken by another player
         if (number !== null && this.players.some((p, idx) => idx !== playerIndex && p.number === number)) {
             this.showNotification(`Number ${number} is already taken`, 'warning');
@@ -380,7 +395,7 @@ class SoccerLineupGenerator {
             this.updatePlayerList();
             return;
         }
-        
+
         this.players[playerIndex].number = number;
         this.savePlayers();
         this.showNotification(`Updated player number`, 'success');
@@ -716,7 +731,7 @@ class SoccerLineupGenerator {
         const totalPlayers = this.players.length;
         const playersPerQuarter = this.playersOnField;
         const sittingPerQuarter = totalPlayers - playersPerQuarter;
-        
+
         // Initialize sitting schedule
         const schedule = {
             1: [],
@@ -724,16 +739,21 @@ class SoccerLineupGenerator {
             3: [],
             4: []
         };
-        
+
         // Create a copy of players to track sitting assignments, shuffled for randomness
         const playersCopy = this.players.map(p => ({
             name: p.name,
+            mustRest: p.mustRest,
             sittingQuarters: []
         }));
-        
-        // Shuffle the players array to randomize who sits extra
-        this.shuffleArray(playersCopy);
-        
+
+        // Separate players who must rest from others
+        const mustRestPlayers = playersCopy.filter(p => p.mustRest);
+        const regularPlayers = playersCopy.filter(p => !p.mustRest);
+
+        // Shuffle the regular players array to randomize who sits extra
+        this.shuffleArray(regularPlayers);
+
         // Calculate how many times each player should sit
         const totalSittingSlots = sittingPerQuarter * this.quarters;
         const minSitsPerPlayer = Math.floor(totalSittingSlots / totalPlayers);
@@ -741,10 +761,25 @@ class SoccerLineupGenerator {
         
         // Assign sitting quarters to ensure even distribution and no consecutive sitting
         let quarterIndex = 0;
-        
-        // First pass: assign minimum sits to all players
+
+        // First pass: Ensure players who must rest get at least 1 sitting quarter
+        mustRestPlayers.forEach(player => {
+            let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule);
+            if (assignedQuarter !== -1) {
+                player.sittingQuarters.push(assignedQuarter);
+                schedule[assignedQuarter].push(player.name);
+            }
+        });
+
+        // Combine all players for remaining assignments
+        const allPlayersCombined = [...mustRestPlayers, ...regularPlayers];
+
+        // Second pass: assign minimum sits to all players (skipping those already assigned)
         for (let i = 0; i < minSitsPerPlayer; i++) {
-            playersCopy.forEach((player, idx) => {
+            allPlayersCombined.forEach((player, idx) => {
+                // Skip if player already has enough sits
+                if (player.sittingQuarters.length > i) return;
+
                 // Find a quarter where the player hasn't sat yet and won't sit consecutively
                 let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule);
                 if (assignedQuarter !== -1) {
@@ -753,15 +788,19 @@ class SoccerLineupGenerator {
                 }
             });
         }
-        
-        // Second pass: randomly select players who need to sit extra
+
+        // Third pass: randomly select players who need to sit extra
         // Shuffle again to ensure different players get extra sits each time
-        const playersForExtraSit = [...playersCopy];
+        const playersForExtraSit = [...allPlayersCombined];
         this.shuffleArray(playersForExtraSit);
-        
+
         let playersAssigned = 0;
         for (let i = 0; i < playersForExtraSit.length && playersAssigned < playersWithExtraSit; i++) {
             const player = playersForExtraSit[i];
+            // Skip if they already have enough quarters
+            const neededSits = minSitsPerPlayer + 1;
+            if (player.sittingQuarters.length >= neededSits) continue;
+
             let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule);
             if (assignedQuarter !== -1) {
                 player.sittingQuarters.push(assignedQuarter);
@@ -1182,16 +1221,20 @@ class SoccerLineupGenerator {
     }
 
     getPlayerSummary() {
-        let html = '<table><thead><tr><th>Player</th><th>Captain</th><th>Quarters Played</th><th>Quarters Resting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>'
-        
+        let html = '<table><thead><tr><th>Rest</th><th>Player</th><th>Captain</th><th>Quarters Played</th><th>Quarters Resting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>'
+
         this.players.forEach(player => {
             const captainIndicator = player.isCaptain ? '⭐ Yes' : 'No';
             const positions = player.positionsPlayed.map(p => `Q${p.quarter}: ${p.position}`).join(', ');
             const defensive = player.defensiveQuarters || 0;
             const offensive = player.offensiveQuarters || 0;
             const numberStr = player.number ? ` #${player.number}` : '';
+            const restChecked = player.mustRest ? 'checked' : '';
             html += `
                 <tr>
+                    <td><input type="checkbox" class="rest-checkbox" ${restChecked}
+                               onchange="lineupGenerator.toggleRestPreference('${player.name}')"
+                               title="Check to ensure this player rests at least 1 quarter" /></td>
                     <td>${player.name}${numberStr}</td>
                     <td>${captainIndicator}</td>
                     <td>${player.quartersPlayed.join(', ') || 'None'}</td>
@@ -1201,7 +1244,7 @@ class SoccerLineupGenerator {
                 </tr>
             `;
         });
-        
+
         html += '</tbody></table>';
         return html;
     }
