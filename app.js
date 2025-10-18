@@ -230,6 +230,7 @@ class SoccerLineupGenerator {
             number: number,
             isCaptain: false,
             mustRest: false,
+            noKeeper: false,
             quartersPlayed: [],
             quartersSitting: [],
             positionsPlayed: [],
@@ -382,6 +383,20 @@ class SoccerLineupGenerator {
             this.showNotification(`${playerName} will rest at least 1 quarter`, 'success');
         } else {
             this.showNotification(`${playerName} may play all quarters`, 'info');
+        }
+    }
+
+    toggleNoKeeperPreference(playerName) {
+        const player = this.players.find(p => p.name === playerName);
+        if (!player) return;
+
+        player.noKeeper = !player.noKeeper;
+        this.savePlayers();
+
+        if (player.noKeeper) {
+            this.showNotification(`${playerName} will not play keeper`, 'success');
+        } else {
+            this.showNotification(`${playerName} may play keeper`, 'info');
         }
     }
 
@@ -1069,16 +1084,22 @@ class SoccerLineupGenerator {
     }
 
     selectKeeper(availablePlayers, quarter) {
-        // Find players who haven't been keeper yet
-        const potentialKeepers = availablePlayers.filter(player => !player.goalieQuarter);
-        
+        // First filter out players who should not play keeper
+        const allowedKeepers = availablePlayers.filter(player => !player.noKeeper);
+
+        // If no players are allowed to be keeper, fall back to all available players
+        const poolToSelectFrom = allowedKeepers.length > 0 ? allowedKeepers : availablePlayers;
+
+        // Find players who haven't been keeper yet from the allowed pool
+        const potentialKeepers = poolToSelectFrom.filter(player => !player.goalieQuarter);
+
         if (potentialKeepers.length > 0) {
             // Random selection from those who haven't been keeper
             return potentialKeepers[Math.floor(Math.random() * potentialKeepers.length)];
         }
-        
-        // If all have been keeper, return any available player
-        return availablePlayers[0];
+
+        // If all allowed players have been keeper, return any available player from the pool
+        return poolToSelectFrom[0];
     }
 
     validateLineup() {
@@ -1267,7 +1288,7 @@ class SoccerLineupGenerator {
     }
 
     getPlayerSummary() {
-        let html = '<table><thead><tr><th>Rest</th><th>Player</th><th>Captain</th><th>Quarters Played</th><th>Quarters Resting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>'
+        let html = '<table><thead><tr><th>Rest</th><th>No Keeper</th><th>Player</th><th>Captain</th><th>Quarters Played</th><th>Quarters Resting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>'
 
         this.players.forEach(player => {
             const captainIndicator = player.isCaptain ? '⭐ Yes' : 'No';
@@ -1276,11 +1297,15 @@ class SoccerLineupGenerator {
             const offensive = player.offensiveQuarters || 0;
             const numberStr = player.number ? ` #${player.number}` : '';
             const restChecked = player.mustRest ? 'checked' : '';
+            const noKeeperChecked = player.noKeeper ? 'checked' : '';
             html += `
                 <tr>
                     <td><input type="checkbox" class="rest-checkbox" ${restChecked}
                                onchange="lineupGenerator.toggleRestPreference('${player.name}')"
                                title="Check to ensure this player rests at least 1 quarter" /></td>
+                    <td><input type="checkbox" class="no-keeper-checkbox" ${noKeeperChecked}
+                               onchange="lineupGenerator.toggleNoKeeperPreference('${player.name}')"
+                               title="Check to prevent this player from playing keeper" /></td>
                     <td>${player.name}${numberStr}</td>
                     <td>${captainIndicator}</td>
                     <td>${player.quartersPlayed.join(', ') || 'None'}</td>
