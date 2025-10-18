@@ -1196,25 +1196,53 @@ class SoccerLineupGenerator {
             grid.appendChild(quarterDiv);
         });
 
+        // Add action buttons container before player summary
+        const actionButtonsContainer = document.createElement('div');
+        actionButtonsContainer.className = 'action-buttons-inline';
+        actionButtonsContainer.style.cssText = 'margin: 30px 0 20px 0; text-align: center;';
+
+        // Create or update the regenerate button
+        let regenerateBtn = document.getElementById('regenerateLineup');
+        if (!regenerateBtn) {
+            regenerateBtn = document.createElement('button');
+            regenerateBtn.id = 'regenerateLineup';
+            regenerateBtn.className = 'btn-export';
+            regenerateBtn.style.background = '#3498db';
+            regenerateBtn.setAttribute('aria-label', 'Generate a new lineup');
+            regenerateBtn.textContent = 'Generate Lineup';
+            regenerateBtn.addEventListener('click', () => this.generateLineup());
+        }
+
+        // Get the existing export and print buttons
+        const exportBtn = document.getElementById('exportLineup');
+        const printBtn = document.getElementById('printLineup');
+
+        // Clone the buttons so we can place them in the new location
+        const regenerateBtnClone = regenerateBtn.cloneNode(true);
+        regenerateBtnClone.addEventListener('click', () => this.generateLineup());
+        const exportBtnClone = exportBtn.cloneNode(true);
+        exportBtnClone.addEventListener('click', () => this.exportLineup());
+        const printBtnClone = printBtn.cloneNode(true);
+        printBtnClone.addEventListener('click', () => this.printLineup());
+
+        // Add buttons to the new container
+        actionButtonsContainer.appendChild(regenerateBtnClone);
+        actionButtonsContainer.appendChild(exportBtnClone);
+        actionButtonsContainer.appendChild(printBtnClone);
+
+        // Add the action buttons container to the grid
+        grid.appendChild(actionButtonsContainer);
+
         // Add player summary
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'player-summary';
         summaryDiv.innerHTML = '<h3>Player Summary</h3>' + this.getPlayerSummary();
         grid.appendChild(summaryDiv);
 
-        // Add regenerate button to the action buttons area
-        const actionButtons = document.querySelector('.action-buttons');
-        if (actionButtons && !document.getElementById('regenerateLineup')) {
-            const regenerateBtn = document.createElement('button');
-            regenerateBtn.id = 'regenerateLineup';
-            regenerateBtn.className = 'btn-export';  // Use same styling as export/print buttons
-            regenerateBtn.style.background = '#3498db';  // Primary blue color
-            regenerateBtn.setAttribute('aria-label', 'Generate a new lineup');
-            regenerateBtn.textContent = 'Generate Lineup';
-            regenerateBtn.addEventListener('click', () => this.generateLineup());
-
-            // Insert as the first button in the action-buttons div
-            actionButtons.insertBefore(regenerateBtn, actionButtons.firstChild);
+        // Hide the original action buttons at the bottom
+        const originalActionButtons = document.querySelector('.action-buttons');
+        if (originalActionButtons) {
+            originalActionButtons.style.display = 'none';
         }
 
         display.classList.remove('hidden');
