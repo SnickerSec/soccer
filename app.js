@@ -467,6 +467,11 @@ class SoccerLineupGenerator {
                         return ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'];
                     }
                     return ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Left Striker', 'Right Striker'];
+                case '3-3':
+                    if (this.playersOnField === 6) {
+                        return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid', 'Right Mid'];
+                    }
+                    return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid', 'Right Mid'];
                 default:
                     return this.getPositionsForFormation('2-3-1');
             }
@@ -551,9 +556,10 @@ class SoccerLineupGenerator {
                 <option value="2-3-1">2-3-1 (Balanced)</option>
                 <option value="3-2-1">3-2-1 (Defensive)</option>
                 <option value="2-2-2">2-2-2 (Paired)</option>
+                <option value="3-3">3-3 (Midfield Heavy)</option>
             `;
             // Set default formation for 7v7 if current is not valid
-            if (!['2-3-1', '3-2-1', '2-2-2'].includes(currentValue)) {
+            if (!['2-3-1', '3-2-1', '2-2-2', '3-3'].includes(currentValue)) {
                 this.formation = '2-3-1';
             }
         }
@@ -584,6 +590,7 @@ class SoccerLineupGenerator {
             '2-3-1': '<strong>2-3-1 Formation:</strong> Provides a solid balance between defense and offense. Easy for players to understand with clear roles: 2 defenders (LB, RB), 3 midfielders (LW, Mid, RW), and 1 striker.',
             '3-2-1': '<strong>3-2-1 Formation:</strong> More defensive formation with an extra defender. Useful against stronger opponents or to develop defensive skills. Can leave the striker isolated if not managed well.',
             '2-2-2': '<strong>2-2-2 Formation:</strong> Creates two lines of paired players. Good for teams with strong partnerships. May lack natural width, requiring midfielders to cover more ground.',
+            '3-3': '<strong>3-3 Formation:</strong> No dedicated striker - focuses on ball control and possession through midfield dominance. Three defenders provide solid protection while three midfielders maintain width and creativity. Emphasizes passing and teamwork over individual scoring.',
             // 9v9 formations
             '3-3-2': '<strong>3-3-2 Formation:</strong> Balanced 9v9 formation with strong defense and midfield. Three defenders provide width and security, three midfielders control the center, and two forwards maintain attacking threat.',
             '3-2-3': '<strong>3-2-3 Formation:</strong> Attacking 9v9 formation with three forwards. Good for teams with strong offensive players. Requires disciplined midfielders to cover defensive gaps.',
