@@ -732,6 +732,7 @@ button:active {
     .settings-section,
     .generate-section,
     .action-buttons,
+    .action-buttons-inline,
     header,
     footer {
         display: none;
