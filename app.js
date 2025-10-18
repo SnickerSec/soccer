@@ -911,24 +911,36 @@ class SoccerLineupGenerator {
                 const timesPlayedPosition = player.positionsPlayed.filter(p => p.position === position).length;
                 const defensive = player.defensiveQuarters || 0;
                 const offensive = player.offensiveQuarters || 0;
-                
+
                 let score = 0;
-                
+
                 // Heavily penalize if already played this position
                 if (hasPlayedPosition) {
                     score -= 1000 * timesPlayedPosition;
                 }
-                
-                // Consider role balance
+
+                // Strongly prioritize role balance to prevent extreme D/O imbalances
+                // Calculate the imbalance this assignment would create
+                const currentImbalance = Math.abs(defensive - offensive);
+                let projectedImbalance;
                 if (isDefensive) {
-                    score += (offensive - defensive) * 10; // Prefer if needs more defense
+                    projectedImbalance = Math.abs((defensive + 1) - offensive);
+                    // Reward players who need more defense (have played more offense)
+                    score += (offensive - defensive) * 100;
                 } else {
-                    score += (defensive - offensive) * 10; // Prefer if needs more offense
+                    projectedImbalance = Math.abs(defensive - (offensive + 1));
+                    // Reward players who need more offense (have played more defense)
+                    score += (defensive - offensive) * 100;
                 }
-                
+
+                // Extra penalty for making the imbalance worse
+                if (projectedImbalance > currentImbalance) {
+                    score -= 200 * (projectedImbalance - currentImbalance);
+                }
+
                 // Add small random factor to vary assignments
                 score += Math.random() * 5;
-                
+
                 return { player, score };
             });
             
