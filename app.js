@@ -1196,7 +1196,13 @@ class SoccerLineupGenerator {
             grid.appendChild(quarterDiv);
         });
 
-        // Add action buttons container before player summary
+        // Remove any existing inline action buttons
+        const existingInlineButtons = display.querySelector('.action-buttons-inline');
+        if (existingInlineButtons) {
+            existingInlineButtons.remove();
+        }
+
+        // Create action buttons container
         const actionButtonsContainer = document.createElement('div');
         actionButtonsContainer.className = 'action-buttons-inline';
 
@@ -1229,14 +1235,16 @@ class SoccerLineupGenerator {
         actionButtonsContainer.appendChild(exportBtnClone);
         actionButtonsContainer.appendChild(printBtnClone);
 
-        // Add the action buttons container to the grid
-        grid.appendChild(actionButtonsContainer);
+        // Insert the action buttons AFTER the grid (outside of grid constraint)
+        display.insertBefore(actionButtonsContainer, display.querySelector('.action-buttons'));
 
-        // Add player summary
+        // Add player summary to the grid
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'player-summary';
         summaryDiv.innerHTML = '<h3>Player Summary</h3>' + this.getPlayerSummary();
-        grid.appendChild(summaryDiv);
+
+        // Insert summary AFTER the action buttons
+        display.insertBefore(summaryDiv, display.querySelector('.action-buttons'));
 
         // Hide the original action buttons at the bottom
         const originalActionButtons = document.querySelector('.action-buttons');
