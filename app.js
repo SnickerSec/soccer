@@ -1245,8 +1245,8 @@ class SoccerLineupGenerator {
             regenerateBtn.id = 'regenerateLineup';
             regenerateBtn.className = 'btn-export';
             regenerateBtn.style.background = '#3498db';
-            regenerateBtn.setAttribute('aria-label', 'Generate a new lineup');
-            regenerateBtn.textContent = 'Generate Lineup';
+            regenerateBtn.setAttribute('aria-label', 'Regenerate a new lineup with different positions');
+            regenerateBtn.textContent = 'Regenerate Lineup';
             regenerateBtn.addEventListener('click', () => this.generateLineup());
         }
 
