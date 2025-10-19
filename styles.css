@@ -91,6 +91,7 @@ h3 {
     padding: 10px 25px;
     background: #3498db;
     color: white;
+    border: none;
     border-radius: 5px;
     cursor: pointer;
     transition: background 0.3s;
