@@ -82,7 +82,8 @@ h3 {
 }
 
 .import-section .file-label,
-.import-section .btn-secondary {
+.import-section .btn-secondary,
+.import-section .btn-export-players {
     margin: 0;
 }
 
@@ -212,20 +213,19 @@ small {
 }
 
 .btn-export-players {
-    margin-top: 15px;
-    padding: 10px 20px;
-    background: #3498db;
+    padding: 10px 25px;
+    background: #27ae60;
     color: white;
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 16px;
+    line-height: 1.5;
     transition: background 0.3s;
-    width: 100%;
 }
 
 .btn-export-players:hover {
-    background: #2980b9;
+    background: #229954;
 }
 
 /* Captain selection styles */
