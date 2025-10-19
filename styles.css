@@ -746,9 +746,14 @@ button:active {
     .generate-section,
     .action-buttons,
     .action-buttons-inline,
+    .btn-export,
+    .btn-print,
+    #generateLineup,
+    #exportLineup,
+    #printLineup,
     header,
     footer {
-        display: none;
+        display: none !important;
     }
     
     .lineup-section {
