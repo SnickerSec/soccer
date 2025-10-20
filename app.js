@@ -1894,11 +1894,12 @@ class SoccerLineupGenerator {
                 console.log(`  Gender: (${genderCoords.x}, ${genderCoords.y})`);
                 console.log(`  Assistant Coach: (${assistantCoords.x}, ${assistantCoords.y})`);
             } else {
-                // Fallback to manual coordinates
-                coachCoords = { x: 180, y: 95 };
-                divisionCoords = { x: 422, y: 95 };
-                genderCoords = { x: 525, y: 95 };
-                assistantCoords = { x: 232, y: 127 };
+                // Fallback to manual coordinates (Y values from bottom of page)
+                // For reference: page height is 792 points
+                coachCoords = { x: 180, y: 690 };
+                divisionCoords = { x: 422, y: 690 };
+                genderCoords = { x: 525, y: 690 };
+                assistantCoords = { x: 232, y: 665 };
 
                 console.log('⚠️ Using MANUAL fallback coordinates');
             }
