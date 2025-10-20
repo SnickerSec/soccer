@@ -1848,19 +1848,19 @@ class SoccerLineupGenerator {
             // DEBUG MODE: Uncomment to draw coordinate grid for alignment
             // this.drawCoordinateGrid(firstPage, width, height);
 
-            // Fill in header information (aligned with form fields)
+            // Fill in header information (using exact measured coordinates)
             firstPage.drawText(coachName, {
-                x: 90, y: height - 150,     // Adjusted to align with "Coach:" field
+                x: 180, y: 95,              // Exact position for "Coach:" field
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(division, {
-                x: 468, y: height - 150,    // Adjusted to align with "Division:" field
+                x: 422, y: 95,              // Exact position for "Division:" field
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(gender, {
-                x: 560, y: height - 150,    // Adjusted to align with "Gender:" field
+                x: 525, y: 95,              // Exact position for "Gender:" field
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
