@@ -1899,8 +1899,10 @@ class SoccerLineupGenerator {
                 color: rgb(0, 0, 0)
             });
 
-            const genderWidth = helveticaFont.widthOfTextAtSize(gender, fontSize);
-            firstPage.drawText(gender, {
+            // Abbreviate gender to just B or G
+            const genderAbbrev = gender === 'Boys' ? 'B' : gender === 'Girls' ? 'G' : gender.charAt(0);
+            const genderWidth = helveticaFont.widthOfTextAtSize(genderAbbrev, fontSize);
+            firstPage.drawText(genderAbbrev, {
                 x: 531 - (genderWidth / 2),
                 y: 714,
                 size: fontSize,
@@ -1917,13 +1919,25 @@ class SoccerLineupGenerator {
                 color: rgb(0, 0, 0)
             });
 
+            // Add today's date at coordinate 448, 113
+            const today = new Date();
+            const dateStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+            const dateWidth = helveticaFont.widthOfTextAtSize(dateStr, fontSize);
+            firstPage.drawText(dateStr, {
+                x: 448 - (dateWidth / 2),
+                y: 114,  // 113 + 1 to match other Y adjustment
+                size: fontSize,
+                font: helveticaFont,
+                color: rgb(0, 0, 0)
+            });
+
             // Player list coordinates (exact measurements from user)
             // Y coordinates moved up by 1 point, text centered on X coordinates
             const playerNameX = 164;
             const ratingX = 326;
             const commentsX = 460;
             const firstPlayerY = 390;  // 389 + 1
-            const lineHeight = 28;  // Spacing: 389 - 361 = 28 points
+            const lineHeight = 28.8;  // Each line is 28.8 points below the previous
             const playersPerPage = 10;
             const playerFontSize = 10;
             const commentFontSize = 9;
