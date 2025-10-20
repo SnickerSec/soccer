@@ -21,72 +21,91 @@
         </header>
 
         <div class="main-content">
-            <!-- Player Management Section -->
+            <!-- Player Management & Evaluation Section with Tabs -->
             <section class="player-section">
-                <h2>Player Management</h2>
-                
-                <div class="import-section">
-                    <label for="fileInput" class="file-label" aria-label="Choose a text file to import player names">Import Players (txt file)</label>
-                    <input type="file" id="fileInput" accept=".txt" aria-label="File input for importing players">
-                    <button id="exportPlayers" class="btn-export-players" style="display: none;" aria-label="Export current player list to text file">Export Players</button>
-                    <button id="clearAll" class="btn-secondary" aria-label="Clear all players and reset the application">Clear All</button>
-                    <small>One player per line. Format: "Name #Number" or just "Name"</small>
+                <h2>Player Management & Evaluation</h2>
+
+                <!-- Tab Navigation -->
+                <div class="tab-navigation">
+                    <button class="tab-button active" data-tab="roster">Roster Management</button>
+                    <button class="tab-button" data-tab="evaluation">Player Evaluation</button>
                 </div>
 
-                <div class="manual-entry">
-                    <h3>Or Add Players Manually</h3>
-                    <div class="player-input">
-                        <input type="text" id="playerName" placeholder="Enter player name" aria-label="Player name input">
-                        <input type="number" id="playerNumber" placeholder="#" min="1" max="99" aria-label="Player number input">
-                        <button id="addPlayer" aria-label="Add the entered player to the roster">Add Player</button>
-                        <button id="demoButton" class="btn-demo" aria-label="Load demo players">Demo</button>
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Roster Management Tab -->
+                    <div class="tab-pane active" id="roster-tab">
+                        <div class="import-section">
+                            <label for="fileInput" class="file-label" aria-label="Choose a text file to import player names">Import Players (txt file)</label>
+                            <input type="file" id="fileInput" accept=".txt" aria-label="File input for importing players">
+                            <button id="exportPlayers" class="btn-export-players" style="display: none;" aria-label="Export current player list to text file">Export Players</button>
+                            <button id="clearAll" class="btn-secondary" aria-label="Clear all players and reset the application">Clear All</button>
+                            <small>One player per line. Format: "Name #Number" or just "Name"</small>
+                        </div>
+
+                        <div class="manual-entry">
+                            <h3>Or Add Players Manually</h3>
+                            <div class="player-input">
+                                <input type="text" id="playerName" placeholder="Enter player name" aria-label="Player name input">
+                                <input type="number" id="playerNumber" placeholder="#" min="1" max="99" aria-label="Player number input">
+                                <button id="addPlayer" aria-label="Add the entered player to the roster">Add Player</button>
+                                <button id="demoButton" class="btn-demo" aria-label="Load demo players">Demo</button>
+                            </div>
+                        </div>
+
+                        <div class="player-list">
+                            <h3>Current Players (<span id="playerCount">0</span>)</h3>
+                            <ul id="playerList" role="list"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Player Evaluation Tab -->
+                    <div class="tab-pane" id="evaluation-tab">
+                        <p class="section-description">Generate AYSO Player Evaluation Form with ratings and comments</p>
+
+                        <div class="evaluation-inputs">
+                            <div class="input-group">
+                                <label for="coachName">Coach Name:</label>
+                                <input type="text" id="coachName" placeholder="Enter coach name" aria-label="Coach name">
+                            </div>
+                            <div class="input-group">
+                                <label for="assistantCoach">Assistant Coach:</label>
+                                <input type="text" id="assistantCoach" placeholder="Enter assistant coach name" aria-label="Assistant coach name">
+                            </div>
+                            <div class="input-group">
+                                <label for="division">Division:</label>
+                                <select id="division" aria-label="Select division">
+                                    <option value="U6">U6</option>
+                                    <option value="U8">U8</option>
+                                    <option value="U10" selected>U10</option>
+                                    <option value="U12">U12</option>
+                                    <option value="U14">U14</option>
+                                    <option value="U16">U16</option>
+                                    <option value="U19">U19</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="gender">Gender:</label>
+                                <select id="gender" aria-label="Select gender">
+                                    <option value="Boys">Boys</option>
+                                    <option value="Girls">Girls</option>
+                                    <option value="Coed">Coed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="evaluation-list">
+                            <h3>Player Ratings & Comments</h3>
+                            <div class="rating-scale">
+                                <strong>Rating Scale:</strong> 1=Limited | 2=Fair | 3=Average | 4=Very Accomplished | 5=Excellent
+                            </div>
+                            <div id="evaluationPlayerList" class="evaluation-players"></div>
+                        </div>
+
+                        <button id="generateEvaluation" class="btn-primary" aria-label="Generate player evaluation form PDF">Generate Evaluation Form (PDF)</button>
+                        <p class="helper-text">Players will be automatically sorted alphabetically by last name in the PDF</p>
                     </div>
                 </div>
-
-                <div class="player-list">
-                    <h3>Current Players (<span id="playerCount">0</span>)</h3>
-                    <ul id="playerList" role="list"></ul>
-                </div>
-            </section>
-
-            <!-- Player Evaluation Form Section -->
-            <section class="evaluation-section">
-                <h2>Player Evaluation Form</h2>
-                <p class="section-description">Generate AYSO Player Evaluation Form for your team</p>
-
-                <div class="evaluation-inputs">
-                    <div class="input-group">
-                        <label for="coachName">Coach Name:</label>
-                        <input type="text" id="coachName" placeholder="Enter coach name" aria-label="Coach name">
-                    </div>
-                    <div class="input-group">
-                        <label for="assistantCoach">Assistant Coach:</label>
-                        <input type="text" id="assistantCoach" placeholder="Enter assistant coach name" aria-label="Assistant coach name">
-                    </div>
-                    <div class="input-group">
-                        <label for="division">Division:</label>
-                        <select id="division" aria-label="Select division">
-                            <option value="U6">U6</option>
-                            <option value="U8">U8</option>
-                            <option value="U10" selected>U10</option>
-                            <option value="U12">U12</option>
-                            <option value="U14">U14</option>
-                            <option value="U16">U16</option>
-                            <option value="U19">U19</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label for="gender">Gender:</label>
-                        <select id="gender" aria-label="Select gender">
-                            <option value="Boys">Boys</option>
-                            <option value="Girls">Girls</option>
-                            <option value="Coed">Coed</option>
-                        </select>
-                    </div>
-                </div>
-
-                <button id="generateEvaluation" class="btn-primary" aria-label="Generate player evaluation form PDF">Generate Evaluation Form (PDF)</button>
-                <p class="helper-text">Players will be automatically sorted alphabetically by last name</p>
             </section>
 
             <!-- Settings Section -->

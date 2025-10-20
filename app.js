@@ -47,24 +47,29 @@ class SoccerLineupGenerator {
     }
 
     setupEventListeners() {
+        // Tab navigation
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+        });
+
         // File import
         document.getElementById('fileInput').addEventListener('change', (e) => this.handleFileImport(e));
-        
+
         // Manual player addition
         document.getElementById('addPlayer').addEventListener('click', () => this.addPlayerManually());
         document.getElementById('playerName').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.addPlayerManually();
         });
-        
+
         // Demo button
         document.getElementById('demoButton').addEventListener('click', () => this.populateDemo());
-        
+
         // Generate lineup
         document.getElementById('generateLineup').addEventListener('click', () => this.generateLineup());
-        
+
         // Clear all
         document.getElementById('clearAll').addEventListener('click', () => this.clearAll());
-        
+
         // Export and print
         document.getElementById('exportLineup').addEventListener('click', () => this.exportLineup());
         document.getElementById('printLineup').addEventListener('click', () => this.printLineup());
@@ -322,8 +327,8 @@ class SoccerLineupGenerator {
                 <label class="player-item">
                     <input type="checkbox" class="captain-checkbox" ${isCaptain ? 'checked' : ''}
                            onchange="lineupGenerator.toggleCaptain('${player.name}')" />
-                    <input type="number" class="player-number-edit" 
-                           value="${player.number || ''}" 
+                    <input type="number" class="player-number-edit"
+                           value="${player.number || ''}"
                            placeholder="#"
                            min="1" max="99"
                            onchange="lineupGenerator.updatePlayerNumber(${index}, this.value)"
@@ -334,6 +339,90 @@ class SoccerLineupGenerator {
             `;
             list.appendChild(li);
         });
+
+        // Also update evaluation list
+        this.updateEvaluationList();
+    }
+
+    switchTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.tab === tabName) {
+                btn.classList.add('active');
+            }
+        });
+
+        // Update tab panes
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.remove('active');
+        });
+
+        const targetPane = tabName === 'roster' ? 'roster-tab' : 'evaluation-tab';
+        document.getElementById(targetPane).classList.add('active');
+
+        // Update evaluation list when switching to evaluation tab
+        if (tabName === 'evaluation') {
+            this.updateEvaluationList();
+        }
+    }
+
+    updateEvaluationList() {
+        const evalList = document.getElementById('evaluationPlayerList');
+
+        if (this.players.length === 0) {
+            evalList.innerHTML = '<div class="evaluation-empty">No players added yet. Add players in the Roster Management tab.</div>';
+            return;
+        }
+
+        evalList.innerHTML = '';
+
+        this.players.forEach((player, index) => {
+            const playerDiv = document.createElement('div');
+            playerDiv.className = 'evaluation-player-item';
+
+            const numberBadge = player.number ? `<span class="eval-player-number">#${player.number}</span>` : '';
+
+            playerDiv.innerHTML = `
+                <div class="eval-player-name">
+                    ${player.name}
+                    ${numberBadge}
+                </div>
+                <div class="eval-rating-group">
+                    <label for="rating-${index}">Rating</label>
+                    <select id="rating-${index}" onchange="lineupGenerator.updatePlayerRating(${index}, this.value)">
+                        <option value="">-</option>
+                        <option value="1" ${player.rating === 1 ? 'selected' : ''}>1 - Limited</option>
+                        <option value="2" ${player.rating === 2 ? 'selected' : ''}>2 - Fair</option>
+                        <option value="3" ${player.rating === 3 ? 'selected' : ''}>3 - Average</option>
+                        <option value="4" ${player.rating === 4 ? 'selected' : ''}>4 - Very Accomplished</option>
+                        <option value="5" ${player.rating === 5 ? 'selected' : ''}>5 - Excellent</option>
+                    </select>
+                </div>
+                <div class="eval-comment-group">
+                    <label for="comment-${index}">Comments / Parental Support</label>
+                    <textarea id="comment-${index}"
+                              placeholder="Enter comments about player skill or parental support..."
+                              onchange="lineupGenerator.updatePlayerComment(${index}, this.value)">${player.comment || ''}</textarea>
+                </div>
+            `;
+
+            evalList.appendChild(playerDiv);
+        });
+    }
+
+    updatePlayerRating(index, rating) {
+        if (this.players[index]) {
+            this.players[index].rating = rating ? parseInt(rating) : null;
+            this.savePlayers();
+        }
+    }
+
+    updatePlayerComment(index, comment) {
+        if (this.players[index]) {
+            this.players[index].comment = comment.trim();
+            this.savePlayers();
+        }
     }
 
     toggleCaptain(playerName) {
@@ -1728,6 +1817,7 @@ class SoccerLineupGenerator {
                     yPosition = (height - 110) - (positionOnPage * lineHeight);
                 }
 
+                // Draw player name
                 currentPage.drawText(playerName, {
                     x: 60,
                     y: yPosition,
@@ -1735,6 +1825,33 @@ class SoccerLineupGenerator {
                     font: helveticaFont,
                     color: rgb(0, 0, 0)
                 });
+
+                // Draw rating if available
+                if (player.rating) {
+                    currentPage.drawText(player.rating.toString(), {
+                        x: 370,
+                        y: yPosition,
+                        size: 10,
+                        font: helveticaFont,
+                        color: rgb(0, 0, 0)
+                    });
+                }
+
+                // Draw comment if available (truncate to fit)
+                if (player.comment) {
+                    const maxCommentLength = 35;
+                    const comment = player.comment.length > maxCommentLength
+                        ? player.comment.substring(0, maxCommentLength - 3) + '...'
+                        : player.comment;
+
+                    currentPage.drawText(comment, {
+                        x: 430,
+                        y: yPosition,
+                        size: 9,
+                        font: helveticaFont,
+                        color: rgb(0, 0, 0)
+                    });
+                }
             }
 
             // Save the PDF
