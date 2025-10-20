@@ -1876,43 +1876,46 @@ class SoccerLineupGenerator {
             // DEBUG MODE: Uncomment to draw coordinate grid for alignment
             // this.drawCoordinateGrid(firstPage, width, height);
 
-            // Fill in header information (manually verified coordinates for AYSO form)
-            // Note: PDF coordinates are from bottom-left. Page height = 792 points.
+            // Fill in header information (exact coordinates from user measurement)
+            // Note: PDF coordinates are from bottom-left. These values represent the middle of each line.
             firstPage.drawText(coachName, {
-                x: 180,
-                y: height - 150,
+                x: 266,
+                y: 713,
                 size: 11,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(division, {
-                x: 422,
-                y: height - 150,
+                x: 443,
+                y: 713,
                 size: 11,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(gender, {
-                x: 525,
-                y: height - 150,
+                x: 531,
+                y: 713,
                 size: 11,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(assistantCoach, {
-                x: 175,
-                y: height - 173,
+                x: 314,
+                y: 685,
                 size: 11,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
             });
 
-            // Starting Y position for player list (adjusted based on actual form layout)
-            let currentY = height - 395;  // Adjusted to align with first player line
-            const lineHeight = 23.5;      // Adjusted line spacing to match form
+            // Player list coordinates (exact measurements from user)
+            const playerNameX = 164;
+            const ratingX = 326;
+            const commentsX = 460;
+            const firstPlayerY = 389;
+            const lineHeight = 28;  // Spacing: 389 - 361 = 28 points
             const playersPerPage = 10;
 
             // Fill in player names, ratings, and comments
@@ -1939,15 +1942,16 @@ class SoccerLineupGenerator {
                 let yPosition;
 
                 if (pageIndex === 0) {
-                    yPosition = currentY - (positionOnPage * lineHeight);
+                    yPosition = firstPlayerY - (positionOnPage * lineHeight);
                 } else {
-                    // Second page has different starting Y
-                    yPosition = (height - 125) - (positionOnPage * lineHeight);
+                    // Second page - need to determine starting Y for page 2
+                    // Assuming similar spacing, will adjust if needed
+                    yPosition = firstPlayerY - (positionOnPage * lineHeight);
                 }
 
                 // Draw player name (left column)
                 currentPage.drawText(playerName, {
-                    x: 85,              // Adjusted to align properly in name column
+                    x: playerNameX,
                     y: yPosition,
                     size: 10,
                     font: helveticaFont,
@@ -1957,7 +1961,7 @@ class SoccerLineupGenerator {
                 // Draw rating if available (center column)
                 if (player.rating) {
                     currentPage.drawText(player.rating.toString(), {
-                        x: 463,         // Adjusted to center in "Current Rating" column
+                        x: ratingX,
                         y: yPosition,
                         size: 10,
                         font: helveticaFont,
@@ -1973,7 +1977,7 @@ class SoccerLineupGenerator {
                         : player.comment;
 
                     currentPage.drawText(comment, {
-                        x: 540,         // Adjusted for "Comments / Parental Support" column
+                        x: commentsX,
                         y: yPosition,
                         size: 9,
                         font: helveticaFont,
