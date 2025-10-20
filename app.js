@@ -1761,24 +1761,24 @@ class SoccerLineupGenerator {
             const firstPage = pages[0];
             const { width, height } = firstPage.getSize();
 
-            // Fill in header information (adjust coordinates as needed)
+            // Fill in header information (aligned with form fields)
             firstPage.drawText(coachName, {
-                x: 60, y: height - 85,
+                x: 90, y: height - 150,     // Adjusted to align with "Coach:" field
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(division, {
-                x: 430, y: height - 85,
+                x: 468, y: height - 150,    // Adjusted to align with "Division:" field
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(gender, {
-                x: 520, y: height - 85,
+                x: 560, y: height - 150,    // Adjusted to align with "Gender:" field
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(assistantCoach, {
-                x: 150, y: height - 105,
+                x: 175, y: height - 173,    // Adjusted to align with "Assistant Coach:" field
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
