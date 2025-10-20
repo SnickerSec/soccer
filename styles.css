@@ -735,7 +735,7 @@ small {
 .player-summary-header {
     display: flex;
     flex-direction: row;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
     gap: 20px;
     margin-bottom: 15px;
