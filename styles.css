@@ -732,6 +732,22 @@ small {
     margin-top: 20px;
 }
 
+.player-summary-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.player-summary-header h3 {
+    margin-bottom: 0;
+}
+
+.player-summary-header .action-buttons-inline {
+    margin: 0;
+}
+
 .player-summary table {
     width: 100%;
     border-collapse: collapse;
@@ -1084,7 +1100,11 @@ button:active {
         page-break-before: always;
         padding-top: 20px;
     }
-    
+
+    .player-summary-header .action-buttons-inline {
+        display: none !important;
+    }
+
     .player-summary table {
         font-size: 0.8em;
     }

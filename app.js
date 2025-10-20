@@ -1359,15 +1359,24 @@ class SoccerLineupGenerator {
         actionButtonsContainer.appendChild(exportBtnClone);
         actionButtonsContainer.appendChild(printBtnClone);
 
-        // Insert the action buttons AFTER the grid (outside of grid constraint)
-        display.insertBefore(actionButtonsContainer, display.querySelector('.action-buttons'));
-
         // Add player summary to the grid
         const summaryDiv = document.createElement('div');
         summaryDiv.className = 'player-summary';
-        summaryDiv.innerHTML = '<h3>Player Summary</h3>' + this.getPlayerSummary();
 
-        // Insert summary AFTER the action buttons
+        // Create a header container with title and buttons
+        const summaryHeader = document.createElement('div');
+        summaryHeader.className = 'player-summary-header';
+
+        const summaryTitle = document.createElement('h3');
+        summaryTitle.textContent = 'Player Summary';
+
+        summaryHeader.appendChild(summaryTitle);
+        summaryHeader.appendChild(actionButtonsContainer);
+
+        summaryDiv.appendChild(summaryHeader);
+        summaryDiv.innerHTML += this.getPlayerSummary();
+
+        // Insert summary into the display
         display.insertBefore(summaryDiv, display.querySelector('.action-buttons'));
 
         // Hide the original action buttons at the bottom
