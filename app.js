@@ -1853,6 +1853,11 @@ class SoccerLineupGenerator {
             const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
             const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
 
+            // Load custom handwriting font for signature
+            const autographyFontUrl = '/assets/Autography-DOLnW.otf';
+            const autographyFontBytes = await fetch(autographyFontUrl).then(res => res.arrayBuffer());
+            const autographyFont = await pdfDoc.embedFont(autographyFontBytes);
+
             // Sort players alphabetically by last name
             const sortedPlayers = [...this.players].sort((a, b) => {
                 const lastNameA = a.name.split(' ').pop().toLowerCase();
@@ -1920,13 +1925,13 @@ class SoccerLineupGenerator {
                 color: rgb(0, 0, 0)
             });
 
-            // Add coach signature at coordinate 241, 80 (using italic/oblique for cursive look)
-            const coachSignatureWidth = helveticaOblique.widthOfTextAtSize(coachName, fontSize);
+            // Add coach signature at coordinate 241, 80 (using custom handwriting font)
+            const coachSignatureWidth = autographyFont.widthOfTextAtSize(coachName, fontSize);
             firstPage.drawText(coachName, {
                 x: 241 - (coachSignatureWidth / 2),
                 y: 81,  // 80 + 1 to match other Y adjustment
                 size: fontSize,
-                font: helveticaOblique,
+                font: autographyFont,
                 color: rgb(0, 0, 0)
             });
 
