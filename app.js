@@ -1919,6 +1919,16 @@ class SoccerLineupGenerator {
                 color: rgb(0, 0, 0)
             });
 
+            // Add coach signature at coordinate 241, 80
+            const coachSignatureWidth = helveticaFont.widthOfTextAtSize(coachName, fontSize);
+            firstPage.drawText(coachName, {
+                x: 241 - (coachSignatureWidth / 2),
+                y: 81,  // 80 + 1 to match other Y adjustment
+                size: fontSize,
+                font: helveticaFont,
+                color: rgb(0, 0, 0)
+            });
+
             // Add today's date at coordinate 448, 80
             const today = new Date();
             const dateStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
