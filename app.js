@@ -1722,6 +1722,22 @@ class SoccerLineupGenerator {
         }, 3000);
     }
     
+    async fetchFormCoordinates() {
+        // Fetch automatically detected field coordinates from the server
+        try {
+            const response = await fetch('/api/analyze-form');
+            const data = await response.json();
+            if (data.success) {
+                console.log('Auto-detected form coordinates:', data.fieldCoordinates);
+                return data;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error fetching form coordinates:', error);
+            return null;
+        }
+    }
+
     drawCoordinateGrid(page, width, height) {
         /**
          * COORDINATE GRID HELPER - For finding exact PDF positions
@@ -1860,24 +1876,51 @@ class SoccerLineupGenerator {
             // DEBUG MODE: Uncomment to draw coordinate grid for alignment
             // this.drawCoordinateGrid(firstPage, width, height);
 
-            // Fill in header information (using exact measured coordinates)
+            // Fetch auto-detected form coordinates
+            const formAnalysis = await this.fetchFormCoordinates();
+
+            let coachCoords, divisionCoords, genderCoords, assistantCoords;
+
+            if (formAnalysis && formAnalysis.fieldCoordinates) {
+                // Use auto-detected coordinates
+                coachCoords = formAnalysis.fieldCoordinates['Coach'] || { x: 180, y: 95 };
+                divisionCoords = formAnalysis.fieldCoordinates['Division'] || { x: 422, y: 95 };
+                genderCoords = formAnalysis.fieldCoordinates['Gender'] || { x: 525, y: 95 };
+                assistantCoords = formAnalysis.fieldCoordinates['Assistant Coach'] || { x: 232, y: 127 };
+
+                console.log('✨ Using AUTO-DETECTED coordinates:');
+                console.log(`  Coach: (${coachCoords.x}, ${coachCoords.y})`);
+                console.log(`  Division: (${divisionCoords.x}, ${divisionCoords.y})`);
+                console.log(`  Gender: (${genderCoords.x}, ${genderCoords.y})`);
+                console.log(`  Assistant Coach: (${assistantCoords.x}, ${assistantCoords.y})`);
+            } else {
+                // Fallback to manual coordinates
+                coachCoords = { x: 180, y: 95 };
+                divisionCoords = { x: 422, y: 95 };
+                genderCoords = { x: 525, y: 95 };
+                assistantCoords = { x: 232, y: 127 };
+
+                console.log('⚠️ Using MANUAL fallback coordinates');
+            }
+
+            // Fill in header information (using auto-detected or fallback coordinates)
             firstPage.drawText(coachName, {
-                x: 180, y: 95,              // Exact position for "Coach:" field
+                x: coachCoords.x, y: coachCoords.y,
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(division, {
-                x: 422, y: 95,              // Exact position for "Division:" field
+                x: divisionCoords.x, y: divisionCoords.y,
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(gender, {
-                x: 525, y: 95,              // Exact position for "Gender:" field
+                x: genderCoords.x, y: genderCoords.y,
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(assistantCoach, {
-                x: 175, y: height - 173,    // Adjusted to align with "Assistant Coach:" field
+                x: assistantCoords.x, y: assistantCoords.y,
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 

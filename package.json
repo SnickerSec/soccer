@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "pdf.js-extract": "^0.2.1"
   },
   "keywords": [
     "soccer",
