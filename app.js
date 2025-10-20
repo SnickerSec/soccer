@@ -69,7 +69,10 @@ class SoccerLineupGenerator {
         document.getElementById('exportLineup').addEventListener('click', () => this.exportLineup());
         document.getElementById('printLineup').addEventListener('click', () => this.printLineup());
         document.getElementById('exportPlayers').addEventListener('click', () => this.exportPlayers());
-        
+
+        // Player evaluation form
+        document.getElementById('generateEvaluation').addEventListener('click', () => this.generatePlayerEvaluationPDF());
+
         // Age division setting
         document.getElementById('ageDivision').addEventListener('change', (e) => {
             this.ageDivision = e.target.value;
@@ -1630,6 +1633,130 @@ class SoccerLineupGenerator {
         }, 3000);
     }
     
+    async generatePlayerEvaluationPDF() {
+        if (this.players.length === 0) {
+            alert('Please add players first before generating the evaluation form.');
+            return;
+        }
+
+        const coachName = document.getElementById('coachName').value.trim();
+        const assistantCoach = document.getElementById('assistantCoach').value.trim();
+        const division = document.getElementById('division').value;
+        const gender = document.getElementById('gender').value;
+
+        if (!coachName) {
+            alert('Please enter the coach name.');
+            return;
+        }
+
+        try {
+            // Load the PDF template
+            const templateUrl = '/assets/Player Evaluation Form 2025.pdf';
+            const existingPdfBytes = await fetch(templateUrl).then(res => res.arrayBuffer());
+
+            // Load pdf-lib
+            const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+            const pdfDoc = await PDFDocument.load(existingPdfBytes);
+            const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+            const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+            // Sort players alphabetically by last name
+            const sortedPlayers = [...this.players].sort((a, b) => {
+                const lastNameA = a.name.split(' ').pop().toLowerCase();
+                const lastNameB = b.name.split(' ').pop().toLowerCase();
+                return lastNameA.localeCompare(lastNameB);
+            });
+
+            // Get the first page
+            const pages = pdfDoc.getPages();
+            const firstPage = pages[0];
+            const { width, height } = firstPage.getSize();
+
+            // Fill in header information (adjust coordinates as needed)
+            firstPage.drawText(coachName, {
+                x: 60, y: height - 85,
+                size: 11, font: helveticaFont, color: rgb(0, 0, 0)
+            });
+
+            firstPage.drawText(division, {
+                x: 430, y: height - 85,
+                size: 11, font: helveticaFont, color: rgb(0, 0, 0)
+            });
+
+            firstPage.drawText(gender, {
+                x: 520, y: height - 85,
+                size: 11, font: helveticaFont, color: rgb(0, 0, 0)
+            });
+
+            firstPage.drawText(assistantCoach, {
+                x: 150, y: height - 105,
+                size: 11, font: helveticaFont, color: rgb(0, 0, 0)
+            });
+
+            // Starting Y position for player list (adjust based on template)
+            let currentY = height - 285;
+            const lineHeight = 19.5;
+            const playersPerPage = 10;
+
+            // Fill in player names
+            for (let i = 0; i < sortedPlayers.length && i < 20; i++) {
+                const pageIndex = Math.floor(i / playersPerPage);
+
+                // Determine which page to use
+                let currentPage;
+                if (pageIndex === 0) {
+                    currentPage = firstPage;
+                } else if (pageIndex === 1 && pages.length > 1) {
+                    currentPage = pages[1];
+                } else {
+                    // Template only has 2 pages with ~20 player slots
+                    break;
+                }
+
+                // Get the player
+                const player = sortedPlayers[i];
+                const playerName = player.number ? `${player.name} #${player.number}` : player.name;
+
+                // Calculate Y position based on which page and position on that page
+                const positionOnPage = i % playersPerPage;
+                let yPosition;
+
+                if (pageIndex === 0) {
+                    yPosition = currentY - (positionOnPage * lineHeight);
+                } else {
+                    // Second page has different starting Y
+                    yPosition = (height - 110) - (positionOnPage * lineHeight);
+                }
+
+                currentPage.drawText(playerName, {
+                    x: 60,
+                    y: yPosition,
+                    size: 10,
+                    font: helveticaFont,
+                    color: rgb(0, 0, 0)
+                });
+            }
+
+            // Save the PDF
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+
+            // Download the file
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Player_Evaluation_${division}_${gender}_${new Date().getFullYear()}.pdf`;
+            a.click();
+
+            URL.revokeObjectURL(url);
+
+            alert('Player Evaluation Form generated successfully!');
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Error generating PDF. Please make sure the template file is accessible.');
+        }
+    }
+
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
             // Ctrl/Cmd + G: Generate lineup

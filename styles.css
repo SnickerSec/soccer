@@ -280,6 +280,59 @@ small {
     box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
 }
 
+/* Player Evaluation Form Section */
+.evaluation-section {
+    background: #f0f4f8;
+    border: 2px solid #3498db;
+}
+
+.section-description {
+    color: #555;
+    font-size: 0.95rem;
+    margin-bottom: 20px;
+}
+
+.evaluation-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.input-group label {
+    font-weight: 600;
+    color: #555;
+    font-size: 14px;
+}
+
+.input-group input,
+.input-group select {
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.helper-text {
+    color: #666;
+    font-size: 0.9rem;
+    margin-top: 10px;
+    font-style: italic;
+}
+
 /* Settings */
 .settings-grid {
     display: grid;

@@ -6,6 +6,7 @@
     <title>AYSO Roster Pro</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -46,6 +47,46 @@
                     <h3>Current Players (<span id="playerCount">0</span>)</h3>
                     <ul id="playerList" role="list"></ul>
                 </div>
+            </section>
+
+            <!-- Player Evaluation Form Section -->
+            <section class="evaluation-section">
+                <h2>Player Evaluation Form</h2>
+                <p class="section-description">Generate AYSO Player Evaluation Form for your team</p>
+
+                <div class="evaluation-inputs">
+                    <div class="input-group">
+                        <label for="coachName">Coach Name:</label>
+                        <input type="text" id="coachName" placeholder="Enter coach name" aria-label="Coach name">
+                    </div>
+                    <div class="input-group">
+                        <label for="assistantCoach">Assistant Coach:</label>
+                        <input type="text" id="assistantCoach" placeholder="Enter assistant coach name" aria-label="Assistant coach name">
+                    </div>
+                    <div class="input-group">
+                        <label for="division">Division:</label>
+                        <select id="division" aria-label="Select division">
+                            <option value="U6">U6</option>
+                            <option value="U8">U8</option>
+                            <option value="U10" selected>U10</option>
+                            <option value="U12">U12</option>
+                            <option value="U14">U14</option>
+                            <option value="U16">U16</option>
+                            <option value="U19">U19</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="gender">Gender:</label>
+                        <select id="gender" aria-label="Select gender">
+                            <option value="Boys">Boys</option>
+                            <option value="Girls">Girls</option>
+                            <option value="Coed">Coed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button id="generateEvaluation" class="btn-primary" aria-label="Generate player evaluation form PDF">Generate Evaluation Form (PDF)</button>
+                <p class="helper-text">Players will be automatically sorted alphabetically by last name</p>
             </section>
 
             <!-- Settings Section -->
