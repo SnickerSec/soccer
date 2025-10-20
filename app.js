@@ -1722,6 +1722,81 @@ class SoccerLineupGenerator {
         }, 3000);
     }
     
+    drawCoordinateGrid(page, width, height) {
+        /**
+         * COORDINATE GRID HELPER - For finding exact PDF positions
+         *
+         * How to use this tool:
+         * 1. Uncomment the call to this function in generatePlayerEvaluationPDF()
+         * 2. Generate a PDF - it will have a grid overlay with coordinate labels
+         * 3. Open the PDF and see where lines fall on the grid
+         * 4. Use the coordinates to adjust text placement
+         *
+         * PDF Coordinate System:
+         * - Origin (0,0) is at BOTTOM-LEFT corner
+         * - X increases from left to right →
+         * - Y increases from bottom to top ↑
+         * - US Letter page: 612 points wide × 792 points tall
+         * - 1 inch = 72 points
+         *
+         * Example calculations:
+         * - Top of page (US Letter): height = 792
+         * - 1 inch from top: y = 792 - 72 = 720
+         * - 2 inches from top: y = 792 - 144 = 648
+         * - 1 inch from left: x = 72
+         * - Center horizontally: x = 612 / 2 = 306
+         *
+         * Using height variable:
+         * - We use `height - value` because we measure from top in design
+         * - Example: height - 150 means 150 points down from top of page
+         */
+        const { rgb } = window.PDFLib;
+
+        // Draw vertical lines every 50 points
+        for (let x = 0; x <= width; x += 50) {
+            page.drawLine({
+                start: { x, y: 0 },
+                end: { x, y: height },
+                thickness: x % 100 === 0 ? 0.5 : 0.2,
+                color: rgb(0.7, 0.7, 0.7),
+                opacity: 0.5
+            });
+
+            // Label every 100 points
+            if (x % 100 === 0) {
+                page.drawText(`${x}`, {
+                    x: x + 2,
+                    y: height - 20,
+                    size: 8,
+                    color: rgb(1, 0, 0)
+                });
+            }
+        }
+
+        // Draw horizontal lines every 50 points
+        for (let y = 0; y <= height; y += 50) {
+            page.drawLine({
+                start: { x: 0, y },
+                end: { x: width, y },
+                thickness: y % 100 === 0 ? 0.5 : 0.2,
+                color: rgb(0.7, 0.7, 0.7),
+                opacity: 0.5
+            });
+
+            // Label every 100 points
+            if (y % 100 === 0) {
+                page.drawText(`${y}`, {
+                    x: 5,
+                    y: y + 2,
+                    size: 8,
+                    color: rgb(1, 0, 0)
+                });
+            }
+        }
+
+        console.log('Coordinate grid drawn on PDF (50pt spacing, labeled every 100pt)');
+    }
+
     async generatePlayerEvaluationPDF() {
         if (this.players.length === 0) {
             alert('Please add players first before generating the evaluation form.');
@@ -1760,6 +1835,18 @@ class SoccerLineupGenerator {
             const pages = pdfDoc.getPages();
             const firstPage = pages[0];
             const { width, height } = firstPage.getSize();
+
+            // LOG: Display page dimensions for debugging
+            console.log('PDF Page Dimensions:');
+            console.log(`  Width: ${width} points`);
+            console.log(`  Height: ${height} points`);
+            console.log('  Note: Origin (0,0) is at bottom-left corner');
+            console.log('  Common page sizes:');
+            console.log('    - US Letter: 612 × 792 points');
+            console.log('    - A4: 595 × 842 points');
+
+            // DEBUG MODE: Uncomment to draw coordinate grid for alignment
+            // this.drawCoordinateGrid(firstPage, width, height);
 
             // Fill in header information (aligned with form fields)
             firstPage.drawText(coachName, {
