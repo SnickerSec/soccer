@@ -1919,13 +1919,13 @@ class SoccerLineupGenerator {
                 color: rgb(0, 0, 0)
             });
 
-            // Add today's date at coordinate 448, 113
+            // Add today's date at coordinate 448, 80
             const today = new Date();
             const dateStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
             const dateWidth = helveticaFont.widthOfTextAtSize(dateStr, fontSize);
             firstPage.drawText(dateStr, {
                 x: 448 - (dateWidth / 2),
-                y: 114,  // 113 + 1 to match other Y adjustment
+                y: 81,  // 80 + 1 to match other Y adjustment
                 size: fontSize,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
