@@ -1782,12 +1782,12 @@ class SoccerLineupGenerator {
                 size: 11, font: helveticaFont, color: rgb(0, 0, 0)
             });
 
-            // Starting Y position for player list (adjust based on template)
-            let currentY = height - 285;
-            const lineHeight = 19.5;
+            // Starting Y position for player list (adjusted based on actual form layout)
+            let currentY = height - 395;  // Adjusted to align with first player line
+            const lineHeight = 23.5;      // Adjusted line spacing to match form
             const playersPerPage = 10;
 
-            // Fill in player names
+            // Fill in player names, ratings, and comments
             for (let i = 0; i < sortedPlayers.length && i < 20; i++) {
                 const pageIndex = Math.floor(i / playersPerPage);
 
@@ -1814,22 +1814,22 @@ class SoccerLineupGenerator {
                     yPosition = currentY - (positionOnPage * lineHeight);
                 } else {
                     // Second page has different starting Y
-                    yPosition = (height - 110) - (positionOnPage * lineHeight);
+                    yPosition = (height - 125) - (positionOnPage * lineHeight);
                 }
 
-                // Draw player name
+                // Draw player name (left column)
                 currentPage.drawText(playerName, {
-                    x: 60,
+                    x: 85,              // Adjusted to align properly in name column
                     y: yPosition,
                     size: 10,
                     font: helveticaFont,
                     color: rgb(0, 0, 0)
                 });
 
-                // Draw rating if available
+                // Draw rating if available (center column)
                 if (player.rating) {
                     currentPage.drawText(player.rating.toString(), {
-                        x: 370,
+                        x: 463,         // Adjusted to center in "Current Rating" column
                         y: yPosition,
                         size: 10,
                         font: helveticaFont,
@@ -1837,15 +1837,15 @@ class SoccerLineupGenerator {
                     });
                 }
 
-                // Draw comment if available (truncate to fit)
+                // Draw comment if available (right column - truncate to fit)
                 if (player.comment) {
-                    const maxCommentLength = 35;
+                    const maxCommentLength = 50;
                     const comment = player.comment.length > maxCommentLength
                         ? player.comment.substring(0, maxCommentLength - 3) + '...'
                         : player.comment;
 
                     currentPage.drawText(comment, {
-                        x: 430,
+                        x: 540,         // Adjusted for "Comments / Parental Support" column
                         y: yPosition,
                         size: 9,
                         font: helveticaFont,
