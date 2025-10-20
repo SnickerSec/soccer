@@ -53,17 +53,23 @@ app.get('/api/analyze-form', async (req, res) => {
         labels.forEach(label => {
             const fieldName = label.str.replace(':', '').trim();
 
-            // Calculate text start position (label x + label width + small gap)
-            const textX = Math.round(label.x + label.width + 5);
+            // Calculate underline start position
+            // Underline typically starts shortly after the label
+            const underlineStartX = Math.round(label.x + label.width + 10);
+
+            // Text should be placed slightly after the underline starts
+            // to account for the visual gap and ensure it's on the line
+            const textX = Math.round(underlineStartX + 5);
 
             // PDF coordinates are from bottom-left, but we need to adjust for text baseline
             // The y coordinate from pdf.js is the top of the text, but drawText uses baseline
-            // For baseline, we subtract a portion of the height
-            const textY = Math.round(label.y - (label.height * 0.2));
+            // For baseline, we subtract a portion of the height (usually 20-25%)
+            const textY = Math.round(label.y - (label.height * 0.25));
 
             fieldCoordinates[fieldName] = {
                 x: textX,
                 y: textY,
+                underlineStartX: underlineStartX,
                 labelText: label.str,
                 labelX: label.x,
                 labelY: label.y,
@@ -71,7 +77,7 @@ app.get('/api/analyze-form', async (req, res) => {
                 labelHeight: label.height
             };
 
-            console.log(`  → Field "${fieldName}" should be at (${textX}, ${textY})`);
+            console.log(`  → Field "${fieldName}": underline at x=${underlineStartX}, text at (${textX}, ${textY})`);
         });
 
         // Find player list starting position
