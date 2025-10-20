@@ -1876,53 +1876,38 @@ class SoccerLineupGenerator {
             // DEBUG MODE: Uncomment to draw coordinate grid for alignment
             // this.drawCoordinateGrid(firstPage, width, height);
 
-            // Fetch auto-detected form coordinates
-            const formAnalysis = await this.fetchFormCoordinates();
-
-            let coachCoords, divisionCoords, genderCoords, assistantCoords;
-
-            if (formAnalysis && formAnalysis.fieldCoordinates) {
-                // Use auto-detected coordinates
-                coachCoords = formAnalysis.fieldCoordinates['Coach'] || { x: 180, y: 95 };
-                divisionCoords = formAnalysis.fieldCoordinates['Division'] || { x: 422, y: 95 };
-                genderCoords = formAnalysis.fieldCoordinates['Gender'] || { x: 525, y: 95 };
-                assistantCoords = formAnalysis.fieldCoordinates['Assistant Coach'] || { x: 232, y: 127 };
-
-                console.log('✨ Using AUTO-DETECTED coordinates:');
-                console.log(`  Coach: (${coachCoords.x}, ${coachCoords.y})`);
-                console.log(`  Division: (${divisionCoords.x}, ${divisionCoords.y})`);
-                console.log(`  Gender: (${genderCoords.x}, ${genderCoords.y})`);
-                console.log(`  Assistant Coach: (${assistantCoords.x}, ${assistantCoords.y})`);
-            } else {
-                // Fallback to manual coordinates (Y values from bottom of page)
-                // For reference: page height is 792 points
-                coachCoords = { x: 180, y: 690 };
-                divisionCoords = { x: 422, y: 690 };
-                genderCoords = { x: 525, y: 690 };
-                assistantCoords = { x: 232, y: 665 };
-
-                console.log('⚠️ Using MANUAL fallback coordinates');
-            }
-
-            // Fill in header information (using auto-detected or fallback coordinates)
+            // Fill in header information (manually verified coordinates for AYSO form)
+            // Note: PDF coordinates are from bottom-left. Page height = 792 points.
             firstPage.drawText(coachName, {
-                x: coachCoords.x, y: coachCoords.y,
-                size: 11, font: helveticaFont, color: rgb(0, 0, 0)
+                x: 180,
+                y: height - 150,
+                size: 11,
+                font: helveticaFont,
+                color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(division, {
-                x: divisionCoords.x, y: divisionCoords.y,
-                size: 11, font: helveticaFont, color: rgb(0, 0, 0)
+                x: 422,
+                y: height - 150,
+                size: 11,
+                font: helveticaFont,
+                color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(gender, {
-                x: genderCoords.x, y: genderCoords.y,
-                size: 11, font: helveticaFont, color: rgb(0, 0, 0)
+                x: 525,
+                y: height - 150,
+                size: 11,
+                font: helveticaFont,
+                color: rgb(0, 0, 0)
             });
 
             firstPage.drawText(assistantCoach, {
-                x: assistantCoords.x, y: assistantCoords.y,
-                size: 11, font: helveticaFont, color: rgb(0, 0, 0)
+                x: 175,
+                y: height - 173,
+                size: 11,
+                font: helveticaFont,
+                color: rgb(0, 0, 0)
             });
 
             // Starting Y position for player list (adjusted based on actual form layout)
