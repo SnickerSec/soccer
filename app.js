@@ -1749,6 +1749,18 @@ class SoccerLineupGenerator {
          * Using height variable:
          * - We use `height - value` because we measure from top in design
          * - Example: height - 150 means 150 points down from top of page
+         *
+         * ADVANCED: Programmatic Form Field Detection
+         * ============================================
+         * For automatic coordinate detection, you could:
+         * 1. Parse PDF to extract all Path objects (vector graphics)
+         * 2. Filter for horizontal lines: |y1 - y2| < epsilon
+         * 3. Filter by length: min 50-100 points for form fields
+         * 4. Find nearby text labels (e.g., "Coach:", "Division:")
+         * 5. Calculate field position: label_x_right → line_x_left, line_y
+         * 6. This approach requires advanced PDF parsing (PyMuPDF, PDFBox)
+         *
+         * Our simpler approach: Use this grid to manually measure positions
          */
         const { rgb } = window.PDFLib;
 
