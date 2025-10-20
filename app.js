@@ -1877,46 +1877,56 @@ class SoccerLineupGenerator {
             // this.drawCoordinateGrid(firstPage, width, height);
 
             // Fill in header information (exact coordinates from user measurement)
-            // Note: PDF coordinates are from bottom-left. These values represent the middle of each line.
+            // Note: PDF coordinates are from bottom-left. Y coordinates moved up by 1 point.
+            // Text is centered on the X coordinate.
+            const fontSize = 11;
+
+            const coachWidth = helveticaFont.widthOfTextAtSize(coachName, fontSize);
             firstPage.drawText(coachName, {
-                x: 266,
-                y: 713,
-                size: 11,
+                x: 266 - (coachWidth / 2),
+                y: 714,
+                size: fontSize,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
             });
 
+            const divisionWidth = helveticaFont.widthOfTextAtSize(division, fontSize);
             firstPage.drawText(division, {
-                x: 443,
-                y: 713,
-                size: 11,
+                x: 443 - (divisionWidth / 2),
+                y: 714,
+                size: fontSize,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
             });
 
+            const genderWidth = helveticaFont.widthOfTextAtSize(gender, fontSize);
             firstPage.drawText(gender, {
-                x: 531,
-                y: 713,
-                size: 11,
+                x: 531 - (genderWidth / 2),
+                y: 714,
+                size: fontSize,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
             });
 
+            const assistantWidth = helveticaFont.widthOfTextAtSize(assistantCoach, fontSize);
             firstPage.drawText(assistantCoach, {
-                x: 314,
-                y: 685,
-                size: 11,
+                x: 314 - (assistantWidth / 2),
+                y: 686,
+                size: fontSize,
                 font: helveticaFont,
                 color: rgb(0, 0, 0)
             });
 
             // Player list coordinates (exact measurements from user)
+            // Y coordinates moved up by 1 point, text centered on X coordinates
             const playerNameX = 164;
             const ratingX = 326;
             const commentsX = 460;
-            const firstPlayerY = 389;
+            const firstPlayerY = 390;  // 389 + 1
             const lineHeight = 28;  // Spacing: 389 - 361 = 28 points
             const playersPerPage = 10;
+            const playerFontSize = 10;
+            const commentFontSize = 9;
 
             // Fill in player names, ratings, and comments
             for (let i = 0; i < sortedPlayers.length && i < 20; i++) {
@@ -1949,37 +1959,41 @@ class SoccerLineupGenerator {
                     yPosition = firstPlayerY - (positionOnPage * lineHeight);
                 }
 
-                // Draw player name (left column)
+                // Draw player name (left column) - centered on X coordinate
+                const playerNameWidth = helveticaFont.widthOfTextAtSize(playerName, playerFontSize);
                 currentPage.drawText(playerName, {
-                    x: playerNameX,
+                    x: playerNameX - (playerNameWidth / 2),
                     y: yPosition,
-                    size: 10,
+                    size: playerFontSize,
                     font: helveticaFont,
                     color: rgb(0, 0, 0)
                 });
 
-                // Draw rating if available (center column)
+                // Draw rating if available (center column) - centered on X coordinate
                 if (player.rating) {
-                    currentPage.drawText(player.rating.toString(), {
-                        x: ratingX,
+                    const ratingText = player.rating.toString();
+                    const ratingWidth = helveticaFont.widthOfTextAtSize(ratingText, playerFontSize);
+                    currentPage.drawText(ratingText, {
+                        x: ratingX - (ratingWidth / 2),
                         y: yPosition,
-                        size: 10,
+                        size: playerFontSize,
                         font: helveticaFont,
                         color: rgb(0, 0, 0)
                     });
                 }
 
-                // Draw comment if available (right column - truncate to fit)
+                // Draw comment if available (right column - truncate to fit) - centered on X coordinate
                 if (player.comment) {
                     const maxCommentLength = 50;
                     const comment = player.comment.length > maxCommentLength
                         ? player.comment.substring(0, maxCommentLength - 3) + '...'
                         : player.comment;
 
+                    const commentWidth = helveticaFont.widthOfTextAtSize(comment, commentFontSize);
                     currentPage.drawText(comment, {
-                        x: commentsX,
+                        x: commentsX - (commentWidth / 2),
                         y: yPosition,
-                        size: 9,
+                        size: commentFontSize,
                         font: helveticaFont,
                         color: rgb(0, 0, 0)
                     });
