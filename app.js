@@ -1849,6 +1849,10 @@ class SoccerLineupGenerator {
             // Load pdf-lib
             const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
             const pdfDoc = await PDFDocument.load(existingPdfBytes);
+
+            // Register fontkit to enable custom fonts
+            pdfDoc.registerFontkit(fontkit);
+
             const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
             const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
             const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
