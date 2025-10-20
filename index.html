@@ -109,7 +109,10 @@
 
             <!-- Settings Section -->
             <section class="settings-section">
-                <h2>Game Settings</h2>
+                <div class="settings-header">
+                    <h2>Game Settings</h2>
+                    <button id="generateLineup" class="btn-primary" aria-label="Generate lineup based on current players and settings">Generate Lineup</button>
+                </div>
                 <div class="settings-grid">
                     <div class="setting-item">
                         <label for="ageDivision">Age Division:</label>
@@ -147,11 +150,6 @@
                 <div class="age-rules" id="ageRules">
                     <p><strong>10U Rules:</strong> 7v7 format with build-out line. No heading allowed. Offside enforced with build-out line. Substitutions at quarters.</p>
                 </div>
-            </section>
-
-            <!-- Generate Lineup Section -->
-            <section class="generate-section">
-                <button id="generateLineup" class="btn-primary" aria-label="Generate lineup based on current players and settings">Generate Lineup</button>
             </section>
 
             <!-- Lineup Display Section -->
