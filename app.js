@@ -1374,7 +1374,11 @@ class SoccerLineupGenerator {
         summaryHeader.appendChild(actionButtonsContainer);
 
         summaryDiv.appendChild(summaryHeader);
-        summaryDiv.innerHTML += this.getPlayerSummary();
+
+        // Create a container for the player summary table
+        const summaryTableDiv = document.createElement('div');
+        summaryTableDiv.innerHTML = this.getPlayerSummary();
+        summaryDiv.appendChild(summaryTableDiv);
 
         // Insert summary into the display
         display.insertBefore(summaryDiv, display.querySelector('.action-buttons'));
