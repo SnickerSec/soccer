@@ -1,14 +1,50 @@
 const express = require('express');
 const path = require('path');
 const { PDFExtract } = require('pdf.js-extract');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const pdfExtract = new PDFExtract();
 
-// Serve static files from the current directory
-app.use(express.static(__dirname));
+// Rate limiting middleware
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again later.'
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
+
+// Stricter rate limiting for API endpoints
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 50, // Limit API calls to 50 per 15 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many API requests, please try again later.'
+});
+
 app.use(express.json());
+
+// Serve static files only from safe directories
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
+app.use(express.static(__dirname, {
+    index: false,
+    dotfiles: 'deny',
+    extensions: ['html', 'css', 'js', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'ico', 'woff', 'woff2', 'ttf'],
+    setHeaders: (res, filePath) => {
+        // Only serve specific file types
+        const allowedExtensions = ['.html', '.css', '.js', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.otf', '.md'];
+        const ext = path.extname(filePath).toLowerCase();
+        if (!allowedExtensions.includes(ext)) {
+            res.status(403).end();
+        }
+    }
+}));
 
 // Serve index.html for the root route
 app.get('/', (req, res) => {
@@ -21,7 +57,7 @@ app.get('/health', (req, res) => {
 });
 
 // API endpoint to analyze PDF and detect form fields
-app.get('/api/analyze-form', async (req, res) => {
+app.get('/api/analyze-form', apiLimiter, async (req, res) => {
     try {
         const pdfPath = path.join(__dirname, 'assets', 'Player Evaluation Form 2025.pdf');
 
