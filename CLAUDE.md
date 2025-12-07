@@ -12,18 +12,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Express backend and vanilla JavaScript frontend.
 
-### Backend Structure
-- **server.js**: Express server that serves static files and provides a health check endpoint for Railway deployment
-- **PORT**: Uses environment variable or defaults to 3000
+### Project Structure
+```
+├── server.js           # Express server with API endpoints
+├── public/             # Frontend static files
+│   ├── index.html      # Main UI
+│   ├── app.js          # Core application logic (SoccerLineupGenerator class)
+│   ├── styles.css      # Application styles
+│   ├── favicon.svg     # Site favicon
+│   └── assets/         # Fonts, PDFs, images
+├── docs/               # Documentation (security, privacy)
+├── test-data/          # Sample player roster files
+├── package.json        # Dependencies and scripts
+└── railway.json        # Railway deployment config
+```
 
-### Frontend Structure
-- **index.html**: Main UI with player management, game settings, and lineup display sections
-- **app.js**: Core application logic implemented as `SoccerLineupGenerator` class that handles:
+### Backend (server.js)
+- Express server serving static files from `public/`
+- Health check endpoint for Railway deployment
+- PDF analysis API endpoint
+- Rate limiting middleware
+
+### Frontend (public/)
+- **index.html**: Main UI with player management, game settings, and lineup display
+- **app.js**: `SoccerLineupGenerator` class handling:
   - Player roster management (import from file or manual entry)
-  - Lineup generation with AYSO rotation rules (fair play time, position variety)
+  - Lineup generation with AYSO rotation rules
   - Visual field display for each quarter
   - Export/print functionality
-- **styles.css**: Styling for the application UI
+- **styles.css**: Application styling
 
 ### Key Features & Constraints
 The lineup generator enforces AYSO "Everyone Plays" rules:

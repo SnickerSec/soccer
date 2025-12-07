@@ -30,26 +30,8 @@ const apiLimiter = rateLimit({
 
 app.use(express.json());
 
-// Serve static files only from safe directories
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
-app.use(express.static(__dirname, {
-    index: false,
-    dotfiles: 'deny',
-    extensions: ['html', 'css', 'js', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'ico', 'woff', 'woff2', 'ttf'],
-    setHeaders: (res, filePath) => {
-        // Only serve specific file types
-        const allowedExtensions = ['.html', '.css', '.js', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.otf', '.md'];
-        const ext = path.extname(filePath).toLowerCase();
-        if (!allowedExtensions.includes(ext)) {
-            res.status(403).end();
-        }
-    }
-}));
-
-// Serve index.html for the root route
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check endpoint for Railway
 app.get('/health', (req, res) => {
@@ -59,7 +41,7 @@ app.get('/health', (req, res) => {
 // API endpoint to analyze PDF and detect form fields
 app.get('/api/analyze-form', apiLimiter, async (req, res) => {
     try {
-        const pdfPath = path.join(__dirname, 'assets', 'Player Evaluation Form 2025.pdf');
+        const pdfPath = path.join(__dirname, 'public', 'assets', 'Player Evaluation Form 2025.pdf');
 
         const data = await pdfExtract.extract(pdfPath, {});
 
