@@ -438,11 +438,12 @@ small {
 }
 
 .pref-checkbox {
-    width: 22px;
-    height: 22px;
-    border-radius: 3px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-input);
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    border: 2px solid var(--border-color);
+    background: var(--bg-elevated);
+    color: var(--text-muted);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -454,45 +455,75 @@ small {
 
 .pref-checkbox:hover {
     border-color: var(--accent-blue);
+    background: var(--bg-hover);
+    color: var(--text-primary);
 }
 
 .pref-checkbox.active {
     color: white;
 }
 
+.pref-checkbox.no-keeper {
+    color: var(--text-muted);
+}
+
+.pref-checkbox.no-keeper:hover {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+}
+
 .pref-checkbox.no-keeper.active {
     background: var(--accent-orange);
     border-color: var(--accent-orange);
+    color: white;
+}
+
+.pref-checkbox.must-rest {
+    color: var(--text-muted);
+}
+
+.pref-checkbox.must-rest:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
 }
 
 .pref-checkbox.must-rest.active {
     background: var(--accent-blue);
     border-color: var(--accent-blue);
+    color: white;
 }
 
 /* Player status dropdown */
 .player-status-select {
-    padding: 2px 4px;
-    border-radius: 3px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-input);
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 2px solid var(--accent-green);
+    background: var(--bg-elevated);
     color: var(--text-primary);
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     cursor: pointer;
+    min-width: 36px;
+}
+
+.player-status-select:hover {
+    background: var(--bg-hover);
 }
 
 .player-status-select.status-available {
     border-color: var(--accent-green);
+    color: var(--accent-green);
 }
 
 .player-status-select.status-injured {
     border-color: var(--accent-red);
     background: var(--error-bg);
+    color: var(--accent-red);
 }
 
 .player-status-select.status-absent {
     border-color: var(--accent-orange);
     background: var(--warning-bg);
+    color: var(--accent-orange);
 }
 
 .remove-btn {
