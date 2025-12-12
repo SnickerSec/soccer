@@ -7,7 +7,10 @@
     "start": "node server.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:all": "npm run test && npm run test:e2e"
   },
   "engines": {
     "node": ">=14.0.0"
@@ -19,8 +22,9 @@
     "pdf.js-extract": "^0.2.1"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "@jest/globals": "^29.7.0"
+    "@jest/globals": "^29.7.0",
+    "@playwright/test": "^1.57.0",
+    "jest": "^29.7.0"
   },
   "keywords": [
     "soccer",
@@ -30,5 +34,11 @@
     "team-management"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/e2e/"
+    ]
+  }
 }
