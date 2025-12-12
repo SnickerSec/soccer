@@ -1,0 +1,20 @@
+{
+    "name": "AYSO Roster Pro",
+    "short_name": "Roster Pro",
+    "description": "Smart lineup generator with fair rotation for youth soccer",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#1a1a2e",
+    "theme_color": "#0f3460",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["sports", "utilities"],
+    "lang": "en-US"
+}

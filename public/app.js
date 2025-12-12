@@ -19,17 +19,335 @@ class SoccerLineupGenerator {
         // Theme
         this.currentTheme = 'dark';
 
+        // Saved games for multi-game tracking
+        this.savedGames = [];
+
+        // Minimum quarters setting
+        this.minQuartersPerPlayer = 2;
+
         this.init();
     }
 
     init() {
+        this.registerServiceWorker();
         this.loadTheme();
         this.loadData();
+        this.loadSavedGames();
+        this.checkForSharedLineup();
         this.setupEventListeners();
         this.setupKeyboardShortcuts();
+        this.setupTooltips();
         this.initializeDefaults();
         this.showWelcomeMessage();
         this.updateUndoRedoButtons();
+    }
+
+    // Register Service Worker for offline support
+    registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker registered:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+    }
+
+    // Check URL for shared lineup data
+    checkForSharedLineup() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sharedData = urlParams.get('lineup');
+
+        if (sharedData) {
+            try {
+                const decoded = JSON.parse(atob(sharedData));
+                if (decoded.players && decoded.lineup) {
+                    this.saveStateForUndo();
+                    this.players = decoded.players;
+                    this.lineup = decoded.lineup;
+                    this.captains = this.players.filter(p => p.isCaptain).map(p => p.name);
+
+                    if (decoded.settings) {
+                        this.ageDivision = decoded.settings.ageDivision || this.ageDivision;
+                        this.playersOnField = decoded.settings.playersOnField || this.playersOnField;
+                        this.formation = decoded.settings.formation || this.formation;
+                    }
+
+                    this.updatePlayerList();
+                    this.displayLineup(this.validateLineup());
+                    this.showNotification('Shared lineup loaded!', 'success');
+
+                    // Clear URL params
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } catch (e) {
+                console.error('Failed to parse shared lineup:', e);
+            }
+        }
+    }
+
+    // Generate shareable URL
+    generateShareURL() {
+        if (this.lineup.length === 0) {
+            this.showNotification('Generate a lineup first before sharing', 'error');
+            return null;
+        }
+
+        const shareData = {
+            players: this.players,
+            lineup: this.lineup,
+            settings: {
+                ageDivision: this.ageDivision,
+                playersOnField: this.playersOnField,
+                formation: this.formation
+            }
+        };
+
+        const encoded = btoa(JSON.stringify(shareData));
+        const url = `${window.location.origin}${window.location.pathname}?lineup=${encoded}`;
+        return url;
+    }
+
+    // Share lineup
+    shareLineup() {
+        const url = this.generateShareURL();
+        if (!url) return;
+
+        if (navigator.share) {
+            navigator.share({
+                title: 'AYSO Lineup',
+                text: 'Check out this game lineup!',
+                url: url
+            }).catch(() => {
+                this.copyShareURL(url);
+            });
+        } else {
+            this.copyShareURL(url);
+        }
+    }
+
+    copyShareURL(url) {
+        navigator.clipboard.writeText(url).then(() => {
+            this.showNotification('Share link copied to clipboard!', 'success');
+        }).catch(() => {
+            this.showNotification('Failed to copy link', 'error');
+        });
+    }
+
+    // Copy lineup to clipboard as text
+    copyLineupToClipboard() {
+        if (this.lineup.length === 0) {
+            this.showNotification('No lineup to copy', 'error');
+            return;
+        }
+
+        let text = `AYSO Lineup - ${this.formation} Formation\n`;
+        text += `${'='.repeat(40)}\n\n`;
+
+        this.lineup.forEach((quarter) => {
+            text += `Quarter ${quarter.quarter}\n`;
+            text += `${'-'.repeat(20)}\n`;
+
+            for (const [position, playerName] of Object.entries(quarter.positions)) {
+                const player = this.players.find(p => p.name === playerName);
+                const number = player?.number ? `#${player.number}` : '';
+                text += `${position}: ${playerName} ${number}\n`;
+            }
+
+            // Add sitting players
+            const sittingPlayers = this.players.filter(p =>
+                p.quartersSitting && p.quartersSitting.includes(quarter.quarter)
+            );
+            if (sittingPlayers.length > 0) {
+                text += `Sitting: ${sittingPlayers.map(p => p.name).join(', ')}\n`;
+            }
+            text += '\n';
+        });
+
+        navigator.clipboard.writeText(text).then(() => {
+            this.showNotification('Lineup copied to clipboard!', 'success');
+        }).catch(() => {
+            this.showNotification('Failed to copy lineup', 'error');
+        });
+    }
+
+    // Export to CSV
+    exportToCSV() {
+        if (this.lineup.length === 0) {
+            this.showNotification('Generate a lineup first', 'error');
+            return;
+        }
+
+        // Create CSV header
+        let csv = 'Position,Quarter 1,Quarter 2,Quarter 3,Quarter 4\n';
+
+        // Get all positions
+        const allPositions = [...new Set(this.lineup.flatMap(q => Object.keys(q.positions)))];
+
+        // Add row for each position
+        allPositions.forEach(position => {
+            const row = [position];
+            for (let q = 1; q <= 4; q++) {
+                const quarter = this.lineup.find(l => l.quarter === q);
+                const playerName = quarter?.positions[position] || '';
+                const player = this.players.find(p => p.name === playerName);
+                const display = player?.number ? `${playerName} (#${player.number})` : playerName;
+                row.push(`"${display}"`);
+            }
+            csv += row.join(',') + '\n';
+        });
+
+        // Add sitting row
+        const sittingRow = ['Sitting'];
+        for (let q = 1; q <= 4; q++) {
+            const sitting = this.players
+                .filter(p => p.quartersSitting?.includes(q))
+                .map(p => p.name)
+                .join('; ');
+            sittingRow.push(`"${sitting}"`);
+        }
+        csv += sittingRow.join(',') + '\n';
+
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `lineup_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        this.showNotification('CSV exported successfully', 'success');
+    }
+
+    // Multi-game tracking
+    loadSavedGames() {
+        const saved = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY);
+        if (saved) {
+            try {
+                this.savedGames = JSON.parse(saved);
+            } catch (e) {
+                this.savedGames = [];
+            }
+        }
+    }
+
+    saveCurrentGame(gameName) {
+        if (this.lineup.length === 0) {
+            this.showNotification('Generate a lineup first', 'error');
+            return;
+        }
+
+        const game = {
+            id: Date.now(),
+            name: gameName || `Game ${this.savedGames.length + 1}`,
+            date: new Date().toISOString(),
+            players: JSON.parse(JSON.stringify(this.players)),
+            lineup: JSON.parse(JSON.stringify(this.lineup)),
+            settings: {
+                ageDivision: this.ageDivision,
+                playersOnField: this.playersOnField,
+                formation: this.formation
+            }
+        };
+
+        this.savedGames.push(game);
+        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.showNotification(`Game "${game.name}" saved!`, 'success');
+    }
+
+    loadSavedGame(gameId) {
+        const game = this.savedGames.find(g => g.id === gameId);
+        if (!game) {
+            this.showNotification('Game not found', 'error');
+            return;
+        }
+
+        this.saveStateForUndo();
+        this.players = JSON.parse(JSON.stringify(game.players));
+        this.lineup = JSON.parse(JSON.stringify(game.lineup));
+        this.captains = this.players.filter(p => p.isCaptain).map(p => p.name);
+        this.ageDivision = game.settings.ageDivision;
+        this.playersOnField = game.settings.playersOnField;
+        this.formation = game.settings.formation;
+
+        this.updatePlayerList();
+        this.displayLineup(this.validateLineup());
+        this.showNotification(`Loaded "${game.name}"`, 'success');
+    }
+
+    getPlayerStats() {
+        const stats = {};
+
+        this.players.forEach(player => {
+            stats[player.name] = {
+                gamesPlayed: 0,
+                totalQuarters: 0,
+                totalSitting: 0,
+                goalkeeperQuarters: 0,
+                positions: {}
+            };
+        });
+
+        this.savedGames.forEach(game => {
+            game.players.forEach(player => {
+                if (!stats[player.name]) {
+                    stats[player.name] = {
+                        gamesPlayed: 0,
+                        totalQuarters: 0,
+                        totalSitting: 0,
+                        goalkeeperQuarters: 0,
+                        positions: {}
+                    };
+                }
+
+                stats[player.name].gamesPlayed++;
+                stats[player.name].totalQuarters += player.quartersPlayed?.length || 0;
+                stats[player.name].totalSitting += player.quartersSitting?.length || 0;
+
+                if (player.goalieQuarter) {
+                    stats[player.name].goalkeeperQuarters++;
+                }
+
+                player.positionsPlayed?.forEach(pos => {
+                    stats[player.name].positions[pos.position] =
+                        (stats[player.name].positions[pos.position] || 0) + 1;
+                });
+            });
+        });
+
+        return stats;
+    }
+
+    // Setup tooltips
+    setupTooltips() {
+        // Add tooltip data attributes to elements that need them
+        const tooltips = {
+            '#generateLineup': 'Generate a fair lineup following AYSO rules (Ctrl+G)',
+            '#demoButton': 'Load sample players to try the app (Ctrl+D)',
+            '#exportLineup': 'Export lineup to text file (Ctrl+E)',
+            '#printLineup': 'Print the lineup (Ctrl+P)',
+            '#backupData': 'Save all data to a backup file',
+            '#themeToggle': 'Switch between dark and light theme',
+            '#undoBtn': 'Undo last change (Ctrl+Z)',
+            '#redoBtn': 'Redo last change (Ctrl+Y)',
+            '.captain-checkbox': 'Select as team captain (max 2)',
+            '.pref-checkbox.no-keeper': 'Player should not play goalkeeper',
+            '.pref-checkbox.must-rest': 'Player needs extra rest time'
+        };
+
+        Object.entries(tooltips).forEach(([selector, text]) => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+                if (!el.hasAttribute('title')) {
+                    el.setAttribute('title', text);
+                }
+            });
+        });
     }
 
     // Theme management
@@ -218,6 +536,20 @@ class SoccerLineupGenerator {
         document.getElementById('exportLineup').addEventListener('click', () => this.exportLineup());
         document.getElementById('printLineup').addEventListener('click', () => this.printLineup());
         document.getElementById('exportPlayers').addEventListener('click', () => this.exportPlayers());
+
+        // New action buttons
+        const copyBtn = document.getElementById('copyLineup');
+        const shareBtn = document.getElementById('shareLineup');
+        const csvBtn = document.getElementById('exportCSV');
+        const saveGameBtn = document.getElementById('saveGame');
+
+        if (copyBtn) copyBtn.addEventListener('click', () => this.copyLineupToClipboard());
+        if (shareBtn) shareBtn.addEventListener('click', () => this.shareLineup());
+        if (csvBtn) csvBtn.addEventListener('click', () => this.exportToCSV());
+        if (saveGameBtn) saveGameBtn.addEventListener('click', () => {
+            const name = prompt('Enter a name for this game (e.g., "vs Tigers 12/10"):');
+            if (name !== null) this.saveCurrentGame(name);
+        });
 
         // Player evaluation form
         document.getElementById('generateEvaluation').addEventListener('click', () => this.generatePlayerEvaluationPDF());
@@ -1164,37 +1496,73 @@ class SoccerLineupGenerator {
         }
     }
 
+    // Loading indicator methods
+    showLoading(message = 'Generating lineup...') {
+        // Remove any existing loading overlay
+        this.hideLoading();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'loading-overlay';
+        overlay.id = 'loadingOverlay';
+        overlay.innerHTML = `
+            <div class="loading-spinner"></div>
+            <div class="loading-text">${message}</div>
+            <div class="loading-progress" id="loadingProgress"></div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    updateLoadingProgress(text) {
+        const progress = document.getElementById('loadingProgress');
+        if (progress) {
+            progress.textContent = text;
+        }
+    }
+
+    hideLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.remove();
+        }
+    }
+
     async generateLineup() {
-        if (this.players.length < this.playersOnField) {
-            this.showNotification(`Need at least ${this.playersOnField} players. Currently have ${this.players.length}.`, 'error');
+        // Filter out unavailable players
+        const availablePlayers = this.players.filter(p =>
+            p.status === CONSTANTS.PLAYER_STATUS.AVAILABLE || !p.status
+        );
+
+        if (availablePlayers.length < this.playersOnField) {
+            this.showNotification(`Need at least ${this.playersOnField} available players. Currently have ${availablePlayers.length}.`, 'error');
             return;
         }
 
         // Additional warning for small rosters
         const recommendedPlayers = Math.ceil(this.playersOnField * 1.5);
-        if (this.players.length < recommendedPlayers) {
-            this.showNotification(`Note: With ${this.players.length} players, some rotation rules may be challenging. Recommend ${recommendedPlayers}+ players.`, 'warning');
+        if (availablePlayers.length < recommendedPlayers) {
+            this.showNotification(`Note: With ${availablePlayers.length} players, some rotation rules may be challenging. Recommend ${recommendedPlayers}+ players.`, 'warning');
         }
 
-        const maxAttempts = 500; // Maximum number of attempts to prevent infinite loops
+        const maxAttempts = CONSTANTS.MAX_GENERATION_ATTEMPTS;
         let attempts = 0;
         let validation = [];
         let bestLineup = null;
         let bestValidationCount = Infinity;
-        
+
         // Show loading indicator
+        this.showLoading('Generating lineup...');
         const generateBtn = document.getElementById('generateLineup');
         const originalText = generateBtn.textContent;
         generateBtn.disabled = true;
-        
+
         // Keep trying until we get a valid lineup or hit max attempts
         do {
             attempts++;
-            generateBtn.textContent = `Generating... (Attempt ${attempts})`;
-            
+            this.updateLoadingProgress(`Attempt ${attempts} of ${maxAttempts}`);
+
             // Add a small delay to allow UI to update
             if (attempts > 1) {
-                await new Promise(resolve => setTimeout(resolve, 10));
+                await new Promise(resolve => setTimeout(resolve, CONSTANTS.GENERATION_DELAY_MS));
             }
             
             // Reset player stats
@@ -1234,11 +1602,12 @@ class SoccerLineupGenerator {
             }
             
         } while (validation.length > 0 && attempts < maxAttempts);
-        
-        // Reset button
+
+        // Hide loading and reset button
+        this.hideLoading();
         generateBtn.textContent = originalText;
         generateBtn.disabled = false;
-        
+
         // If we hit max attempts, use the best lineup found
         if (attempts >= maxAttempts && validation.length > 0) {
             if (bestLineup) {

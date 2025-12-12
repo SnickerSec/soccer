@@ -4,7 +4,10 @@
   "description": "AYSO Roster Pro - Smart lineup generator for youth soccer teams",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "engines": {
     "node": ">=14.0.0"
@@ -14,6 +17,10 @@
     "express-rate-limit": "^8.2.1",
     "pdf-lib": "^1.17.1",
     "pdf.js-extract": "^0.2.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@jest/globals": "^29.7.0"
   },
   "keywords": [
     "soccer",

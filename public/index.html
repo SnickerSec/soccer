@@ -3,8 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Smart lineup generator with fair rotation for youth soccer. AYSO compliant.">
+    <meta name="theme-color" content="#0f3460">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Roster Pro">
     <title>AYSO Roster Pro</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="apple-touch-icon" href="favicon.svg">
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -184,10 +191,26 @@
                 <h2>Game Lineup</h2>
                 <div id="validationMessages" class="validation-messages"></div>
                 <div id="lineupGrid" class="lineup-grid"></div>
-                
+
                 <div class="action-buttons">
-                    <button id="exportLineup" class="btn-export" aria-label="Export the generated lineup to a text file">Export to Text</button>
-                    <button id="printLineup" class="btn-print" aria-label="Print the current lineup">Print Lineup</button>
+                    <button id="copyLineup" class="btn-copy" aria-label="Copy lineup to clipboard" title="Copy to clipboard">
+                        <span>&#128203;</span> Copy
+                    </button>
+                    <button id="shareLineup" class="btn-share" aria-label="Share lineup via link" title="Share lineup">
+                        <span>&#128279;</span> Share
+                    </button>
+                    <button id="exportCSV" class="btn-csv" aria-label="Export lineup to CSV" title="Export to CSV">
+                        <span>&#128200;</span> CSV
+                    </button>
+                    <button id="exportLineup" class="btn-export" aria-label="Export the generated lineup to a text file" title="Export to text file">
+                        <span>&#128190;</span> Text
+                    </button>
+                    <button id="printLineup" class="btn-print" aria-label="Print the current lineup" title="Print lineup">
+                        <span>&#128424;</span> Print
+                    </button>
+                    <button id="saveGame" class="btn-save-game" aria-label="Save this game" title="Save game for tracking">
+                        <span>&#128190;</span> Save Game
+                    </button>
                 </div>
             </section>
         </div>
