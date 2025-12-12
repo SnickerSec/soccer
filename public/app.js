@@ -4,20 +4,164 @@ class SoccerLineupGenerator {
         this.captains = []; // Track selected captains
         this.ageDivision = '10U';
         this.formation = '2-3-1';
-        this.quarters = 4;
+        this.quarters = CONSTANTS.DEFAULT_QUARTERS;
         this.playersOnField = 7;
         this.positions = [];
         this.lineup = [];
-        
+
+        // Undo/Redo stacks
+        this.undoStack = [];
+        this.redoStack = [];
+
+        // PDF template cache
+        this.pdfTemplateCache = null;
+
+        // Theme
+        this.currentTheme = 'dark';
+
         this.init();
     }
 
     init() {
+        this.loadTheme();
         this.loadData();
         this.setupEventListeners();
         this.setupKeyboardShortcuts();
         this.initializeDefaults();
         this.showWelcomeMessage();
+        this.updateUndoRedoButtons();
+    }
+
+    // Theme management
+    loadTheme() {
+        const savedTheme = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.THEME);
+        if (savedTheme) {
+            this.currentTheme = savedTheme;
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+    }
+
+    toggleTheme() {
+        this.currentTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', this.currentTheme);
+        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.THEME, this.currentTheme);
+        this.showNotification(`Switched to ${this.currentTheme} theme`, 'info');
+    }
+
+    // Safe localStorage operations with quota handling
+    safeGetFromStorage(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (error) {
+            console.warn('localStorage read error:', error);
+            return null;
+        }
+    }
+
+    safeSetToStorage(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (error) {
+            if (error.name === 'QuotaExceededError' || error.code === 22) {
+                this.showNotification('Storage quota exceeded. Some data may not be saved.', 'error');
+            } else {
+                console.warn('localStorage write error:', error);
+            }
+            return false;
+        }
+    }
+
+    safeRemoveFromStorage(key) {
+        try {
+            localStorage.removeItem(key);
+            return true;
+        } catch (error) {
+            console.warn('localStorage remove error:', error);
+            return false;
+        }
+    }
+
+    // Undo/Redo system
+    saveStateForUndo() {
+        const state = {
+            players: JSON.parse(JSON.stringify(this.players)),
+            captains: [...this.captains],
+            lineup: JSON.parse(JSON.stringify(this.lineup))
+        };
+
+        this.undoStack.push(state);
+        if (this.undoStack.length > CONSTANTS.MAX_UNDO_STACK_SIZE) {
+            this.undoStack.shift();
+        }
+
+        // Clear redo stack when new action is performed
+        this.redoStack = [];
+        this.updateUndoRedoButtons();
+    }
+
+    undo() {
+        if (this.undoStack.length === 0) return;
+
+        // Save current state to redo stack
+        const currentState = {
+            players: JSON.parse(JSON.stringify(this.players)),
+            captains: [...this.captains],
+            lineup: JSON.parse(JSON.stringify(this.lineup))
+        };
+        this.redoStack.push(currentState);
+
+        // Restore previous state
+        const previousState = this.undoStack.pop();
+        this.players = previousState.players;
+        this.captains = previousState.captains;
+        this.lineup = previousState.lineup;
+
+        this.updatePlayerList();
+        if (this.lineup.length > 0) {
+            this.displayLineup(this.validateLineup());
+        }
+        this.savePlayers();
+        this.updateUndoRedoButtons();
+        this.showNotification('Undo successful', 'info');
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+
+        // Save current state to undo stack
+        const currentState = {
+            players: JSON.parse(JSON.stringify(this.players)),
+            captains: [...this.captains],
+            lineup: JSON.parse(JSON.stringify(this.lineup))
+        };
+        this.undoStack.push(currentState);
+
+        // Restore next state
+        const nextState = this.redoStack.pop();
+        this.players = nextState.players;
+        this.captains = nextState.captains;
+        this.lineup = nextState.lineup;
+
+        this.updatePlayerList();
+        if (this.lineup.length > 0) {
+            this.displayLineup(this.validateLineup());
+        }
+        this.savePlayers();
+        this.updateUndoRedoButtons();
+        this.showNotification('Redo successful', 'info');
+    }
+
+    updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+
+        if (undoBtn) {
+            undoBtn.disabled = this.undoStack.length === 0;
+        }
+        if (redoBtn) {
+            redoBtn.disabled = this.redoStack.length === 0;
+        }
     }
     
     initializeDefaults() {
@@ -78,6 +222,32 @@ class SoccerLineupGenerator {
         // Player evaluation form
         document.getElementById('generateEvaluation').addEventListener('click', () => this.generatePlayerEvaluationPDF());
 
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => this.toggleTheme());
+        }
+
+        // Undo/Redo buttons
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => this.undo());
+        }
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => this.redo());
+        }
+
+        // Backup/Restore
+        const backupBtn = document.getElementById('backupData');
+        const restoreInput = document.getElementById('restoreInput');
+        if (backupBtn) {
+            backupBtn.addEventListener('click', () => this.backupAllData());
+        }
+        if (restoreInput) {
+            restoreInput.addEventListener('change', (e) => this.restoreFromBackup(e));
+        }
+
         // Age division setting
         document.getElementById('ageDivision').addEventListener('change', (e) => {
             this.ageDivision = e.target.value;
@@ -87,7 +257,7 @@ class SoccerLineupGenerator {
             this.updateAgeRules();
             this.saveSettings();
         });
-        
+
         // Field players setting
         document.getElementById('fieldPlayers').addEventListener('change', (e) => {
             this.playersOnField = parseInt(e.target.value);
@@ -95,7 +265,7 @@ class SoccerLineupGenerator {
             this.updatePositions();
             this.saveSettings();
         });
-        
+
         // Formation setting
         document.getElementById('formation').addEventListener('change', (e) => {
             this.formation = e.target.value;
@@ -103,6 +273,217 @@ class SoccerLineupGenerator {
             this.updateFormationDescription();
             this.saveSettings();
         });
+
+        // Event delegation for player list (fixes XSS vulnerability)
+        const playerList = document.getElementById('playerList');
+        if (playerList) {
+            playerList.addEventListener('click', (e) => this.handlePlayerListClick(e));
+            playerList.addEventListener('change', (e) => this.handlePlayerListChange(e));
+        }
+    }
+
+    // Event delegation handlers to fix XSS vulnerability
+    handlePlayerListClick(e) {
+        const target = e.target;
+
+        // Remove button
+        if (target.classList.contains('remove-btn')) {
+            const playerName = target.dataset.player;
+            if (playerName) {
+                this.removePlayer(playerName);
+            }
+            return;
+        }
+
+        // Preference checkbox
+        if (target.classList.contains('pref-checkbox')) {
+            const playerName = target.dataset.player;
+            const prefType = target.dataset.pref;
+            if (playerName && prefType) {
+                if (prefType === 'noKeeper') {
+                    this.toggleNoKeeperPreference(playerName);
+                } else if (prefType === 'mustRest') {
+                    this.toggleRestPreference(playerName);
+                }
+                this.updatePlayerList();
+            }
+            return;
+        }
+    }
+
+    handlePlayerListChange(e) {
+        const target = e.target;
+
+        // Captain checkbox
+        if (target.classList.contains('captain-checkbox')) {
+            const playerName = target.dataset.player;
+            if (playerName) {
+                this.toggleCaptainByName(playerName, target.checked);
+            }
+            return;
+        }
+
+        // Player number edit
+        if (target.classList.contains('player-number-edit')) {
+            const playerIndex = parseInt(target.dataset.index);
+            if (!isNaN(playerIndex)) {
+                this.updatePlayerNumber(playerIndex, target.value);
+            }
+            return;
+        }
+
+        // Player status select
+        if (target.classList.contains('player-status-select')) {
+            const playerName = target.dataset.player;
+            if (playerName) {
+                this.updatePlayerStatus(playerName, target.value);
+            }
+            return;
+        }
+    }
+
+    // Backup all data to JSON
+    backupAllData() {
+        const backup = {
+            version: '1.0',
+            timestamp: new Date().toISOString(),
+            players: this.players,
+            captains: this.captains,
+            settings: {
+                ageDivision: this.ageDivision,
+                playersOnField: this.playersOnField,
+                formation: this.formation
+            },
+            lineup: this.lineup
+        };
+
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ayso_backup_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        this.showNotification('Backup created successfully', 'success');
+    }
+
+    // Restore from backup
+    restoreFromBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const backup = JSON.parse(e.target.result);
+
+                // Validate backup structure
+                if (!backup.players || !Array.isArray(backup.players)) {
+                    throw new Error('Invalid backup file: missing players data');
+                }
+
+                // Save state for undo
+                this.saveStateForUndo();
+
+                // Restore data
+                this.players = backup.players;
+                this.captains = backup.captains || [];
+
+                if (backup.settings) {
+                    this.ageDivision = backup.settings.ageDivision || this.ageDivision;
+                    this.playersOnField = backup.settings.playersOnField || this.playersOnField;
+                    this.formation = backup.settings.formation || this.formation;
+
+                    // Update UI
+                    const ageDivisionSelect = document.getElementById('ageDivision');
+                    const fieldPlayersSelect = document.getElementById('fieldPlayers');
+                    const formationSelect = document.getElementById('formation');
+
+                    if (ageDivisionSelect) ageDivisionSelect.value = this.ageDivision;
+                    this.updateFieldOptions();
+                    if (fieldPlayersSelect) fieldPlayersSelect.value = this.playersOnField;
+                    this.updateFormationOptions();
+                    if (formationSelect) formationSelect.value = this.formation;
+                }
+
+                this.lineup = backup.lineup || [];
+
+                this.updatePlayerList();
+                this.updatePositions();
+                this.savePlayers();
+                this.saveSettings();
+
+                if (this.lineup.length > 0) {
+                    this.displayLineup(this.validateLineup());
+                }
+
+                this.showNotification(`Restored ${this.players.length} players from backup`, 'success');
+            } catch (error) {
+                console.error('Restore error:', error);
+                this.showNotification('Error restoring backup: ' + error.message, 'error');
+            }
+
+            event.target.value = ''; // Reset file input
+        };
+
+        reader.onerror = () => {
+            this.showNotification('Failed to read backup file', 'error');
+            event.target.value = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    // Update player status (available, injured, absent)
+    updatePlayerStatus(playerName, status) {
+        const player = this.players.find(p => p.name === playerName);
+        if (!player) return;
+
+        this.saveStateForUndo();
+        player.status = status;
+        this.savePlayers();
+        this.updatePlayerList();
+
+        const statusLabels = {
+            available: 'available',
+            injured: 'injured',
+            absent: 'absent'
+        };
+        this.showNotification(`${playerName} marked as ${statusLabels[status] || status}`, 'info');
+    }
+
+    // Toggle captain using name (for event delegation)
+    toggleCaptainByName(playerName, isChecked) {
+        const player = this.players.find(p => p.name === playerName);
+        if (!player) return;
+
+        this.saveStateForUndo();
+
+        if (isChecked) {
+            if (this.captains.length >= CONSTANTS.MAX_CAPTAINS) {
+                const removedCaptain = this.captains.shift();
+                const removedPlayer = this.players.find(p => p.name === removedCaptain);
+                if (removedPlayer) {
+                    removedPlayer.isCaptain = false;
+                }
+                this.showNotification(`Captain limit reached. Replaced ${removedCaptain} with ${playerName}`, 'info');
+            } else {
+                this.showNotification(`${playerName} is now a captain`, 'success');
+            }
+            this.captains.push(playerName);
+            player.isCaptain = true;
+        } else {
+            const index = this.captains.indexOf(playerName);
+            if (index > -1) {
+                this.captains.splice(index, 1);
+            }
+            player.isCaptain = false;
+            this.showNotification(`${playerName} is no longer a captain`, 'info');
+        }
+
+        this.updatePlayerList();
+        this.savePlayers();
     }
 
     handleFileImport(event) {
@@ -228,23 +609,27 @@ class SoccerLineupGenerator {
             return;
         }
         
-        if (this.players.length >= 30) {
-            this.showNotification('Maximum roster size reached (30 players)', 'error');
+        if (this.players.length >= CONSTANTS.MAX_PLAYERS) {
+            this.showNotification(`Maximum roster size reached (${CONSTANTS.MAX_PLAYERS} players)`, 'error');
             return;
         }
-        
+
+        this.saveStateForUndo();
+
         this.players.push({
             name: safeName,
             number: number,
             isCaptain: false,
             mustRest: false,
             noKeeper: false,
+            status: CONSTANTS.PLAYER_STATUS.AVAILABLE,
+            preferredPositions: [],
             quartersPlayed: [],
             quartersSitting: [],
             positionsPlayed: [],
             goalieQuarter: null
         });
-        
+
         this.updatePlayerList();
         this.savePlayers();
         this.showNotification(`Added ${safeName}${number ? ' #' + number : ''} to roster`, 'success');
@@ -294,6 +679,8 @@ class SoccerLineupGenerator {
     }
 
     removePlayer(name) {
+        this.saveStateForUndo();
+
         // Remove from captains if they were a captain
         const captainIndex = this.captains.indexOf(name);
         if (captainIndex > -1) {
@@ -302,46 +689,97 @@ class SoccerLineupGenerator {
         this.players = this.players.filter(p => p.name !== name);
         this.updatePlayerList();
         this.savePlayers();
+        this.showNotification(`Removed ${name} from roster`, 'info');
     }
 
     updatePlayerList() {
         const list = document.getElementById('playerList');
         const count = document.getElementById('playerCount');
         const exportBtn = document.getElementById('exportPlayers');
-        
+
         count.textContent = this.players.length;
         list.innerHTML = '';
-        
+
         // Show/hide export button based on whether there are players
         if (this.players.length > 0) {
             exportBtn.style.display = 'block';
         } else {
             exportBtn.style.display = 'none';
         }
-        
+
         this.players.forEach((player, index) => {
             const li = document.createElement('li');
             const isCaptain = this.captains.includes(player.name);
-            const captainIcon = isCaptain ? '⭐' : '';
+            const captainIcon = isCaptain ? '<span class="captain-star">&#9733;</span> ' : '';
+            const status = player.status || CONSTANTS.PLAYER_STATUS.AVAILABLE;
+
+            // Use data attributes instead of inline handlers (XSS fix)
+            const escapedName = this.escapeHtmlAttribute(player.name);
+
+            li.setAttribute('role', 'listitem');
+            li.setAttribute('aria-label', `Player ${player.name}${player.number ? ' number ' + player.number : ''}`);
+
+            // Status indicator class
+            const statusClass = status === CONSTANTS.PLAYER_STATUS.INJURED ? 'status-injured' :
+                               status === CONSTANTS.PLAYER_STATUS.ABSENT ? 'status-absent' : 'status-available';
+
             li.innerHTML = `
-                <label class="player-item">
+                <div class="player-item-container">
                     <input type="checkbox" class="captain-checkbox" ${isCaptain ? 'checked' : ''}
-                           onchange="lineupGenerator.toggleCaptain('${player.name}')" />
+                           data-player="${escapedName}"
+                           aria-label="Select ${player.name} as captain"
+                           title="Captain" />
                     <input type="number" class="player-number-edit"
                            value="${player.number || ''}"
                            placeholder="#"
-                           min="1" max="99"
-                           onchange="lineupGenerator.updatePlayerNumber(${index}, this.value)"
+                           min="${CONSTANTS.MIN_PLAYER_NUMBER}" max="${CONSTANTS.MAX_PLAYER_NUMBER}"
+                           data-index="${index}"
+                           aria-label="Jersey number for ${player.name}"
                            onclick="event.stopPropagation()" />
-                    <span class="player-name-display">${captainIcon} ${player.name}</span>
-                </label>
-                <button class="remove-btn" onclick="lineupGenerator.removePlayer('${player.name}')">×</button>
+                    <span class="player-name-display">${captainIcon}${this.sanitizeHtml(player.name)}</span>
+                    <div class="player-preferences">
+                        <button type="button" class="pref-checkbox no-keeper ${player.noKeeper ? 'active' : ''}"
+                                data-player="${escapedName}" data-pref="noKeeper"
+                                aria-label="Toggle no goalkeeper for ${player.name}"
+                                aria-pressed="${player.noKeeper}"
+                                title="No Keeper">GK</button>
+                        <button type="button" class="pref-checkbox must-rest ${player.mustRest ? 'active' : ''}"
+                                data-player="${escapedName}" data-pref="mustRest"
+                                aria-label="Toggle must rest for ${player.name}"
+                                aria-pressed="${player.mustRest}"
+                                title="Must Rest">R</button>
+                        <select class="player-status-select ${statusClass}"
+                                data-player="${escapedName}"
+                                aria-label="Status for ${player.name}">
+                            <option value="available" ${status === 'available' ? 'selected' : ''}>&#9679;</option>
+                            <option value="injured" ${status === 'injured' ? 'selected' : ''}>&#128128;</option>
+                            <option value="absent" ${status === 'absent' ? 'selected' : ''}>&#10006;</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="remove-btn" data-player="${escapedName}"
+                        aria-label="Remove ${player.name} from roster"
+                        title="Remove player">×</button>
             `;
             list.appendChild(li);
         });
 
         // Also update evaluation list
         this.updateEvaluationList();
+    }
+
+    // Escape HTML attribute to prevent XSS
+    escapeHtmlAttribute(str) {
+        return str.replace(/[&<>"']/g, (char) => {
+            const entities = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            };
+            return entities[char];
+        });
     }
 
     switchTab(tabName) {
@@ -718,11 +1156,11 @@ class SoccerLineupGenerator {
     
     showWelcomeMessage() {
         // Only show on first visit
-        if (!localStorage.getItem('ayso_visited')) {
-            localStorage.setItem('ayso_visited', 'true');
+        if (!this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.VISITED)) {
+            this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.VISITED, 'true');
             setTimeout(() => {
                 this.showNotification('Welcome to AYSO Roster Pro! Add players to get started.', 'info');
-            }, 500);
+            }, CONSTANTS.WELCOME_MESSAGE_DELAY_MS);
         }
     }
 
@@ -1510,14 +1948,15 @@ class SoccerLineupGenerator {
     
     clearAll() {
         if (confirm('Clear all players and lineup? This cannot be undone.')) {
+            this.saveStateForUndo();
             this.players = [];
             this.captains = [];
             this.lineup = [];
             this.updatePlayerList();
             document.getElementById('lineupDisplay').classList.add('hidden');
             document.getElementById('fileInput').value = '';
-            localStorage.removeItem('ayso_players');
-            localStorage.removeItem('ayso_settings');
+            this.safeRemoveFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS);
+            this.safeRemoveFromStorage(CONSTANTS.STORAGE_KEYS.SETTINGS);
             this.showNotification('All data cleared', 'info');
         }
     }
@@ -1653,34 +2092,50 @@ class SoccerLineupGenerator {
     
     loadData() {
         // Load players
-        const savedPlayers = localStorage.getItem('ayso_players');
+        const savedPlayers = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS);
         if (savedPlayers) {
-            this.players = JSON.parse(savedPlayers);
-            // Reconstruct captains from player data
-            this.captains = this.players.filter(p => p.isCaptain).map(p => p.name);
+            try {
+                this.players = JSON.parse(savedPlayers);
+                // Ensure all players have required fields (migration for older data)
+                this.players = this.players.map(p => ({
+                    ...p,
+                    status: p.status || CONSTANTS.PLAYER_STATUS.AVAILABLE,
+                    preferredPositions: p.preferredPositions || []
+                }));
+                // Reconstruct captains from player data
+                this.captains = this.players.filter(p => p.isCaptain).map(p => p.name);
+            } catch (error) {
+                console.error('Error parsing players data:', error);
+                this.players = [];
+                this.captains = [];
+            }
         }
 
         // Load settings
-        const savedSettings = localStorage.getItem('ayso_settings');
+        const savedSettings = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SETTINGS);
         if (savedSettings) {
-            const settings = JSON.parse(savedSettings);
-            this.ageDivision = settings.ageDivision || this.ageDivision;
-            this.playersOnField = settings.playersOnField || this.playersOnField;
-            this.formation = settings.formation || this.formation;
+            try {
+                const settings = JSON.parse(savedSettings);
+                this.ageDivision = settings.ageDivision || this.ageDivision;
+                this.playersOnField = settings.playersOnField || this.playersOnField;
+                this.formation = settings.formation || this.formation;
 
-            // Update UI with loaded settings
-            const ageDivisionSelect = document.getElementById('ageDivision');
-            if (ageDivisionSelect) {
-                ageDivisionSelect.value = this.ageDivision;
-                this.updateFieldOptions();
+                // Update UI with loaded settings
+                const ageDivisionSelect = document.getElementById('ageDivision');
+                if (ageDivisionSelect) {
+                    ageDivisionSelect.value = this.ageDivision;
+                    this.updateFieldOptions();
+                }
+                const fieldPlayersSelect = document.getElementById('fieldPlayers');
+                if (fieldPlayersSelect) {
+                    fieldPlayersSelect.value = this.playersOnField;
+                    this.updateFormationOptions();
+                }
+                const formationSelect = document.getElementById('formation');
+                if (formationSelect) formationSelect.value = this.formation;
+            } catch (error) {
+                console.error('Error parsing settings data:', error);
             }
-            const fieldPlayersSelect = document.getElementById('fieldPlayers');
-            if (fieldPlayersSelect) {
-                fieldPlayersSelect.value = this.playersOnField;
-                this.updateFormationOptions();
-            }
-            const formationSelect = document.getElementById('formation');
-            if (formationSelect) formationSelect.value = this.formation;
         }
 
         // Update player list after loading
@@ -1691,7 +2146,7 @@ class SoccerLineupGenerator {
     }
 
     savePlayers() {
-        localStorage.setItem('ayso_players', JSON.stringify(this.players));
+        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.PLAYERS, JSON.stringify(this.players));
     }
 
     saveSettings() {
@@ -1700,7 +2155,7 @@ class SoccerLineupGenerator {
             playersOnField: this.playersOnField,
             formation: this.formation
         };
-        localStorage.setItem('ayso_settings', JSON.stringify(settings));
+        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     }
 
     sanitizeHtml(text) {
@@ -1840,7 +2295,7 @@ class SoccerLineupGenerator {
 
     async generatePlayerEvaluationPDF() {
         if (this.players.length === 0) {
-            alert('Please add players first before generating the evaluation form.');
+            this.showNotification('Please add players first before generating the evaluation form.', 'error');
             return;
         }
 
@@ -1850,14 +2305,32 @@ class SoccerLineupGenerator {
         const gender = document.getElementById('gender').value;
 
         if (!coachName) {
-            alert('Please enter the coach name.');
+            this.showNotification('Please enter the coach name.', 'error');
+            return;
+        }
+
+        // Check for PDF library
+        if (typeof window.PDFLib === 'undefined') {
+            this.showNotification('PDF library not loaded. Please refresh the page and try again.', 'error');
             return;
         }
 
         try {
-            // Load the PDF template
+            // Load the PDF template (use cache if available)
             const templateUrl = '/assets/Player Evaluation Form 2025.pdf';
-            const existingPdfBytes = await fetch(templateUrl).then(res => res.arrayBuffer());
+            let existingPdfBytes;
+
+            if (this.pdfTemplateCache) {
+                existingPdfBytes = this.pdfTemplateCache;
+            } else {
+                const response = await fetch(templateUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to load PDF template: ${response.status} ${response.statusText}`);
+                }
+                existingPdfBytes = await response.arrayBuffer();
+                // Cache the template for future use
+                this.pdfTemplateCache = existingPdfBytes;
+            }
 
             // Load pdf-lib
             const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
@@ -2060,10 +2533,23 @@ class SoccerLineupGenerator {
 
             URL.revokeObjectURL(url);
 
-            alert('Player Evaluation Form generated successfully!');
+            this.showNotification('Player Evaluation Form generated successfully!', 'success');
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Error generating PDF. Please make sure the template file is accessible.');
+
+            // Provide specific error messages based on error type
+            let errorMessage = 'Error generating PDF: ';
+            if (error.message.includes('Failed to load PDF template')) {
+                errorMessage += 'Could not load the template file. Please check your internet connection.';
+            } else if (error.message.includes('font')) {
+                errorMessage += 'Font loading error. Please refresh the page and try again.';
+            } else if (error.name === 'TypeError') {
+                errorMessage += 'Invalid data format. Please check player information.';
+            } else {
+                errorMessage += error.message || 'Unknown error occurred.';
+            }
+
+            this.showNotification(errorMessage, 'error');
         }
     }
 
@@ -2074,25 +2560,37 @@ class SoccerLineupGenerator {
                 e.preventDefault();
                 document.getElementById('generateLineup').click();
             }
-            
+
             // Ctrl/Cmd + D: Demo players
             if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
                 e.preventDefault();
                 document.getElementById('demoButton').click();
             }
-            
+
             // Ctrl/Cmd + P: Print lineup
             if ((e.ctrlKey || e.metaKey) && e.key === 'p' && !document.getElementById('lineupDisplay').classList.contains('hidden')) {
                 e.preventDefault();
                 this.printLineup();
             }
-            
+
             // Ctrl/Cmd + E: Export lineup
             if ((e.ctrlKey || e.metaKey) && e.key === 'e' && !document.getElementById('lineupDisplay').classList.contains('hidden')) {
                 e.preventDefault();
                 this.exportLineup();
             }
-            
+
+            // Ctrl/Cmd + Z: Undo
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.undo();
+            }
+
+            // Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z: Redo
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                this.redo();
+            }
+
             // ESC: Clear player name input
             if (e.key === 'Escape') {
                 const playerInput = document.getElementById('playerName');

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,38 +8,59 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="constants.js"></script>
 </head>
 <body>
+    <!-- Skip link for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <div class="container">
         <header>
-            <h1>AYSO Roster Pro</h1>
+            <div class="header-top">
+                <h1>AYSO Roster Pro</h1>
+                <div class="header-controls">
+                    <button id="themeToggle" class="btn-icon" aria-label="Toggle light/dark theme" title="Toggle theme">
+                        <span class="theme-icon-dark">&#9790;</span>
+                        <span class="theme-icon-light">&#9728;</span>
+                    </button>
+                    <button id="undoBtn" class="btn-icon" aria-label="Undo last action" title="Undo (Ctrl+Z)" disabled>
+                        &#8630;
+                    </button>
+                    <button id="redoBtn" class="btn-icon" aria-label="Redo last action" title="Redo (Ctrl+Y)" disabled>
+                        &#8631;
+                    </button>
+                </div>
+            </div>
             <p class="subtitle">Smart lineup generator with fair rotation for youth soccer</p>
             <div class="keyboard-help" title="Keyboard Shortcuts">
                 <span style="font-size: 0.85rem; opacity: 0.8;">
-                    Shortcuts: Ctrl+G (Generate) | Ctrl+D (Demo) | Ctrl+P (Print) | Ctrl+E (Export)
+                    Shortcuts: Ctrl+G (Generate) | Ctrl+D (Demo) | Ctrl+P (Print) | Ctrl+E (Export) | Ctrl+Z (Undo) | Ctrl+Y (Redo)
                 </span>
             </div>
         </header>
 
-        <div class="main-content">
+        <div class="main-content" id="main-content">
             <!-- Player Management & Evaluation Section with Tabs -->
-            <section class="player-section">
+            <section class="player-section" aria-labelledby="roster-heading">
                 <!-- Tab Navigation -->
-                <div class="tab-navigation">
-                    <button class="tab-button active" data-tab="roster">Roster Management</button>
-                    <button class="tab-button" data-tab="evaluation">Player Evaluation</button>
+                <div class="tab-navigation" role="tablist" aria-label="Player management tabs">
+                    <button class="tab-button active" data-tab="roster" role="tab" aria-selected="true" aria-controls="roster-tab" id="roster-tab-btn">Roster Management</button>
+                    <button class="tab-button" data-tab="evaluation" role="tab" aria-selected="false" aria-controls="evaluation-tab" id="evaluation-tab-btn">Player Evaluation</button>
                 </div>
 
                 <!-- Tab Content -->
                 <div class="tab-content">
                     <!-- Roster Management Tab -->
-                    <div class="tab-pane active" id="roster-tab">
+                    <div class="tab-pane active" id="roster-tab" role="tabpanel" aria-labelledby="roster-tab-btn">
                         <div class="import-section">
                             <label for="fileInput" class="file-label" aria-label="Choose a text file to import player names">Import Players (txt file)</label>
-                            <input type="file" id="fileInput" accept=".txt" aria-label="File input for importing players">
+                            <input type="file" id="fileInput" accept=".txt,.json" aria-label="File input for importing players">
                             <button id="exportPlayers" class="btn-export-players" style="display: none;" aria-label="Export current player list to text file">Export Players</button>
+                            <button id="backupData" class="btn-backup" aria-label="Backup all data to JSON file" title="Save all data including settings">Backup All</button>
+                            <label for="restoreInput" class="btn-restore" aria-label="Restore data from JSON backup" title="Load from backup file">Restore</label>
+                            <input type="file" id="restoreInput" accept=".json" aria-label="File input for restoring backup" style="display: none;">
                             <button id="clearAll" class="btn-secondary" aria-label="Clear all players and reset the application">Clear All</button>
-                            <small>One player per line. Format: "Name #Number" or just "Name"</small>
+                            <small>Import: txt (one player per line) or JSON backup. Format: "Name #Number" or just "Name"</small>
                         </div>
 
                         <div class="manual-entry">
@@ -53,13 +74,19 @@
                         </div>
 
                         <div class="player-list">
-                            <h3>Current Players (<span id="playerCount">0</span>)</h3>
-                            <ul id="playerList" role="list"></ul>
+                            <h3 id="roster-heading">Current Players (<span id="playerCount">0</span>)</h3>
+                            <div class="player-list-legend">
+                                <span class="legend-item" title="Check to select as team captain"><span class="legend-icon captain">&#9733;</span> Captain</span>
+                                <span class="legend-item" title="Check if player should not play goalkeeper"><span class="legend-icon no-keeper">GK</span> No Keeper</span>
+                                <span class="legend-item" title="Check if player needs to rest at least 1 quarter"><span class="legend-icon rest">R</span> Must Rest</span>
+                                <span class="legend-item" title="Player availability status"><span class="legend-icon status">&#9679;</span> Status</span>
+                            </div>
+                            <ul id="playerList" role="list" aria-label="Player roster"></ul>
                         </div>
                     </div>
 
                     <!-- Player Evaluation Tab -->
-                    <div class="tab-pane" id="evaluation-tab">
+                    <div class="tab-pane" id="evaluation-tab" role="tabpanel" aria-labelledby="evaluation-tab-btn">
                         <p class="section-description">Generate AYSO Player Evaluation Form with ratings and comments</p>
 
                         <div class="evaluation-inputs">
