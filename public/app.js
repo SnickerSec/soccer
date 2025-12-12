@@ -752,7 +752,7 @@ class SoccerLineupGenerator {
                                 data-player="${escapedName}"
                                 aria-label="Status for ${player.name}">
                             <option value="available" ${status === 'available' ? 'selected' : ''}>&#9679;</option>
-                            <option value="injured" ${status === 'injured' ? 'selected' : ''}>&#128128;</option>
+                            <option value="injured" ${status === 'injured' ? 'selected' : ''}>&#129657;</option>
                             <option value="absent" ${status === 'absent' ? 'selected' : ''}>&#10006;</option>
                         </select>
                     </div>
