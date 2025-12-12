@@ -331,7 +331,6 @@ class SoccerLineupGenerator {
             '#demoButton': 'Load sample players to try the app (Ctrl+D)',
             '#exportLineup': 'Export lineup to text file (Ctrl+E)',
             '#printLineup': 'Print the lineup (Ctrl+P)',
-            '#backupData': 'Save all data to a backup file',
             '#themeToggle': 'Switch between dark and light theme',
             '#undoBtn': 'Undo last change (Ctrl+Z)',
             '#redoBtn': 'Redo last change (Ctrl+Y)',
@@ -570,16 +569,6 @@ class SoccerLineupGenerator {
             redoBtn.addEventListener('click', () => this.redo());
         }
 
-        // Backup/Restore
-        const backupBtn = document.getElementById('backupData');
-        const restoreInput = document.getElementById('restoreInput');
-        if (backupBtn) {
-            backupBtn.addEventListener('click', () => this.backupAllData());
-        }
-        if (restoreInput) {
-            restoreInput.addEventListener('change', (e) => this.restoreFromBackup(e));
-        }
-
         // Age division setting
         document.getElementById('ageDivision').addEventListener('change', (e) => {
             this.ageDivision = e.target.value;
@@ -672,99 +661,6 @@ class SoccerLineupGenerator {
             }
             return;
         }
-    }
-
-    // Backup all data to JSON
-    backupAllData() {
-        const backup = {
-            version: '1.0',
-            timestamp: new Date().toISOString(),
-            players: this.players,
-            captains: this.captains,
-            settings: {
-                ageDivision: this.ageDivision,
-                playersOnField: this.playersOnField,
-                formation: this.formation
-            },
-            lineup: this.lineup
-        };
-
-        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ayso_backup_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        this.showNotification('Backup created successfully', 'success');
-    }
-
-    // Restore from backup
-    restoreFromBackup(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const backup = JSON.parse(e.target.result);
-
-                // Validate backup structure
-                if (!backup.players || !Array.isArray(backup.players)) {
-                    throw new Error('Invalid backup file: missing players data');
-                }
-
-                // Save state for undo
-                this.saveStateForUndo();
-
-                // Restore data
-                this.players = backup.players;
-                this.captains = backup.captains || [];
-
-                if (backup.settings) {
-                    this.ageDivision = backup.settings.ageDivision || this.ageDivision;
-                    this.playersOnField = backup.settings.playersOnField || this.playersOnField;
-                    this.formation = backup.settings.formation || this.formation;
-
-                    // Update UI
-                    const ageDivisionSelect = document.getElementById('ageDivision');
-                    const fieldPlayersSelect = document.getElementById('fieldPlayers');
-                    const formationSelect = document.getElementById('formation');
-
-                    if (ageDivisionSelect) ageDivisionSelect.value = this.ageDivision;
-                    this.updateFieldOptions();
-                    if (fieldPlayersSelect) fieldPlayersSelect.value = this.playersOnField;
-                    this.updateFormationOptions();
-                    if (formationSelect) formationSelect.value = this.formation;
-                }
-
-                this.lineup = backup.lineup || [];
-
-                this.updatePlayerList();
-                this.updatePositions();
-                this.savePlayers();
-                this.saveSettings();
-
-                if (this.lineup.length > 0) {
-                    this.displayLineup(this.validateLineup());
-                }
-
-                this.showNotification(`Restored ${this.players.length} players from backup`, 'success');
-            } catch (error) {
-                console.error('Restore error:', error);
-                this.showNotification('Error restoring backup: ' + error.message, 'error');
-            }
-
-            event.target.value = ''; // Reset file input
-        };
-
-        reader.onerror = () => {
-            this.showNotification('Failed to read backup file', 'error');
-            event.target.value = '';
-        };
-
-        reader.readAsText(file);
     }
 
     // Update player status (available, injured, absent)

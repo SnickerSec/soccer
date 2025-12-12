@@ -267,27 +267,6 @@ small {
     color: var(--text-muted);
 }
 
-/* Backup/Restore buttons */
-.btn-backup,
-.btn-restore {
-    display: inline-block;
-    padding: 10px 20px;
-    background: var(--accent-purple);
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 1.5;
-    transition: background 0.3s;
-    text-align: center;
-}
-
-.btn-backup:hover,
-.btn-restore:hover {
-    background: #8e44ad;
-}
-
 /* Player list legend */
 .player-list-legend {
     display: flex;
@@ -1740,12 +1719,6 @@ button:active {
     /* Improve mobile import section */
     .import-section {
         flex-direction: column;
-    }
-
-    .btn-backup,
-    .btn-restore {
-        width: 100%;
-        margin: 5px 0;
     }
 }
 
