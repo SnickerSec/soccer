@@ -429,6 +429,7 @@ small {
     align-items: center;
     flex: 1;
     gap: 8px;
+    padding-right: 10px;
 }
 
 .player-preferences {
