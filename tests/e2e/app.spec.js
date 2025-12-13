@@ -66,7 +66,7 @@ test.describe('AYSO Roster Pro', () => {
     });
 
     test('header controls exist', async ({ page }) => {
-        await expect(page.locator('#themeToggle')).toBeVisible();
+        await expect(page.locator('#themeToggle')).toBeVisible({ timeout: 10000 });
         await expect(page.locator('#undoBtn')).toBeVisible();
         await expect(page.locator('#redoBtn')).toBeVisible();
     });

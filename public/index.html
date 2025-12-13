@@ -53,6 +53,7 @@
                 <div class="tab-navigation" role="tablist" aria-label="Player management tabs">
                     <button class="tab-button active" data-tab="roster" role="tab" aria-selected="true" aria-controls="roster-tab" id="roster-tab-btn">Roster Management</button>
                     <button class="tab-button" data-tab="evaluation" role="tab" aria-selected="false" aria-controls="evaluation-tab" id="evaluation-tab-btn">Player Evaluation</button>
+                    <button class="tab-button" data-tab="season" role="tab" aria-selected="false" aria-controls="season-tab" id="season-tab-btn">Season Stats</button>
                 </div>
 
                 <!-- Tab Content -->
@@ -134,6 +135,38 @@
 
                         <button id="generateEvaluation" class="btn-primary" aria-label="Generate player evaluation form PDF">Generate Evaluation Form (PDF)</button>
                         <p class="helper-text">Players will be automatically sorted alphabetically by last name in the PDF</p>
+                    </div>
+
+                    <!-- Season Stats Tab -->
+                    <div class="tab-pane" id="season-tab" role="tabpanel" aria-labelledby="season-tab-btn">
+                        <div class="season-summary">
+                            <div class="summary-stat">
+                                <span class="stat-value" id="totalGames">0</span>
+                                <span class="stat-label">Games Played</span>
+                            </div>
+                            <div class="summary-stat">
+                                <span class="stat-value" id="totalPlayersTracked">0</span>
+                                <span class="stat-label">Players Tracked</span>
+                            </div>
+                        </div>
+
+                        <div class="season-section">
+                            <h3>Game History</h3>
+                            <div id="gameHistoryList" class="game-history-list">
+                                <p class="empty-state">No games saved yet. Generate a lineup and click "Save Game" to start tracking.</p>
+                            </div>
+                        </div>
+
+                        <div class="season-section">
+                            <h3>Player Statistics</h3>
+                            <div id="playerStatsTable" class="player-stats-container">
+                                <p class="empty-state">Save some games to see player statistics across the season.</p>
+                            </div>
+                        </div>
+
+                        <div class="season-actions">
+                            <button id="clearSeasonHistory" class="btn-secondary" aria-label="Clear all season history">Clear All History</button>
+                        </div>
                     </div>
                 </div>
             </section>

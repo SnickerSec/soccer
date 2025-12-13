@@ -824,6 +824,207 @@ small {
     font-style: italic;
 }
 
+/* Season Stats Tab */
+.season-summary {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: var(--bg-elevated);
+    border-radius: 8px;
+    justify-content: center;
+}
+
+.summary-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px 30px;
+}
+
+.summary-stat .stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+}
+
+.summary-stat .stat-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-top: 5px;
+}
+
+.season-section {
+    margin-bottom: 30px;
+}
+
+.season-section h3 {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.game-history-list {
+    background: var(--bg-surface);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.game-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.2s;
+}
+
+.game-history-item:last-child {
+    border-bottom: none;
+}
+
+.game-history-item:hover {
+    background: var(--bg-hover);
+}
+
+.game-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.game-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.game-date {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.game-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.game-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.game-actions button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.btn-view-game {
+    background: var(--accent-blue);
+    color: white;
+}
+
+.btn-view-game:hover {
+    background: #4a9fd4;
+}
+
+.btn-delete-game {
+    background: var(--accent-red);
+    color: white;
+}
+
+.btn-delete-game:hover {
+    background: #c0392b;
+}
+
+.player-stats-container {
+    overflow-x: auto;
+}
+
+.player-stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-surface);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.player-stats-table th,
+.player-stats-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.player-stats-table th {
+    background: var(--bg-elevated);
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.player-stats-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.player-stats-table th.sortable:hover {
+    background: var(--bg-hover);
+}
+
+.player-stats-table th.sortable::after {
+    content: ' \2195';
+    opacity: 0.5;
+}
+
+.player-stats-table th.sorted-asc::after {
+    content: ' \2191';
+    opacity: 1;
+}
+
+.player-stats-table th.sorted-desc::after {
+    content: ' \2193';
+    opacity: 1;
+}
+
+.player-stats-table tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+.player-stats-table td {
+    color: var(--text-secondary);
+}
+
+.player-stats-table td:first-child {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.stat-bar {
+    display: inline-block;
+    height: 8px;
+    background: var(--accent-blue);
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.season-actions {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
 /* Settings */
 .settings-header {
     display: flex;

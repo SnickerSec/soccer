@@ -33,6 +33,7 @@ class SoccerLineupGenerator {
         this.loadTheme();
         this.loadData();
         this.loadSavedGames();
+        this.renderSeasonStats();
         this.checkForSharedLineup();
         this.setupEventListeners();
         this.setupKeyboardShortcuts();
@@ -257,6 +258,7 @@ class SoccerLineupGenerator {
 
         this.savedGames.push(game);
         this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.renderSeasonStats();
         this.showNotification(`Game "${game.name}" saved!`, 'success');
     }
 
@@ -321,6 +323,175 @@ class SoccerLineupGenerator {
         });
 
         return stats;
+    }
+
+    // Render season stats tab
+    renderSeasonStats() {
+        const totalGamesEl = document.getElementById('totalGames');
+        const totalPlayersEl = document.getElementById('totalPlayersTracked');
+        const gameHistoryEl = document.getElementById('gameHistoryList');
+        const playerStatsEl = document.getElementById('playerStatsTable');
+
+        if (!totalGamesEl || !gameHistoryEl || !playerStatsEl) return;
+
+        // Update summary stats
+        totalGamesEl.textContent = this.savedGames.length;
+
+        const allPlayers = new Set();
+        this.savedGames.forEach(game => {
+            game.players.forEach(p => allPlayers.add(p.name));
+        });
+        totalPlayersEl.textContent = allPlayers.size;
+
+        // Render game history
+        if (this.savedGames.length === 0) {
+            gameHistoryEl.innerHTML = '<p class="empty-state">No games saved yet. Generate a lineup and click "Save Game" to start tracking.</p>';
+        } else {
+            const sortedGames = [...this.savedGames].sort((a, b) => new Date(b.date) - new Date(a.date));
+            gameHistoryEl.innerHTML = sortedGames.map(game => {
+                const date = new Date(game.date);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+                const playerCount = game.players.filter(p => p.status === 'available').length;
+                return `
+                    <div class="game-history-item" data-game-id="${game.id}">
+                        <div class="game-info">
+                            <span class="game-name">${this.escapeHtml(game.name)}</span>
+                            <span class="game-date">${formattedDate}</span>
+                            <span class="game-meta">${playerCount} players | ${game.settings.formation} | ${game.settings.ageDivision}</span>
+                        </div>
+                        <div class="game-actions">
+                            <button class="btn-view-game" data-action="view-game" data-game-id="${game.id}">View</button>
+                            <button class="btn-delete-game" data-action="delete-game" data-game-id="${game.id}">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render player stats
+        if (this.savedGames.length === 0) {
+            playerStatsEl.innerHTML = '<p class="empty-state">Save some games to see player statistics across the season.</p>';
+        } else {
+            const stats = this.getPlayerStats();
+            const playerNames = Object.keys(stats).filter(name => stats[name].gamesPlayed > 0);
+
+            if (playerNames.length === 0) {
+                playerStatsEl.innerHTML = '<p class="empty-state">No player statistics available.</p>';
+                return;
+            }
+
+            // Sort by games played (descending), then by name
+            playerNames.sort((a, b) => {
+                const diff = stats[b].gamesPlayed - stats[a].gamesPlayed;
+                return diff !== 0 ? diff : a.localeCompare(b);
+            });
+
+            const maxQuarters = Math.max(...playerNames.map(n => stats[n].totalQuarters)) || 1;
+
+            playerStatsEl.innerHTML = `
+                <table class="player-stats-table">
+                    <thead>
+                        <tr>
+                            <th>Player</th>
+                            <th class="sortable" data-sort="games">Games</th>
+                            <th class="sortable" data-sort="quarters">Quarters</th>
+                            <th class="sortable" data-sort="sitting">Sitting %</th>
+                            <th class="sortable" data-sort="gk">GK</th>
+                            <th>Top Positions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${playerNames.map(name => {
+                            const s = stats[name];
+                            const totalPossibleQuarters = s.gamesPlayed * 4;
+                            const sittingPct = totalPossibleQuarters > 0
+                                ? Math.round((s.totalSitting / totalPossibleQuarters) * 100)
+                                : 0;
+                            const barWidth = Math.round((s.totalQuarters / maxQuarters) * 50);
+
+                            // Get top 3 positions
+                            const positions = Object.entries(s.positions)
+                                .sort((a, b) => b[1] - a[1])
+                                .slice(0, 3)
+                                .map(([pos, count]) => `${pos} (${count})`)
+                                .join(', ') || '-';
+
+                            return `
+                                <tr>
+                                    <td>${this.escapeHtml(name)}</td>
+                                    <td>${s.gamesPlayed}</td>
+                                    <td>${s.totalQuarters}<span class="stat-bar" style="width: ${barWidth}px;"></span></td>
+                                    <td>${sittingPct}%</td>
+                                    <td>${s.goalkeeperQuarters}</td>
+                                    <td>${positions}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+    }
+
+    // Delete a saved game
+    deleteGame(gameId) {
+        const game = this.savedGames.find(g => g.id === gameId);
+        if (!game) return;
+
+        if (!confirm(`Are you sure you want to delete "${game.name}"?`)) {
+            return;
+        }
+
+        this.savedGames = this.savedGames.filter(g => g.id !== gameId);
+        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.renderSeasonStats();
+        this.showNotification(`Deleted "${game.name}"`, 'info');
+    }
+
+    // View a saved game's lineup
+    viewGameDetails(gameId) {
+        const game = this.savedGames.find(g => g.id === gameId);
+        if (!game) {
+            this.showNotification('Game not found', 'error');
+            return;
+        }
+
+        // Load the game data temporarily to display the lineup
+        const originalPlayers = JSON.parse(JSON.stringify(this.players));
+        const originalLineup = JSON.parse(JSON.stringify(this.lineup));
+
+        this.players = JSON.parse(JSON.stringify(game.players));
+        this.lineup = JSON.parse(JSON.stringify(game.lineup));
+
+        // Display the lineup
+        this.displayLineup([]);
+
+        // Scroll to lineup section
+        const lineupSection = document.getElementById('lineupDisplay');
+        if (lineupSection) {
+            lineupSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        this.showNotification(`Viewing lineup from "${game.name}"`, 'info');
+
+        // Restore original data after a delay (user can see the lineup)
+        // Note: We don't restore automatically - user can generate a new lineup or save this one
+    }
+
+    // Clear all season history
+    clearSeasonHistory() {
+        if (!confirm('Are you sure you want to delete ALL saved games? This cannot be undone.')) {
+            return;
+        }
+
+        this.savedGames = [];
+        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.renderSeasonStats();
+        this.showNotification('Season history cleared', 'info');
     }
 
     // Setup tooltips
@@ -549,6 +720,30 @@ class SoccerLineupGenerator {
             const name = prompt('Enter a name for this game (e.g., "vs Tigers 12/10"):');
             if (name !== null) this.saveCurrentGame(name);
         });
+
+        // Season stats tab - event delegation for game actions
+        const gameHistoryList = document.getElementById('gameHistoryList');
+        if (gameHistoryList) {
+            gameHistoryList.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+
+                const action = button.dataset.action;
+                const gameId = parseInt(button.dataset.gameId);
+
+                if (action === 'view-game') {
+                    this.viewGameDetails(gameId);
+                } else if (action === 'delete-game') {
+                    this.deleteGame(gameId);
+                }
+            });
+        }
+
+        // Clear season history button
+        const clearSeasonBtn = document.getElementById('clearSeasonHistory');
+        if (clearSeasonBtn) {
+            clearSeasonBtn.addEventListener('click', () => this.clearSeasonHistory());
+        }
 
         // Player evaluation form
         document.getElementById('generateEvaluation').addEventListener('click', () => this.generatePlayerEvaluationPDF());
@@ -1024,12 +1219,20 @@ class SoccerLineupGenerator {
             pane.classList.remove('active');
         });
 
-        const targetPane = tabName === 'roster' ? 'roster-tab' : 'evaluation-tab';
-        document.getElementById(targetPane).classList.add('active');
+        const targetPane = `${tabName}-tab`;
+        const paneEl = document.getElementById(targetPane);
+        if (paneEl) {
+            paneEl.classList.add('active');
+        }
 
         // Update evaluation list when switching to evaluation tab
         if (tabName === 'evaluation') {
             this.updateEvaluationList();
+        }
+
+        // Render season stats when switching to season tab
+        if (tabName === 'season') {
+            this.renderSeasonStats();
         }
     }
 
