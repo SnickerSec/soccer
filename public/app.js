@@ -1140,7 +1140,7 @@ class SoccerLineupGenerator {
             const escapedName = this.escapeHtmlAttribute(player.name);
 
             li.setAttribute('role', 'listitem');
-            li.setAttribute('aria-label', `Player ${player.name}${player.number ? ' number ' + player.number : ''}`);
+            li.setAttribute('aria-label', `Player ${escapedName}${player.number ? ' number ' + player.number : ''}`);
 
             // Status indicator class
             const statusClass = status === CONSTANTS.PLAYER_STATUS.INJURED ? 'status-injured' :
@@ -1150,30 +1150,30 @@ class SoccerLineupGenerator {
                 <div class="player-item-container">
                     <input type="checkbox" class="captain-checkbox" ${isCaptain ? 'checked' : ''}
                            data-player="${escapedName}"
-                           aria-label="Select ${player.name} as captain"
+                           aria-label="Select ${escapedName} as captain"
                            title="Captain" />
                     <input type="number" class="player-number-edit"
                            value="${player.number || ''}"
                            placeholder="#"
                            min="${CONSTANTS.MIN_PLAYER_NUMBER}" max="${CONSTANTS.MAX_PLAYER_NUMBER}"
                            data-index="${index}"
-                           aria-label="Jersey number for ${player.name}"
+                           aria-label="Jersey number for ${escapedName}"
                            onclick="event.stopPropagation()" />
                     <span class="player-name-display">${captainIcon}${this.sanitizeHtml(player.name)}</span>
                     <div class="player-preferences">
                         <button type="button" class="pref-checkbox no-keeper ${player.noKeeper ? 'active' : ''}"
                                 data-player="${escapedName}" data-pref="noKeeper"
-                                aria-label="Toggle no goalkeeper for ${player.name}"
+                                aria-label="Toggle no goalkeeper for ${escapedName}"
                                 aria-pressed="${player.noKeeper}"
                                 title="No Keeper">GK</button>
                         <button type="button" class="pref-checkbox must-rest ${player.mustRest ? 'active' : ''}"
                                 data-player="${escapedName}" data-pref="mustRest"
-                                aria-label="Toggle must rest for ${player.name}"
+                                aria-label="Toggle must rest for ${escapedName}"
                                 aria-pressed="${player.mustRest}"
                                 title="Must Rest">R</button>
                         <select class="player-status-select ${statusClass}"
                                 data-player="${escapedName}"
-                                aria-label="Status for ${player.name}">
+                                aria-label="Status for ${escapedName}">
                             <option value="available" ${status === 'available' ? 'selected' : ''}>&#9679;</option>
                             <option value="injured" ${status === 'injured' ? 'selected' : ''}>&#129657;</option>
                             <option value="absent" ${status === 'absent' ? 'selected' : ''}>&#10006;</option>
@@ -1181,7 +1181,7 @@ class SoccerLineupGenerator {
                     </div>
                 </div>
                 <button class="remove-btn" data-player="${escapedName}"
-                        aria-label="Remove ${player.name} from roster"
+                        aria-label="Remove ${escapedName} from roster"
                         title="Remove player">×</button>
             `;
             list.appendChild(li);
@@ -1251,10 +1251,12 @@ class SoccerLineupGenerator {
             playerDiv.className = 'evaluation-player-item';
 
             const numberBadge = player.number ? `<span class="eval-player-number">#${player.number}</span>` : '';
+            const sanitizedName = this.sanitizeHtml(player.name);
+            const sanitizedComment = this.sanitizeHtml(player.comment || '');
 
             playerDiv.innerHTML = `
                 <div class="eval-player-name">
-                    ${player.name}
+                    ${sanitizedName}
                     ${numberBadge}
                 </div>
                 <div class="eval-rating-group">
@@ -1272,7 +1274,7 @@ class SoccerLineupGenerator {
                     <label for="comment-${index}">Comments / Parental Support</label>
                     <textarea id="comment-${index}"
                               placeholder="Enter comments about player skill or parental support..."
-                              onchange="lineupGenerator.updatePlayerComment(${index}, this.value)">${player.comment || ''}</textarea>
+                              onchange="lineupGenerator.updatePlayerComment(${index}, this.value)">${sanitizedComment}</textarea>
                 </div>
             `;
 
@@ -2166,7 +2168,7 @@ class SoccerLineupGenerator {
         // Show validation messages
         if (validationIssues.length > 0) {
             validationDiv.innerHTML = '<h3>Rotation Issues:</h3>' +
-                validationIssues.map(issue => `<p>${issue}</p>`).join('');
+                validationIssues.map(issue => `<p>${this.sanitizeHtml(issue)}</p>`).join('');
             validationDiv.classList.add('has-issues');
         } else {
             validationDiv.innerHTML = '<p class="success">✓ All rotation rules satisfied!</p>';
@@ -2193,10 +2195,11 @@ class SoccerLineupGenerator {
                 const captainIndicator = player && player.isCaptain ? '<span class="captain-star">⭐</span> ' : '';
                 const numberStr = player && player.number ? `<span class="player-number">#${player.number}</span> ` : '';
                 const isKeeper = position === 'Keeper';
+                const sanitizedPlayerName = this.sanitizeHtml(playerName);
                 html += `
                     <tr class="${isKeeper ? 'keeper-row' : ''}">
                         <td class="position">${position}:</td>
-                        <td class="player-name">${numberStr}${captainIndicator}${playerName}</td>
+                        <td class="player-name">${numberStr}${captainIndicator}${sanitizedPlayerName}</td>
                     </tr>
                 `;
             });
@@ -2207,7 +2210,7 @@ class SoccerLineupGenerator {
                 const sittingText = sittingPlayers.map(p => {
                     const captainIndicator = p.isCaptain ? '<span class="captain-star">⭐</span> ' : '';
                     const numberStr = p.number ? `<span class="player-number">#${p.number}</span> ` : '';
-                    return `${numberStr}${captainIndicator}${p.name}`;
+                    return `${numberStr}${captainIndicator}${this.sanitizeHtml(p.name)}`;
                 }).join(', ');
                 html += `
                     <tr class="sitting-row">
@@ -2309,15 +2312,17 @@ class SoccerLineupGenerator {
             const numberStr = player.number ? ` #${player.number}` : '';
             const restChecked = player.mustRest ? 'checked' : '';
             const noKeeperChecked = player.noKeeper ? 'checked' : '';
+            const escapedName = this.escapeHtmlAttribute(player.name);
+            const sanitizedName = this.sanitizeHtml(player.name);
             html += `
                 <tr>
                     <td><input type="checkbox" class="rest-checkbox" ${restChecked}
-                               onchange="lineupGenerator.toggleRestPreference('${player.name}')"
+                               onchange="lineupGenerator.toggleRestPreference('${escapedName}')"
                                title="Check to ensure this player rests at least 1 quarter" /></td>
                     <td><input type="checkbox" class="no-keeper-checkbox" ${noKeeperChecked}
-                               onchange="lineupGenerator.toggleNoKeeperPreference('${player.name}')"
+                               onchange="lineupGenerator.toggleNoKeeperPreference('${escapedName}')"
                                title="Check to prevent this player from playing keeper" /></td>
-                    <td>${player.name}${numberStr}</td>
+                    <td>${sanitizedName}${numberStr}</td>
                     <td>${captainIndicator}</td>
                     <td>${player.quartersPlayed.join(', ') || 'None'}</td>
                     <td>${player.quartersSitting.join(', ') || 'None'}</td>
@@ -2514,16 +2519,17 @@ class SoccerLineupGenerator {
                 // Get player info for displaying number or initials
                 const playerInfo = this.players.find(p => p.name === player);
                 const displayText = playerInfo && playerInfo.number ? playerInfo.number : this.getPlayerInitials(player);
-                
+                const sanitizedDisplayText = this.sanitizeHtml(String(displayText));
+
                 svg += `
                     <g class="player-marker">
-                        <circle cx="${x}" cy="${y}" r="18" 
-                            fill="${isKeeper ? '#ffcc00' : isDefensive ? '#3498db' : '#e74c3c'}" 
+                        <circle cx="${x}" cy="${y}" r="18"
+                            fill="${isKeeper ? '#ffcc00' : isDefensive ? '#3498db' : '#e74c3c'}"
                             stroke="white" stroke-width="2"/>
-                        <text x="${x}" y="${y}" 
-                            text-anchor="middle" dominant-baseline="middle" 
+                        <text x="${x}" y="${y}"
+                            text-anchor="middle" dominant-baseline="middle"
                             fill="white" font-size="${playerInfo && playerInfo.number ? '12' : '10'}" font-weight="bold">
-                            ${displayText}
+                            ${sanitizedDisplayText}
                         </text>
                     </g>
                 `;
