@@ -1133,57 +1133,114 @@ class SoccerLineupGenerator {
         this.players.forEach((player, index) => {
             const li = document.createElement('li');
             const isCaptain = this.captains.includes(player.name);
-            const captainIcon = isCaptain ? '<span class="captain-star">&#9733;</span> ' : '';
             const status = player.status || CONSTANTS.PLAYER_STATUS.AVAILABLE;
 
-            // Use data attributes instead of inline handlers (XSS fix)
-            const escapedName = this.escapeHtmlAttribute(player.name);
-
             li.setAttribute('role', 'listitem');
-            li.setAttribute('aria-label', `Player ${escapedName}${player.number ? ' number ' + player.number : ''}`);
+            li.setAttribute('aria-label', `Player ${player.name}${player.number ? ' number ' + player.number : ''}`);
 
             // Status indicator class
             const statusClass = status === CONSTANTS.PLAYER_STATUS.INJURED ? 'status-injured' :
                                status === CONSTANTS.PLAYER_STATUS.ABSENT ? 'status-absent' : 'status-available';
 
-            li.innerHTML = `
-                <div class="player-item-container">
-                    <input type="checkbox" class="captain-checkbox" ${isCaptain ? 'checked' : ''}
-                           data-player="${escapedName}"
-                           aria-label="Select ${escapedName} as captain"
-                           title="Captain" />
-                    <input type="number" class="player-number-edit"
-                           value="${player.number || ''}"
-                           placeholder="#"
-                           min="${CONSTANTS.MIN_PLAYER_NUMBER}" max="${CONSTANTS.MAX_PLAYER_NUMBER}"
-                           data-index="${index}"
-                           aria-label="Jersey number for ${escapedName}"
-                           onclick="event.stopPropagation()" />
-                    <span class="player-name-display">${captainIcon}${this.sanitizeHtml(player.name)}</span>
-                    <div class="player-preferences">
-                        <button type="button" class="pref-checkbox no-keeper ${player.noKeeper ? 'active' : ''}"
-                                data-player="${escapedName}" data-pref="noKeeper"
-                                aria-label="Toggle no goalkeeper for ${escapedName}"
-                                aria-pressed="${player.noKeeper}"
-                                title="No Keeper">GK</button>
-                        <button type="button" class="pref-checkbox must-rest ${player.mustRest ? 'active' : ''}"
-                                data-player="${escapedName}" data-pref="mustRest"
-                                aria-label="Toggle must rest for ${escapedName}"
-                                aria-pressed="${player.mustRest}"
-                                title="Must Rest">R</button>
-                        <select class="player-status-select ${statusClass}"
-                                data-player="${escapedName}"
-                                aria-label="Status for ${escapedName}">
-                            <option value="available" ${status === 'available' ? 'selected' : ''}>&#9679;</option>
-                            <option value="injured" ${status === 'injured' ? 'selected' : ''}>&#129657;</option>
-                            <option value="absent" ${status === 'absent' ? 'selected' : ''}>&#10006;</option>
-                        </select>
-                    </div>
-                </div>
-                <button class="remove-btn" data-player="${escapedName}"
-                        aria-label="Remove ${escapedName} from roster"
-                        title="Remove player">×</button>
-            `;
+            // Build DOM elements instead of innerHTML to avoid XSS
+            const container = document.createElement('div');
+            container.className = 'player-item-container';
+
+            // Captain checkbox
+            const captainCheckbox = document.createElement('input');
+            captainCheckbox.type = 'checkbox';
+            captainCheckbox.className = 'captain-checkbox';
+            captainCheckbox.checked = isCaptain;
+            captainCheckbox.dataset.player = player.name;
+            captainCheckbox.setAttribute('aria-label', `Select ${player.name} as captain`);
+            captainCheckbox.title = 'Captain';
+            container.appendChild(captainCheckbox);
+
+            // Player number input
+            const numberInput = document.createElement('input');
+            numberInput.type = 'number';
+            numberInput.className = 'player-number-edit';
+            numberInput.value = player.number || '';
+            numberInput.placeholder = '#';
+            numberInput.min = CONSTANTS.MIN_PLAYER_NUMBER;
+            numberInput.max = CONSTANTS.MAX_PLAYER_NUMBER;
+            numberInput.dataset.index = index;
+            numberInput.setAttribute('aria-label', `Jersey number for ${player.name}`);
+            numberInput.onclick = (e) => e.stopPropagation();
+            container.appendChild(numberInput);
+
+            // Player name display
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'player-name-display';
+            if (isCaptain) {
+                const starSpan = document.createElement('span');
+                starSpan.className = 'captain-star';
+                starSpan.textContent = '★';
+                nameSpan.appendChild(starSpan);
+                nameSpan.appendChild(document.createTextNode(' '));
+            }
+            nameSpan.appendChild(document.createTextNode(player.name));
+            container.appendChild(nameSpan);
+
+            // Preferences container
+            const prefsDiv = document.createElement('div');
+            prefsDiv.className = 'player-preferences';
+
+            // No keeper button
+            const noKeeperBtn = document.createElement('button');
+            noKeeperBtn.type = 'button';
+            noKeeperBtn.className = `pref-checkbox no-keeper${player.noKeeper ? ' active' : ''}`;
+            noKeeperBtn.dataset.player = player.name;
+            noKeeperBtn.dataset.pref = 'noKeeper';
+            noKeeperBtn.setAttribute('aria-label', `Toggle no goalkeeper for ${player.name}`);
+            noKeeperBtn.setAttribute('aria-pressed', player.noKeeper);
+            noKeeperBtn.title = 'No Keeper';
+            noKeeperBtn.textContent = 'GK';
+            prefsDiv.appendChild(noKeeperBtn);
+
+            // Must rest button
+            const mustRestBtn = document.createElement('button');
+            mustRestBtn.type = 'button';
+            mustRestBtn.className = `pref-checkbox must-rest${player.mustRest ? ' active' : ''}`;
+            mustRestBtn.dataset.player = player.name;
+            mustRestBtn.dataset.pref = 'mustRest';
+            mustRestBtn.setAttribute('aria-label', `Toggle must rest for ${player.name}`);
+            mustRestBtn.setAttribute('aria-pressed', player.mustRest);
+            mustRestBtn.title = 'Must Rest';
+            mustRestBtn.textContent = 'R';
+            prefsDiv.appendChild(mustRestBtn);
+
+            // Status select
+            const statusSelect = document.createElement('select');
+            statusSelect.className = `player-status-select ${statusClass}`;
+            statusSelect.dataset.player = player.name;
+            statusSelect.setAttribute('aria-label', `Status for ${player.name}`);
+            const statusOptions = [
+                { value: 'available', text: '●' },
+                { value: 'injured', text: '🩹' },
+                { value: 'absent', text: '✖' }
+            ];
+            statusOptions.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.text;
+                option.selected = status === opt.value;
+                statusSelect.appendChild(option);
+            });
+            prefsDiv.appendChild(statusSelect);
+
+            container.appendChild(prefsDiv);
+            li.appendChild(container);
+
+            // Remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.dataset.player = player.name;
+            removeBtn.setAttribute('aria-label', `Remove ${player.name} from roster`);
+            removeBtn.title = 'Remove player';
+            removeBtn.textContent = '×';
+            li.appendChild(removeBtn);
+
             list.appendChild(li);
         });
 
@@ -1238,45 +1295,76 @@ class SoccerLineupGenerator {
 
     updateEvaluationList() {
         const evalList = document.getElementById('evaluationPlayerList');
+        evalList.textContent = '';
 
         if (this.players.length === 0) {
-            evalList.innerHTML = '<div class="evaluation-empty">No players added yet. Add players in the Roster Management tab.</div>';
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'evaluation-empty';
+            emptyDiv.textContent = 'No players added yet. Add players in the Roster Management tab.';
+            evalList.appendChild(emptyDiv);
             return;
         }
-
-        evalList.innerHTML = '';
 
         this.players.forEach((player, index) => {
             const playerDiv = document.createElement('div');
             playerDiv.className = 'evaluation-player-item';
 
-            const numberBadge = player.number ? `<span class="eval-player-number">#${player.number}</span>` : '';
-            const sanitizedName = this.sanitizeHtml(player.name);
-            const sanitizedComment = this.sanitizeHtml(player.comment || '');
+            // Player name div
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'eval-player-name';
+            nameDiv.appendChild(document.createTextNode(player.name));
+            if (player.number) {
+                const numberSpan = document.createElement('span');
+                numberSpan.className = 'eval-player-number';
+                numberSpan.textContent = `#${player.number}`;
+                nameDiv.appendChild(numberSpan);
+            }
+            playerDiv.appendChild(nameDiv);
 
-            playerDiv.innerHTML = `
-                <div class="eval-player-name">
-                    ${sanitizedName}
-                    ${numberBadge}
-                </div>
-                <div class="eval-rating-group">
-                    <label for="rating-${index}">Rating</label>
-                    <select id="rating-${index}" onchange="lineupGenerator.updatePlayerRating(${index}, this.value)">
-                        <option value="">-</option>
-                        <option value="1" ${player.rating === 1 ? 'selected' : ''}>1 - Limited</option>
-                        <option value="2" ${player.rating === 2 ? 'selected' : ''}>2 - Fair</option>
-                        <option value="3" ${player.rating === 3 ? 'selected' : ''}>3 - Average</option>
-                        <option value="4" ${player.rating === 4 ? 'selected' : ''}>4 - Very Accomplished</option>
-                        <option value="5" ${player.rating === 5 ? 'selected' : ''}>5 - Excellent</option>
-                    </select>
-                </div>
-                <div class="eval-comment-group">
-                    <label for="comment-${index}">Comments / Parental Support</label>
-                    <textarea id="comment-${index}"
-                              placeholder="Enter comments about player skill or parental support..."
-                              onchange="lineupGenerator.updatePlayerComment(${index}, this.value)">${sanitizedComment}</textarea>
-                </div>
-            `;
+            // Rating group
+            const ratingGroup = document.createElement('div');
+            ratingGroup.className = 'eval-rating-group';
+            const ratingLabel = document.createElement('label');
+            ratingLabel.setAttribute('for', `rating-${index}`);
+            ratingLabel.textContent = 'Rating';
+            ratingGroup.appendChild(ratingLabel);
+
+            const ratingSelect = document.createElement('select');
+            ratingSelect.id = `rating-${index}`;
+            ratingSelect.addEventListener('change', () => this.updatePlayerRating(index, ratingSelect.value));
+            const ratingOptions = [
+                { value: '', text: '-' },
+                { value: '1', text: '1 - Limited' },
+                { value: '2', text: '2 - Fair' },
+                { value: '3', text: '3 - Average' },
+                { value: '4', text: '4 - Very Accomplished' },
+                { value: '5', text: '5 - Excellent' }
+            ];
+            ratingOptions.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.text;
+                option.selected = player.rating === parseInt(opt.value);
+                ratingSelect.appendChild(option);
+            });
+            ratingGroup.appendChild(ratingSelect);
+            playerDiv.appendChild(ratingGroup);
+
+            // Comment group
+            const commentGroup = document.createElement('div');
+            commentGroup.className = 'eval-comment-group';
+            const commentLabel = document.createElement('label');
+            commentLabel.setAttribute('for', `comment-${index}`);
+            commentLabel.textContent = 'Comments / Parental Support';
+            commentGroup.appendChild(commentLabel);
+
+            const textarea = document.createElement('textarea');
+            textarea.id = `comment-${index}`;
+            textarea.placeholder = 'Enter comments about player skill or parental support...';
+            textarea.value = player.comment || '';
+            textarea.addEventListener('change', () => this.updatePlayerComment(index, textarea.value));
+            commentGroup.appendChild(textarea);
+            playerDiv.appendChild(commentGroup);
 
             evalList.appendChild(playerDiv);
         });
@@ -2165,63 +2253,116 @@ class SoccerLineupGenerator {
         const grid = document.getElementById('lineupGrid');
         const validationDiv = document.getElementById('validationMessages');
 
-        // Show validation messages
+        // Show validation messages using DOM APIs
+        validationDiv.textContent = '';
         if (validationIssues.length > 0) {
-            validationDiv.innerHTML = '<h3>Rotation Issues:</h3>' +
-                validationIssues.map(issue => `<p>${this.sanitizeHtml(issue)}</p>`).join('');
+            const h3 = document.createElement('h3');
+            h3.textContent = 'Rotation Issues:';
+            validationDiv.appendChild(h3);
+            validationIssues.forEach(issue => {
+                const p = document.createElement('p');
+                p.textContent = issue;
+                validationDiv.appendChild(p);
+            });
             validationDiv.classList.add('has-issues');
         } else {
-            validationDiv.innerHTML = '<p class="success">✓ All rotation rules satisfied!</p>';
+            const p = document.createElement('p');
+            p.className = 'success';
+            p.textContent = '✓ All rotation rules satisfied!';
+            validationDiv.appendChild(p);
             validationDiv.classList.remove('has-issues');
         }
 
         // Display lineup grid
-        grid.innerHTML = '';
+        grid.textContent = '';
 
         this.lineup.forEach(quarter => {
             const quarterDiv = document.createElement('div');
             quarterDiv.className = 'quarter-lineup';
 
-            let html = `<h3>Quarter ${quarter.quarter}</h3>`;
+            // Quarter heading
+            const h3 = document.createElement('h3');
+            h3.textContent = `Quarter ${quarter.quarter}`;
+            quarterDiv.appendChild(h3);
 
-            // Add soccer field visualization
-            html += this.createFieldVisualization(quarter);
+            // Add soccer field visualization (returns DOM element)
+            quarterDiv.appendChild(this.createFieldVisualization(quarter));
 
-            html += '<table>';
+            // Create positions table
+            const table = document.createElement('table');
 
             this.positions.forEach(position => {
                 const playerName = quarter.positions[position] || 'TBD';
                 const player = this.players.find(p => p.name === playerName);
-                const captainIndicator = player && player.isCaptain ? '<span class="captain-star">⭐</span> ' : '';
-                const numberStr = player && player.number ? `<span class="player-number">#${player.number}</span> ` : '';
                 const isKeeper = position === 'Keeper';
-                const sanitizedPlayerName = this.sanitizeHtml(playerName);
-                html += `
-                    <tr class="${isKeeper ? 'keeper-row' : ''}">
-                        <td class="position">${position}:</td>
-                        <td class="player-name">${numberStr}${captainIndicator}${sanitizedPlayerName}</td>
-                    </tr>
-                `;
+
+                const tr = document.createElement('tr');
+                if (isKeeper) tr.className = 'keeper-row';
+
+                const tdPosition = document.createElement('td');
+                tdPosition.className = 'position';
+                tdPosition.textContent = `${position}:`;
+                tr.appendChild(tdPosition);
+
+                const tdPlayer = document.createElement('td');
+                tdPlayer.className = 'player-name';
+                if (player && player.number) {
+                    const numberSpan = document.createElement('span');
+                    numberSpan.className = 'player-number';
+                    numberSpan.textContent = `#${player.number}`;
+                    tdPlayer.appendChild(numberSpan);
+                    tdPlayer.appendChild(document.createTextNode(' '));
+                }
+                if (player && player.isCaptain) {
+                    const starSpan = document.createElement('span');
+                    starSpan.className = 'captain-star';
+                    starSpan.textContent = '⭐';
+                    tdPlayer.appendChild(starSpan);
+                    tdPlayer.appendChild(document.createTextNode(' '));
+                }
+                tdPlayer.appendChild(document.createTextNode(playerName));
+                tr.appendChild(tdPlayer);
+
+                table.appendChild(tr);
             });
 
             // Show sitting players
             const sittingPlayers = this.players.filter(p => p.quartersSitting.includes(quarter.quarter));
             if (sittingPlayers.length > 0) {
-                const sittingText = sittingPlayers.map(p => {
-                    const captainIndicator = p.isCaptain ? '<span class="captain-star">⭐</span> ' : '';
-                    const numberStr = p.number ? `<span class="player-number">#${p.number}</span> ` : '';
-                    return `${numberStr}${captainIndicator}${this.sanitizeHtml(p.name)}`;
-                }).join(', ');
-                html += `
-                    <tr class="sitting-row">
-                        <td class="position">Resting:</td>
-                        <td class="player-name">${sittingText}</td>
-                    </tr>
-                `;
+                const tr = document.createElement('tr');
+                tr.className = 'sitting-row';
+
+                const tdPosition = document.createElement('td');
+                tdPosition.className = 'position';
+                tdPosition.textContent = 'Resting:';
+                tr.appendChild(tdPosition);
+
+                const tdPlayer = document.createElement('td');
+                tdPlayer.className = 'player-name';
+                sittingPlayers.forEach((p, idx) => {
+                    if (idx > 0) tdPlayer.appendChild(document.createTextNode(', '));
+                    if (p.number) {
+                        const numberSpan = document.createElement('span');
+                        numberSpan.className = 'player-number';
+                        numberSpan.textContent = `#${p.number}`;
+                        tdPlayer.appendChild(numberSpan);
+                        tdPlayer.appendChild(document.createTextNode(' '));
+                    }
+                    if (p.isCaptain) {
+                        const starSpan = document.createElement('span');
+                        starSpan.className = 'captain-star';
+                        starSpan.textContent = '⭐';
+                        tdPlayer.appendChild(starSpan);
+                        tdPlayer.appendChild(document.createTextNode(' '));
+                    }
+                    tdPlayer.appendChild(document.createTextNode(p.name));
+                });
+                tr.appendChild(tdPlayer);
+
+                table.appendChild(tr);
             }
 
-            html += '</table>';
-            quarterDiv.innerHTML = html;
+            quarterDiv.appendChild(table);
             grid.appendChild(quarterDiv);
         });
 
@@ -2286,7 +2427,7 @@ class SoccerLineupGenerator {
 
         // Create a container for the player summary table
         const summaryTableDiv = document.createElement('div');
-        summaryTableDiv.innerHTML = this.getPlayerSummary();
+        summaryTableDiv.appendChild(this.getPlayerSummary());
         summaryDiv.appendChild(summaryTableDiv);
 
         // Insert summary into the display
@@ -2302,38 +2443,83 @@ class SoccerLineupGenerator {
     }
 
     getPlayerSummary() {
-        let html = '<table><thead><tr><th>Rest</th><th>No Keeper</th><th>Player</th><th>Captain</th><th>Quarters Played</th><th>Quarters Resting</th><th>Defense/Offense</th><th>Positions</th></tr></thead><tbody>'
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        const headers = ['Rest', 'No Keeper', 'Player', 'Captain', 'Quarters Played', 'Quarters Resting', 'Defense/Offense', 'Positions'];
+        headers.forEach(text => {
+            const th = document.createElement('th');
+            th.textContent = text;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
 
         this.players.forEach(player => {
-            const captainIndicator = player.isCaptain ? '⭐ Yes' : 'No';
-            const positions = player.positionsPlayed.map(p => `Q${p.quarter}: ${p.position}`).join(', ');
+            const tr = document.createElement('tr');
+
+            // Rest checkbox
+            const tdRest = document.createElement('td');
+            const restCheckbox = document.createElement('input');
+            restCheckbox.type = 'checkbox';
+            restCheckbox.className = 'rest-checkbox';
+            restCheckbox.checked = player.mustRest;
+            restCheckbox.title = 'Check to ensure this player rests at least 1 quarter';
+            restCheckbox.addEventListener('change', () => this.toggleRestPreference(player.name));
+            tdRest.appendChild(restCheckbox);
+            tr.appendChild(tdRest);
+
+            // No Keeper checkbox
+            const tdNoKeeper = document.createElement('td');
+            const noKeeperCheckbox = document.createElement('input');
+            noKeeperCheckbox.type = 'checkbox';
+            noKeeperCheckbox.className = 'no-keeper-checkbox';
+            noKeeperCheckbox.checked = player.noKeeper;
+            noKeeperCheckbox.title = 'Check to prevent this player from playing keeper';
+            noKeeperCheckbox.addEventListener('change', () => this.toggleNoKeeperPreference(player.name));
+            tdNoKeeper.appendChild(noKeeperCheckbox);
+            tr.appendChild(tdNoKeeper);
+
+            // Player name
+            const tdPlayer = document.createElement('td');
+            tdPlayer.textContent = player.name + (player.number ? ` #${player.number}` : '');
+            tr.appendChild(tdPlayer);
+
+            // Captain
+            const tdCaptain = document.createElement('td');
+            tdCaptain.textContent = player.isCaptain ? '⭐ Yes' : 'No';
+            tr.appendChild(tdCaptain);
+
+            // Quarters Played
+            const tdPlayed = document.createElement('td');
+            tdPlayed.textContent = player.quartersPlayed.join(', ') || 'None';
+            tr.appendChild(tdPlayed);
+
+            // Quarters Resting
+            const tdResting = document.createElement('td');
+            tdResting.textContent = player.quartersSitting.join(', ') || 'None';
+            tr.appendChild(tdResting);
+
+            // Defense/Offense
+            const tdDO = document.createElement('td');
             const defensive = player.defensiveQuarters || 0;
             const offensive = player.offensiveQuarters || 0;
-            const numberStr = player.number ? ` #${player.number}` : '';
-            const restChecked = player.mustRest ? 'checked' : '';
-            const noKeeperChecked = player.noKeeper ? 'checked' : '';
-            const escapedName = this.escapeHtmlAttribute(player.name);
-            const sanitizedName = this.sanitizeHtml(player.name);
-            html += `
-                <tr>
-                    <td><input type="checkbox" class="rest-checkbox" ${restChecked}
-                               onchange="lineupGenerator.toggleRestPreference('${escapedName}')"
-                               title="Check to ensure this player rests at least 1 quarter" /></td>
-                    <td><input type="checkbox" class="no-keeper-checkbox" ${noKeeperChecked}
-                               onchange="lineupGenerator.toggleNoKeeperPreference('${escapedName}')"
-                               title="Check to prevent this player from playing keeper" /></td>
-                    <td>${sanitizedName}${numberStr}</td>
-                    <td>${captainIndicator}</td>
-                    <td>${player.quartersPlayed.join(', ') || 'None'}</td>
-                    <td>${player.quartersSitting.join(', ') || 'None'}</td>
-                    <td>D: ${defensive} / O: ${offensive}</td>
-                    <td>${positions || 'None'}</td>
-                </tr>
-            `;
+            tdDO.textContent = `D: ${defensive} / O: ${offensive}`;
+            tr.appendChild(tdDO);
+
+            // Positions
+            const tdPositions = document.createElement('td');
+            const positions = player.positionsPlayed.map(p => `Q${p.quarter}: ${p.position}`).join(', ');
+            tdPositions.textContent = positions || 'None';
+            tr.appendChild(tdPositions);
+
+            tbody.appendChild(tr);
         });
 
-        html += '</tbody></table>';
-        return html;
+        table.appendChild(tbody);
+        return table;
     }
 
     exportLineup() {
@@ -2436,30 +2622,25 @@ class SoccerLineupGenerator {
 
     createFieldVisualization(quarter) {
         const positions = quarter.positions;
-        
+        const svgNS = 'http://www.w3.org/2000/svg';
+
         // Position coordinates for all formations (percentage-based)
         const positionCoords = {
             'Keeper': { x: 50, y: 90 },
-            // 2-3-1 Formation positions
             'Left Back': { x: 25, y: 70 },
             'Right Back': { x: 75, y: 70 },
             'Left Wing': { x: 15, y: 40 },
             'Right Wing': { x: 85, y: 40 },
             'Center Mid': { x: 50, y: 45 },
             'Striker': { x: 50, y: 20 },
-            // 3-2-1 Formation positions
             'Center Back': { x: 50, y: 72 },
             'Left Mid': { x: 30, y: 45 },
             'Right Mid': { x: 70, y: 45 },
-            // 2-2-2 Formation positions
             'Left Striker': { x: 35, y: 20 },
             'Right Striker': { x: 65, y: 20 },
-            // Legacy/Other formations
             'Midfield': { x: 50, y: 50 },
-            // 9v9 positions
             'Left Forward': { x: 35, y: 25 },
             'Right Forward': { x: 65, y: 25 },
-            // 11v11 positions
             'Left Center Back': { x: 35, y: 75 },
             'Right Center Back': { x: 65, y: 75 },
             'Left Wing Back': { x: 15, y: 55 },
@@ -2470,83 +2651,106 @@ class SoccerLineupGenerator {
             'Right Defensive Mid': { x: 60, y: 60 },
             'Attacking Mid': { x: 50, y: 35 }
         };
-        
-        let svg = `
-            <div class="field-container" role="img" aria-label="Soccer field visualization showing player positions for Quarter ${quarter.quarter}">
-                <svg viewBox="0 0 400 600" class="soccer-field">
-                    <!-- Field background -->
-                    <rect x="0" y="0" width="400" height="600" fill="#4a9b4a"/>
-                    
-                    <!-- Field lines -->
-                    <rect x="20" y="20" width="360" height="560" fill="none" stroke="white" stroke-width="3"/>
-                    
-                    <!-- Center line -->
-                    <line x1="20" y1="300" x2="380" y2="300" stroke="white" stroke-width="3"/>
-                    
-                    <!-- Center circle -->
-                    <circle cx="200" cy="300" r="60" fill="none" stroke="white" stroke-width="3"/>
-                    <circle cx="200" cy="300" r="5" fill="white"/>
-                    
-                    <!-- Penalty areas -->
-                    <rect x="100" y="20" width="200" height="100" fill="none" stroke="white" stroke-width="3"/>
-                    <rect x="100" y="480" width="200" height="100" fill="none" stroke="white" stroke-width="3"/>
-                    
-                    <!-- Goal areas -->
-                    <rect x="140" y="20" width="120" height="40" fill="none" stroke="white" stroke-width="3"/>
-                    <rect x="140" y="540" width="120" height="40" fill="none" stroke="white" stroke-width="3"/>
-                    
-                    <!-- Goals -->
-                    <rect x="170" y="10" width="60" height="10" fill="white"/>
-                    <rect x="170" y="580" width="60" height="10" fill="white"/>
-                    
-                    <!-- Penalty spots -->
-                    <circle cx="200" cy="80" r="3" fill="white"/>
-                    <circle cx="200" cy="520" r="3" fill="white"/>
-        `;
-        
+
+        // Create container
+        const container = document.createElement('div');
+        container.className = 'field-container';
+        container.setAttribute('role', 'img');
+        container.setAttribute('aria-label', `Soccer field visualization showing player positions for Quarter ${quarter.quarter}`);
+
+        // Create SVG element
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('viewBox', '0 0 400 600');
+        svg.setAttribute('class', 'soccer-field');
+
+        // Helper to create SVG elements
+        const createSvgElement = (tag, attrs) => {
+            const el = document.createElementNS(svgNS, tag);
+            Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+            return el;
+        };
+
+        // Field background
+        svg.appendChild(createSvgElement('rect', { x: 0, y: 0, width: 400, height: 600, fill: '#4a9b4a' }));
+        // Field lines
+        svg.appendChild(createSvgElement('rect', { x: 20, y: 20, width: 360, height: 560, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
+        // Center line
+        svg.appendChild(createSvgElement('line', { x1: 20, y1: 300, x2: 380, y2: 300, stroke: 'white', 'stroke-width': 3 }));
+        // Center circle
+        svg.appendChild(createSvgElement('circle', { cx: 200, cy: 300, r: 60, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
+        svg.appendChild(createSvgElement('circle', { cx: 200, cy: 300, r: 5, fill: 'white' }));
+        // Penalty areas
+        svg.appendChild(createSvgElement('rect', { x: 100, y: 20, width: 200, height: 100, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
+        svg.appendChild(createSvgElement('rect', { x: 100, y: 480, width: 200, height: 100, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
+        // Goal areas
+        svg.appendChild(createSvgElement('rect', { x: 140, y: 20, width: 120, height: 40, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
+        svg.appendChild(createSvgElement('rect', { x: 140, y: 540, width: 120, height: 40, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
+        // Goals
+        svg.appendChild(createSvgElement('rect', { x: 170, y: 10, width: 60, height: 10, fill: 'white' }));
+        svg.appendChild(createSvgElement('rect', { x: 170, y: 580, width: 60, height: 10, fill: 'white' }));
+        // Penalty spots
+        svg.appendChild(createSvgElement('circle', { cx: 200, cy: 80, r: 3, fill: 'white' }));
+        svg.appendChild(createSvgElement('circle', { cx: 200, cy: 520, r: 3, fill: 'white' }));
+
         // Add player positions
         this.positions.forEach(position => {
             const player = positions[position];
             if (player && positionCoords[position]) {
                 const coord = positionCoords[position];
-                const x = coord.x * 4; // Convert percentage to SVG coordinates
-                const y = coord.y * 6; // Convert percentage to SVG coordinates
-                
-                // Determine if defensive or offensive position
+                const x = coord.x * 4;
+                const y = coord.y * 6;
                 const isDefensive = position.includes('Back') || position === 'Keeper';
                 const isKeeper = position === 'Keeper';
-                
-                // Get player info for displaying number or initials
                 const playerInfo = this.players.find(p => p.name === player);
                 const displayText = playerInfo && playerInfo.number ? playerInfo.number : this.getPlayerInitials(player);
-                const sanitizedDisplayText = this.sanitizeHtml(String(displayText));
 
-                svg += `
-                    <g class="player-marker">
-                        <circle cx="${x}" cy="${y}" r="18"
-                            fill="${isKeeper ? '#ffcc00' : isDefensive ? '#3498db' : '#e74c3c'}"
-                            stroke="white" stroke-width="2"/>
-                        <text x="${x}" y="${y}"
-                            text-anchor="middle" dominant-baseline="middle"
-                            fill="white" font-size="${playerInfo && playerInfo.number ? '12' : '10'}" font-weight="bold">
-                            ${sanitizedDisplayText}
-                        </text>
-                    </g>
-                `;
+                const g = document.createElementNS(svgNS, 'g');
+                g.setAttribute('class', 'player-marker');
+
+                const circle = createSvgElement('circle', {
+                    cx: x, cy: y, r: 18,
+                    fill: isKeeper ? '#ffcc00' : isDefensive ? '#3498db' : '#e74c3c',
+                    stroke: 'white', 'stroke-width': 2
+                });
+                g.appendChild(circle);
+
+                const text = createSvgElement('text', {
+                    x: x, y: y,
+                    'text-anchor': 'middle',
+                    'dominant-baseline': 'middle',
+                    fill: 'white',
+                    'font-size': playerInfo && playerInfo.number ? '12' : '10',
+                    'font-weight': 'bold'
+                });
+                text.textContent = String(displayText);
+                g.appendChild(text);
+
+                svg.appendChild(g);
             }
         });
-        
-        svg += `
-                </svg>
-                <div class="field-legend">
-                    <span class="legend-item"><span class="legend-color keeper"></span>Keeper</span>
-                    <span class="legend-item"><span class="legend-color defensive"></span>Defense</span>
-                    <span class="legend-item"><span class="legend-color offensive"></span>Offense</span>
-                </div>
-            </div>
-        `;
-        
-        return svg;
+
+        container.appendChild(svg);
+
+        // Create legend
+        const legend = document.createElement('div');
+        legend.className = 'field-legend';
+        const legendItems = [
+            { className: 'keeper', label: 'Keeper' },
+            { className: 'defensive', label: 'Defense' },
+            { className: 'offensive', label: 'Offense' }
+        ];
+        legendItems.forEach(item => {
+            const span = document.createElement('span');
+            span.className = 'legend-item';
+            const colorSpan = document.createElement('span');
+            colorSpan.className = `legend-color ${item.className}`;
+            span.appendChild(colorSpan);
+            span.appendChild(document.createTextNode(item.label));
+            legend.appendChild(span);
+        });
+        container.appendChild(legend);
+
+        return container;
     }
     
     getPlayerInitials(name) {
