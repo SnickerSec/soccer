@@ -22,6 +22,9 @@ class SoccerLineupGenerator {
         // Saved games for multi-game tracking
         this.savedGames = [];
 
+        // Season stats cache for performance during lineup generation
+        this.seasonStatsCache = null;
+
         // Minimum quarters setting
         this.minQuartersPerPlayer = 2;
 
@@ -253,7 +256,8 @@ class SoccerLineupGenerator {
                 ageDivision: this.ageDivision,
                 playersOnField: this.playersOnField,
                 formation: this.formation
-            }
+            },
+            captains: [...this.captains]
         };
 
         this.savedGames.push(game);
@@ -291,6 +295,7 @@ class SoccerLineupGenerator {
                 totalQuarters: 0,
                 totalSitting: 0,
                 goalkeeperQuarters: 0,
+                captainGames: 0,
                 positions: {}
             };
         });
@@ -303,6 +308,7 @@ class SoccerLineupGenerator {
                         totalQuarters: 0,
                         totalSitting: 0,
                         goalkeeperQuarters: 0,
+                        captainGames: 0,
                         positions: {}
                     };
                 }
@@ -313,6 +319,11 @@ class SoccerLineupGenerator {
 
                 if (player.goalieQuarter) {
                     stats[player.name].goalkeeperQuarters++;
+                }
+
+                // Track captain assignments (check both new captains array and legacy isCaptain flag)
+                if (game.captains?.includes(player.name) || player.isCaptain) {
+                    stats[player.name].captainGames++;
                 }
 
                 player.positionsPlayed?.forEach(pos => {
@@ -401,6 +412,7 @@ class SoccerLineupGenerator {
                             <th class="sortable" data-sort="quarters">Quarters</th>
                             <th class="sortable" data-sort="sitting">Sitting %</th>
                             <th class="sortable" data-sort="gk">GK</th>
+                            <th class="sortable" data-sort="captain">Capt</th>
                             <th>Top Positions</th>
                         </tr>
                     </thead>
@@ -427,6 +439,7 @@ class SoccerLineupGenerator {
                                     <td>${s.totalQuarters}<span class="stat-bar" style="width: ${barWidth}px;"></span></td>
                                     <td>${sittingPct}%</td>
                                     <td>${s.goalkeeperQuarters}</td>
+                                    <td>${s.captainGames || 0}</td>
                                     <td>${positions}</td>
                                 </tr>
                             `;
@@ -1732,6 +1745,9 @@ class SoccerLineupGenerator {
             this.showNotification(`Note: With ${availablePlayers.length} players, some rotation rules may be challenging. Recommend ${recommendedPlayers}+ players.`, 'warning');
         }
 
+        // Cache season stats for performance during generation
+        this.seasonStatsCache = this.getPlayerStats();
+
         const maxAttempts = CONSTANTS.MAX_GENERATION_ATTEMPTS;
         let attempts = 0;
         let validation = [];
@@ -1813,26 +1829,61 @@ class SoccerLineupGenerator {
             this.showNotification('Lineup generated successfully!', 'success');
         }
         
-        // Automatically mark 2 random players as captains after lineup generation
+        // Automatically assign captains based on season history (rotation)
         this.captains = [];
         this.players.forEach(p => p.isCaptain = false);
-        
+
         if (this.players.length >= 2) {
-            // Shuffle players to randomize selection
-            const shuffledPlayers = [...this.players];
-            this.shuffleArray(shuffledPlayers);
-            
-            // Select first 2 as captains
-            for (let i = 0; i < 2; i++) {
-                const player = shuffledPlayers[i];
+            const seasonStats = this.seasonStatsCache || this.getPlayerStats();
+
+            // Filter to available players only
+            const availablePlayers = this.players.filter(p =>
+                p.status === CONSTANTS.PLAYER_STATUS.AVAILABLE || !p.status
+            );
+
+            // Sort by captain games ascending (players who've been captain less get priority)
+            const sortedPlayers = [...availablePlayers].sort((a, b) => {
+                const captainA = seasonStats[a.name]?.captainGames || 0;
+                const captainB = seasonStats[b.name]?.captainGames || 0;
+                return captainA - captainB;
+            });
+
+            // Get minimum captain count
+            const minCaptain = seasonStats[sortedPlayers[0]?.name]?.captainGames || 0;
+
+            // Filter to players with minimum captain games
+            const lowestCaptainGroup = sortedPlayers.filter(p =>
+                (seasonStats[p.name]?.captainGames || 0) === minCaptain
+            );
+
+            // Shuffle within the lowest group for variety
+            this.shuffleArray(lowestCaptainGroup);
+
+            // Select captains from lowest group first
+            for (let i = 0; i < Math.min(2, lowestCaptainGroup.length); i++) {
+                const player = lowestCaptainGroup[i];
                 player.isCaptain = true;
                 this.captains.push(player.name);
             }
-            
+
+            // If we need more captains (less than 2 in lowest group), take from next tier
+            if (this.captains.length < 2 && sortedPlayers.length > lowestCaptainGroup.length) {
+                const remaining = sortedPlayers.filter(p => !this.captains.includes(p.name));
+                this.shuffleArray(remaining);
+                for (let i = 0; i < Math.min(2 - this.captains.length, remaining.length); i++) {
+                    const player = remaining[i];
+                    player.isCaptain = true;
+                    this.captains.push(player.name);
+                }
+            }
+
             // Update player list to reflect new captains
             this.updatePlayerList();
         }
-        
+
+        // Clear season stats cache
+        this.seasonStatsCache = null;
+
         this.displayLineup(validation);
         this.savePlayers();
     }
@@ -1842,6 +1893,9 @@ class SoccerLineupGenerator {
         const playersPerQuarter = this.playersOnField;
         const sittingPerQuarter = totalPlayers - playersPerQuarter;
 
+        // Get season stats for sitting priority
+        const seasonStats = this.seasonStatsCache || this.getPlayerStats();
+
         // Initialize sitting schedule
         const schedule = {
             1: [],
@@ -1850,7 +1904,7 @@ class SoccerLineupGenerator {
             4: []
         };
 
-        // Create a copy of players to track sitting assignments, shuffled for randomness
+        // Create a copy of players to track sitting assignments
         const playersCopy = this.players.map(p => ({
             name: p.name,
             mustRest: p.mustRest,
@@ -1861,8 +1915,26 @@ class SoccerLineupGenerator {
         const mustRestPlayers = playersCopy.filter(p => p.mustRest);
         const regularPlayers = playersCopy.filter(p => !p.mustRest);
 
-        // Shuffle the regular players array to randomize who sits extra
-        this.shuffleArray(regularPlayers);
+        // Sort regular players by season sitting history (ascending avg sitting = higher priority to sit now)
+        // Players who've sat less across the season should sit more now
+        regularPlayers.sort((a, b) => {
+            const statsA = seasonStats[a.name] || { totalSitting: 0, gamesPlayed: 0 };
+            const statsB = seasonStats[b.name] || { totalSitting: 0, gamesPlayed: 0 };
+
+            // Calculate average sitting per game (normalize for players with different game counts)
+            const avgSitA = statsA.gamesPlayed > 0 ? statsA.totalSitting / statsA.gamesPlayed : 0;
+            const avgSitB = statsB.gamesPlayed > 0 ? statsB.totalSitting / statsB.gamesPlayed : 0;
+
+            // Players with lower average sitting should sit more (appear first)
+            return avgSitA - avgSitB;
+        });
+
+        // Add small randomness within similar sitting averages to prevent deterministic lineups
+        // Group players with similar averages and shuffle within groups
+        this.shuffleWithinSimilarGroups(regularPlayers, (p) => {
+            const stats = seasonStats[p.name] || { totalSitting: 0, gamesPlayed: 0 };
+            return stats.gamesPlayed > 0 ? Math.round(stats.totalSitting / stats.gamesPlayed * 2) / 2 : 0;
+        });
 
         // Calculate how many times each player should sit
         const totalSittingSlots = sittingPerQuarter * this.quarters;
@@ -1899,10 +1971,21 @@ class SoccerLineupGenerator {
             });
         }
 
-        // Third pass: randomly select players who need to sit extra
-        // Shuffle again to ensure different players get extra sits each time
+        // Third pass: select players who need to sit extra based on season history
+        // Players who've sat less this season get priority for extra sits
         const playersForExtraSit = [...allPlayersCombined];
-        this.shuffleArray(playersForExtraSit);
+        playersForExtraSit.sort((a, b) => {
+            const statsA = seasonStats[a.name] || { totalSitting: 0, gamesPlayed: 0 };
+            const statsB = seasonStats[b.name] || { totalSitting: 0, gamesPlayed: 0 };
+            const avgSitA = statsA.gamesPlayed > 0 ? statsA.totalSitting / statsA.gamesPlayed : 0;
+            const avgSitB = statsB.gamesPlayed > 0 ? statsB.totalSitting / statsB.gamesPlayed : 0;
+            return avgSitA - avgSitB;
+        });
+        // Shuffle within similar groups for variety
+        this.shuffleWithinSimilarGroups(playersForExtraSit, (p) => {
+            const stats = seasonStats[p.name] || { totalSitting: 0, gamesPlayed: 0 };
+            return stats.gamesPlayed > 0 ? Math.round(stats.totalSitting / stats.gamesPlayed * 2) / 2 : 0;
+        });
 
         let playersAssigned = 0;
         for (let i = 0; i < playersForExtraSit.length && playersAssigned < playersWithExtraSit; i++) {
@@ -2045,15 +2128,18 @@ class SoccerLineupGenerator {
         const assignments = [];
         const remainingPlayers = [...players];
         const remainingPositions = [...positions];
-        
+
+        // Get season stats for position variety bonus
+        const seasonStats = this.seasonStatsCache || this.getPlayerStats();
+
         // Shuffle positions to vary assignment order across quarters
         this.shuffleArray(remainingPositions);
-        
+
         // First pass: Assign positions prioritizing players who haven't played them
         for (let i = remainingPositions.length - 1; i >= 0; i--) {
             const position = remainingPositions[i];
             const isDefensive = defensivePositions.includes(position);
-            
+
             // Sort remaining players by priority for this position
             const scoredPlayers = remainingPlayers.map(player => {
                 const hasPlayedPosition = player.positionsPlayed.some(p => p.position === position);
@@ -2063,7 +2149,7 @@ class SoccerLineupGenerator {
 
                 let score = 0;
 
-                // Heavily penalize if already played this position
+                // Heavily penalize if already played this position THIS GAME (-1000)
                 if (hasPlayedPosition) {
                     score -= 1000 * timesPlayedPosition;
                 }
@@ -2085,6 +2171,26 @@ class SoccerLineupGenerator {
                 // Extra penalty for making the imbalance worse
                 if (projectedImbalance > currentImbalance) {
                     score -= 200 * (projectedImbalance - currentImbalance);
+                }
+
+                // Season position variety bonus (+50 to +200)
+                // Reward positions this player has played less across the season
+                const playerSeasonStats = seasonStats[player.name];
+                if (playerSeasonStats && playerSeasonStats.positions) {
+                    const timesPlayedPositionSeason = playerSeasonStats.positions[position] || 0;
+                    const totalPositionsPlayed = Object.values(playerSeasonStats.positions).reduce((a, b) => a + b, 0);
+                    if (totalPositionsPlayed > 0) {
+                        // Calculate what percentage of their positions this has been
+                        const positionPct = timesPlayedPositionSeason / totalPositionsPlayed;
+                        // Bonus for positions played less this season (0-200 points)
+                        score += (1 - positionPct) * 200;
+                    } else {
+                        // No season history, give neutral bonus
+                        score += 100;
+                    }
+                } else {
+                    // No season history for this player, give neutral bonus
+                    score += 100;
                 }
 
                 // Add small random factor to vary assignments
@@ -2178,15 +2284,33 @@ class SoccerLineupGenerator {
         // If no players are allowed to be keeper, fall back to all available players
         const poolToSelectFrom = allowedKeepers.length > 0 ? allowedKeepers : availablePlayers;
 
-        // Find players who haven't been keeper yet from the allowed pool
-        const potentialKeepers = poolToSelectFrom.filter(player => !player.goalieQuarter);
+        // Find players who haven't been keeper yet THIS GAME from the allowed pool
+        let potentialKeepers = poolToSelectFrom.filter(player => !player.goalieQuarter);
 
         if (potentialKeepers.length > 0) {
-            // Random selection from those who haven't been keeper
-            return potentialKeepers[Math.floor(Math.random() * potentialKeepers.length)];
+            // Use season stats to prioritize players who've been goalkeeper less across the season
+            const seasonStats = this.seasonStatsCache || this.getPlayerStats();
+
+            // Sort by season goalkeeper quarters (ascending - fewer GK = higher priority)
+            potentialKeepers.sort((a, b) => {
+                const gkA = seasonStats[a.name]?.goalkeeperQuarters || 0;
+                const gkB = seasonStats[b.name]?.goalkeeperQuarters || 0;
+                return gkA - gkB;
+            });
+
+            // Get minimum GK count from the sorted list
+            const minGK = seasonStats[potentialKeepers[0].name]?.goalkeeperQuarters || 0;
+
+            // Filter to players with lowest GK count this season
+            const lowestGKGroup = potentialKeepers.filter(p =>
+                (seasonStats[p.name]?.goalkeeperQuarters || 0) === minGK
+            );
+
+            // Random selection within the lowest GK group for variety
+            return lowestGKGroup[Math.floor(Math.random() * lowestGKGroup.length)];
         }
 
-        // If all allowed players have been keeper, return any available player from the pool
+        // If all allowed players have been keeper this game, return any available player from the pool
         return poolToSelectFrom[0];
     }
 
@@ -2786,7 +2910,38 @@ class SoccerLineupGenerator {
             [array[i], array[j]] = [array[j], array[i]];
         }
     }
-    
+
+    // Shuffle elements within groups that have similar values (to add randomness while preserving priority order)
+    shuffleWithinSimilarGroups(array, keyFn) {
+        if (array.length <= 1) return;
+
+        // Group elements by their key value
+        const groups = [];
+        let currentGroup = [array[0]];
+        let currentKey = keyFn(array[0]);
+
+        for (let i = 1; i < array.length; i++) {
+            const key = keyFn(array[i]);
+            if (key === currentKey) {
+                currentGroup.push(array[i]);
+            } else {
+                groups.push(currentGroup);
+                currentGroup = [array[i]];
+                currentKey = key;
+            }
+        }
+        groups.push(currentGroup);
+
+        // Shuffle within each group and rebuild the array
+        let index = 0;
+        groups.forEach(group => {
+            this.shuffleArray(group);
+            group.forEach(item => {
+                array[index++] = item;
+            });
+        });
+    }
+
     loadData() {
         // Load players
         const savedPlayers = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS);
