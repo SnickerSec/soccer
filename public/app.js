@@ -2392,22 +2392,41 @@ class SoccerLineupGenerator {
             regenerateBtn.addEventListener('click', () => this.generateLineup());
         }
 
-        // Get the existing export and print buttons
+        // Get the existing buttons
+        const copyBtn = document.getElementById('copyLineup');
+        const shareBtn = document.getElementById('shareLineup');
+        const csvBtn = document.getElementById('exportCSV');
         const exportBtn = document.getElementById('exportLineup');
         const printBtn = document.getElementById('printLineup');
+        const saveGameBtn = document.getElementById('saveGame');
 
         // Clone the buttons so we can place them in the new location
         const regenerateBtnClone = regenerateBtn.cloneNode(true);
         regenerateBtnClone.addEventListener('click', () => this.generateLineup());
+        const copyBtnClone = copyBtn.cloneNode(true);
+        copyBtnClone.addEventListener('click', () => this.copyLineupToClipboard());
+        const shareBtnClone = shareBtn.cloneNode(true);
+        shareBtnClone.addEventListener('click', () => this.shareLineup());
+        const csvBtnClone = csvBtn.cloneNode(true);
+        csvBtnClone.addEventListener('click', () => this.exportToCSV());
         const exportBtnClone = exportBtn.cloneNode(true);
         exportBtnClone.addEventListener('click', () => this.exportLineup());
         const printBtnClone = printBtn.cloneNode(true);
         printBtnClone.addEventListener('click', () => this.printLineup());
+        const saveGameBtnClone = saveGameBtn.cloneNode(true);
+        saveGameBtnClone.addEventListener('click', () => {
+            const name = prompt('Enter a name for this game (e.g., "vs Tigers 12/10"):');
+            if (name !== null) this.saveCurrentGame(name);
+        });
 
         // Add buttons to the new container
         actionButtonsContainer.appendChild(regenerateBtnClone);
+        actionButtonsContainer.appendChild(copyBtnClone);
+        actionButtonsContainer.appendChild(shareBtnClone);
+        actionButtonsContainer.appendChild(csvBtnClone);
         actionButtonsContainer.appendChild(exportBtnClone);
         actionButtonsContainer.appendChild(printBtnClone);
+        actionButtonsContainer.appendChild(saveGameBtnClone);
 
         // Add player summary to the grid
         const summaryDiv = document.createElement('div');
