@@ -12,6 +12,7 @@ A professional lineup generator for AYSO youth soccer teams, ensuring fair play 
   - Maximum 1 quarter as goalkeeper per player
   - Minimizes position repetition
 - **Visual Field Display**: See player positions on a soccer field diagram for each quarter
+- **Season Stats Tracking**: Track lineups across an entire season with per-player statistics (games played, quarters, positions, goalkeeper duties)
 - **Export Options**: Export lineups to text file or print
 - **Flexible Team Sizes**: Supports 5v5, 7v7, 9v9, and 11v11 formations
 
@@ -59,10 +60,15 @@ npm start
    - Click "Generate Lineup" to create automatic rotations
    - System ensures fair play time and position variety
 
-4. **Review & Export**: 
+4. **Review & Export**:
    - Check the visual field diagrams
    - Review player summary for balance
    - Export or print the lineup
+
+5. **Track Season Stats**:
+   - Click "Save Game" after generating a lineup
+   - View the Season Stats tab to see cumulative player statistics
+   - Track games played, quarters, sitting time, and position history
 
 ## Rules Enforced
 
