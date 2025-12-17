@@ -359,7 +359,7 @@ class SoccerLineupGenerator {
                 return `
                     <div class="game-history-item" data-game-id="${game.id}">
                         <div class="game-info">
-                            <span class="game-name">${this.escapeHtml(game.name)}</span>
+                            <span class="game-name">${this.escapeHtmlAttribute(game.name)}</span>
                             <span class="game-date">${formattedDate}</span>
                             <span class="game-meta">${playerCount} players | ${game.settings.formation} | ${game.settings.ageDivision}</span>
                         </div>
@@ -422,7 +422,7 @@ class SoccerLineupGenerator {
 
                             return `
                                 <tr>
-                                    <td>${this.escapeHtml(name)}</td>
+                                    <td>${this.escapeHtmlAttribute(name)}</td>
                                     <td>${s.gamesPlayed}</td>
                                     <td>${s.totalQuarters}<span class="stat-bar" style="width: ${barWidth}px;"></span></td>
                                     <td>${sittingPct}%</td>
