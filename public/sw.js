@@ -1,5 +1,5 @@
 // Service Worker for AYSO Roster Pro - Offline Support
-const CACHE_NAME = 'ayso-roster-pro-v9';
+const CACHE_NAME = 'ayso-roster-pro-v10';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',

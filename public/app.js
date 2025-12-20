@@ -652,9 +652,9 @@ class SoccerLineupGenerator {
                             ${notesHtml}
                         </div>
                         <div class="game-actions">
-                            <button class="btn-view-game" data-action="view-game" data-game-id="${game.id}">View</button>
-                            <button class="btn-notes-game" data-action="notes-game" data-game-id="${game.id}" title="Edit notes">Notes</button>
-                            <button class="btn-delete-game" data-action="delete-game" data-game-id="${game.id}">Delete</button>
+                            <button class="btn-view-game" data-action="view-game" data-game-id="${game.id}" aria-label="View ${this.escapeHtmlAttribute(game.name)}">View</button>
+                            <button class="btn-notes-game" data-action="notes-game" data-game-id="${game.id}" aria-label="Edit notes for ${this.escapeHtmlAttribute(game.name)}">Notes</button>
+                            <button class="btn-delete-game" data-action="delete-game" data-game-id="${game.id}" aria-label="Delete ${this.escapeHtmlAttribute(game.name)}">Delete</button>
                         </div>
                     </div>
                 `;

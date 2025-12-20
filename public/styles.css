@@ -1941,7 +1941,66 @@ button:active {
     .player-summary table {
         font-size: 0.75em;
     }
-    
+
+    /* Recommendations grid on mobile */
+    .recommendations-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .rec-section {
+        padding: 12px;
+    }
+
+    /* Game history on mobile */
+    .game-history-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .game-actions {
+        display: flex;
+        width: 100%;
+        gap: 8px;
+    }
+
+    .game-actions button {
+        flex: 1;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+
+    /* Player stats table on mobile */
+    .player-stats-table {
+        font-size: 0.85rem;
+    }
+
+    .player-stats-table th,
+    .player-stats-table td {
+        padding: 8px 10px;
+    }
+
+    /* Season summary on mobile */
+    .season-summary {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .summary-stat {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* Season actions on mobile */
+    .season-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .season-actions button {
+        width: 100%;
+    }
+
 }
 
 @media (max-width: 480px) {
