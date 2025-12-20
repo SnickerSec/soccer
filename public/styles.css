@@ -1496,8 +1496,29 @@ small {
 }
 
 .action-buttons-inline button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
     flex: 0 0 auto !important;
     width: auto !important;
+}
+
+.action-buttons-inline button span {
+    font-size: 16px;
+}
+
+/* Override .btn-export and .btn-print padding/margin when inside action-buttons-inline */
+.action-buttons-inline .btn-export,
+.action-buttons-inline .btn-print {
+    padding: 10px 16px;
+    margin: 0;
 }
 
 .btn-export, .btn-print {
