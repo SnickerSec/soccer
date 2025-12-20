@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "description": "AYSO Roster Pro - Smart lineup generator for youth soccer teams",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:all": "npm run test && npm run test:e2e"
@@ -39,6 +40,9 @@
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/tests/e2e/"
-    ]
+    ],
+    "transform": {},
+    "testEnvironment": "node",
+    "moduleFileExtensions": ["js", "mjs"]
   }
 }
