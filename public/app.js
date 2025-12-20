@@ -1,3 +1,34 @@
+// Module imports
+import {
+    safeGetFromStorage,
+    safeSetToStorage,
+    safeRemoveFromStorage,
+    safeParseJSON
+} from './modules/storage.js';
+
+import {
+    escapeHtml,
+    shuffleArray,
+    shuffleWithinSimilarGroups,
+    deepClone,
+    formatDate,
+    debounce
+} from './modules/utils.js';
+
+import {
+    calculatePlayerStats,
+    getLineupRecommendations
+} from './modules/season-stats.js';
+
+import {
+    FORMATIONS,
+    getPositionsForFormation,
+    getFormationsForFieldSize,
+    isDefensivePosition,
+    isOffensivePosition,
+    getFormationDescription
+} from './modules/formations.js';
+
 class SoccerLineupGenerator {
     constructor() {
         this.players = [];
@@ -761,38 +792,21 @@ class SoccerLineupGenerator {
         this.showNotification(`Switched to ${this.currentTheme} theme`, 'info');
     }
 
-    // Safe localStorage operations with quota handling
+    // Safe localStorage operations - delegate to module
     safeGetFromStorage(key) {
-        try {
-            return localStorage.getItem(key);
-        } catch (error) {
-            console.warn('localStorage read error:', error);
-            return null;
-        }
+        return safeGetFromStorage(key);
     }
 
     safeSetToStorage(key, value) {
-        try {
-            localStorage.setItem(key, value);
-            return true;
-        } catch (error) {
-            if (error.name === 'QuotaExceededError' || error.code === 22) {
-                this.showNotification('Storage quota exceeded. Some data may not be saved.', 'error');
-            } else {
-                console.warn('localStorage write error:', error);
-            }
-            return false;
+        const result = safeSetToStorage(key, value);
+        if (!result) {
+            this.showNotification('Storage quota exceeded. Some data may not be saved.', 'error');
         }
+        return result;
     }
 
     safeRemoveFromStorage(key) {
-        try {
-            localStorage.removeItem(key);
-            return true;
-        } catch (error) {
-            console.warn('localStorage remove error:', error);
-            return false;
-        }
+        return safeRemoveFromStorage(key);
     }
 
     // Undo/Redo system
@@ -3116,42 +3130,13 @@ class SoccerLineupGenerator {
         return name.substring(0, 2).toUpperCase();
     }
 
+    // Shuffle utilities - delegate to module
     shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
+        return shuffleArray(array);
     }
 
-    // Shuffle elements within groups that have similar values (to add randomness while preserving priority order)
     shuffleWithinSimilarGroups(array, keyFn) {
-        if (array.length <= 1) return;
-
-        // Group elements by their key value
-        const groups = [];
-        let currentGroup = [array[0]];
-        let currentKey = keyFn(array[0]);
-
-        for (let i = 1; i < array.length; i++) {
-            const key = keyFn(array[i]);
-            if (key === currentKey) {
-                currentGroup.push(array[i]);
-            } else {
-                groups.push(currentGroup);
-                currentGroup = [array[i]];
-                currentKey = key;
-            }
-        }
-        groups.push(currentGroup);
-
-        // Shuffle within each group and rebuild the array
-        let index = 0;
-        groups.forEach(group => {
-            this.shuffleArray(group);
-            group.forEach(item => {
-                array[index++] = item;
-            });
-        });
+        return shuffleWithinSimilarGroups(array, keyFn);
     }
 
     loadData() {

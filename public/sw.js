@@ -1,5 +1,5 @@
 // Service Worker for AYSO Roster Pro - Offline Support
-const CACHE_NAME = 'ayso-roster-pro-v6';
+const CACHE_NAME = 'ayso-roster-pro-v7';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -8,7 +8,12 @@ const ASSETS_TO_CACHE = [
     '/styles.css',
     '/favicon.svg',
     '/lineup-worker.js',
-    '/manifest.json'
+    '/manifest.json',
+    '/modules/storage.js',
+    '/modules/utils.js',
+    '/modules/season-stats.js',
+    '/modules/formations.js',
+    '/modules/index.js'
 ];
 
 // Install event - cache assets

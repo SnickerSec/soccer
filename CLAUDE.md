@@ -18,8 +18,15 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
 ├── public/             # Frontend static files
 │   ├── index.html      # Main UI
 │   ├── app.js          # Core application logic (SoccerLineupGenerator class)
+│   ├── constants.js    # App constants and configuration
 │   ├── styles.css      # Application styles
 │   ├── favicon.svg     # Site favicon
+│   ├── modules/        # ES6 modules for code organization
+│   │   ├── storage.js      # LocalStorage utilities
+│   │   ├── utils.js        # General utilities (shuffle, escape, etc.)
+│   │   ├── season-stats.js # Season statistics calculations
+│   │   ├── formations.js   # Formation definitions and positions
+│   │   └── index.js        # Module exports
 │   └── assets/         # Fonts, PDFs, images
 ├── docs/               # Documentation (security, privacy)
 ├── test-data/          # Sample player roster files
@@ -52,3 +59,7 @@ The lineup generator enforces AYSO "Everyone Plays" rules:
 
 ### Deployment
 Configured for Railway deployment via **railway.json** with automatic builds using Nixpacks.
+
+## Guidelines
+
+- Keep the codebase organized
