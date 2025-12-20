@@ -271,7 +271,7 @@ class SoccerLineupGenerator {
         }
     }
 
-    saveCurrentGame(gameName) {
+    saveCurrentGame(gameName, notes = '') {
         if (this.lineup.length === 0) {
             this.showNotification('Generate a lineup first', 'error');
             return;
@@ -281,6 +281,7 @@ class SoccerLineupGenerator {
             id: Date.now(),
             name: gameName || `Game ${this.savedGames.length + 1}`,
             date: new Date().toISOString(),
+            notes: notes || '',
             players: JSON.parse(JSON.stringify(this.players)),
             lineup: JSON.parse(JSON.stringify(this.lineup)),
             settings: {
@@ -295,6 +296,28 @@ class SoccerLineupGenerator {
         this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
         this.showNotification(`Game "${game.name}" saved!`, 'success');
+    }
+
+    // Update game notes
+    updateGameNotes(gameId, notes) {
+        const game = this.savedGames.find(g => g.id === gameId);
+        if (!game) return;
+
+        game.notes = notes;
+        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.renderSeasonStats();
+        this.showNotification('Notes updated', 'success');
+    }
+
+    // Edit game notes dialog
+    editGameNotes(gameId) {
+        const game = this.savedGames.find(g => g.id === gameId);
+        if (!game) return;
+
+        const notes = prompt('Enter notes for this game:', game.notes || '');
+        if (notes !== null) {
+            this.updateGameNotes(gameId, notes);
+        }
     }
 
     loadSavedGame(gameId) {
@@ -617,15 +640,20 @@ class SoccerLineupGenerator {
                     year: 'numeric'
                 });
                 const playerCount = game.players.filter(p => p.status === 'available').length;
+                const notesHtml = game.notes
+                    ? `<span class="game-notes">${this.escapeHtmlAttribute(game.notes)}</span>`
+                    : '';
                 return `
                     <div class="game-history-item" data-game-id="${game.id}">
                         <div class="game-info">
                             <span class="game-name">${this.escapeHtmlAttribute(game.name)}</span>
                             <span class="game-date">${formattedDate}</span>
                             <span class="game-meta">${playerCount} players | ${game.settings.formation} | ${game.settings.ageDivision}</span>
+                            ${notesHtml}
                         </div>
                         <div class="game-actions">
                             <button class="btn-view-game" data-action="view-game" data-game-id="${game.id}">View</button>
+                            <button class="btn-notes-game" data-action="notes-game" data-game-id="${game.id}" title="Edit notes">Notes</button>
                             <button class="btn-delete-game" data-action="delete-game" data-game-id="${game.id}">Delete</button>
                         </div>
                     </div>
@@ -1050,6 +1078,8 @@ class SoccerLineupGenerator {
                     this.viewGameDetails(gameId);
                 } else if (action === 'delete-game') {
                     this.deleteGame(gameId);
+                } else if (action === 'notes-game') {
+                    this.editGameNotes(gameId);
                 }
             });
         }
