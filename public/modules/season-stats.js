@@ -19,7 +19,18 @@ export function calculatePlayerStats(players, savedGames) {
             }
 
             const s = stats[player.name];
-            s.gamesPlayed++;
+
+            // Track attendance
+            s.gamesOnRoster++;
+            if (player.status === 'available') {
+                s.gamesAttended++;
+                s.gamesPlayed++;
+            } else if (player.status === 'absent') {
+                s.gamesAbsent++;
+            } else if (player.status === 'injured') {
+                s.gamesInjured++;
+            }
+
             s.totalQuarters += player.quartersPlayed?.length || 0;
             s.totalSitting += player.quartersSitting?.length || 0;
 
@@ -45,6 +56,10 @@ export function calculatePlayerStats(players, savedGames) {
 function createEmptyStats() {
     return {
         gamesPlayed: 0,
+        gamesOnRoster: 0,
+        gamesAttended: 0,
+        gamesAbsent: 0,
+        gamesInjured: 0,
         totalQuarters: 0,
         totalSitting: 0,
         goalkeeperQuarters: 0,

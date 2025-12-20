@@ -19,6 +19,7 @@ const mockSavedGames = [
         players: [
             {
                 name: 'Alice',
+                status: 'available',
                 quartersPlayed: [1, 2, 3],
                 quartersSitting: [4],
                 goalieQuarter: 1,
@@ -32,6 +33,7 @@ const mockSavedGames = [
             },
             {
                 name: 'Bob',
+                status: 'available',
                 quartersPlayed: [1, 2, 3, 4],
                 quartersSitting: [],
                 goalieQuarter: null,
@@ -43,6 +45,12 @@ const mockSavedGames = [
                 ],
                 offensiveQuarters: 0,
                 defensiveQuarters: 4
+            },
+            {
+                name: 'Charlie',
+                status: 'absent',
+                quartersPlayed: [],
+                quartersSitting: []
             }
         ]
     }
@@ -107,6 +115,7 @@ describe('calculatePlayerStats', () => {
                 ...mockSavedGames[0].players,
                 {
                     name: 'OldPlayer',
+                    status: 'available',
                     quartersPlayed: [1, 2],
                     quartersSitting: [3, 4]
                 }
@@ -115,6 +124,18 @@ describe('calculatePlayerStats', () => {
         const stats = calculatePlayerStats(mockPlayers, savedGamesWithExtra);
         expect(stats['OldPlayer']).toBeDefined();
         expect(stats['OldPlayer'].gamesPlayed).toBe(1);
+        expect(stats['OldPlayer'].gamesAttended).toBe(1);
+    });
+
+    test('should track attendance correctly', () => {
+        const stats = calculatePlayerStats(mockPlayers, mockSavedGames);
+        // Alice and Bob attended, Charlie was absent
+        expect(stats['Alice'].gamesAttended).toBe(1);
+        expect(stats['Alice'].gamesAbsent).toBe(0);
+        expect(stats['Bob'].gamesAttended).toBe(1);
+        expect(stats['Charlie'].gamesAttended).toBe(0);
+        expect(stats['Charlie'].gamesAbsent).toBe(1);
+        expect(stats['Charlie'].gamesOnRoster).toBe(1);
     });
 });
 

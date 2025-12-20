@@ -320,46 +320,56 @@ class SoccerLineupGenerator {
     getPlayerStats() {
         const stats = {};
 
+        const createEmptyStats = () => ({
+            gamesPlayed: 0,
+            gamesOnRoster: 0,
+            gamesAttended: 0,
+            gamesAbsent: 0,
+            gamesInjured: 0,
+            totalQuarters: 0,
+            totalSitting: 0,
+            goalkeeperQuarters: 0,
+            captainGames: 0,
+            positions: {}
+        });
+
         this.players.forEach(player => {
-            stats[player.name] = {
-                gamesPlayed: 0,
-                totalQuarters: 0,
-                totalSitting: 0,
-                goalkeeperQuarters: 0,
-                captainGames: 0,
-                positions: {}
-            };
+            stats[player.name] = createEmptyStats();
         });
 
         this.savedGames.forEach(game => {
             game.players.forEach(player => {
                 if (!stats[player.name]) {
-                    stats[player.name] = {
-                        gamesPlayed: 0,
-                        totalQuarters: 0,
-                        totalSitting: 0,
-                        goalkeeperQuarters: 0,
-                        captainGames: 0,
-                        positions: {}
-                    };
+                    stats[player.name] = createEmptyStats();
                 }
 
-                stats[player.name].gamesPlayed++;
-                stats[player.name].totalQuarters += player.quartersPlayed?.length || 0;
-                stats[player.name].totalSitting += player.quartersSitting?.length || 0;
+                const s = stats[player.name];
+
+                // Track attendance
+                s.gamesOnRoster++;
+                if (player.status === 'available') {
+                    s.gamesAttended++;
+                    s.gamesPlayed++;
+                } else if (player.status === 'absent') {
+                    s.gamesAbsent++;
+                } else if (player.status === 'injured') {
+                    s.gamesInjured++;
+                }
+
+                s.totalQuarters += player.quartersPlayed?.length || 0;
+                s.totalSitting += player.quartersSitting?.length || 0;
 
                 if (player.goalieQuarter) {
-                    stats[player.name].goalkeeperQuarters++;
+                    s.goalkeeperQuarters++;
                 }
 
                 // Track captain assignments (check both new captains array and legacy isCaptain flag)
                 if (game.captains?.includes(player.name) || player.isCaptain) {
-                    stats[player.name].captainGames++;
+                    s.captainGames++;
                 }
 
                 player.positionsPlayed?.forEach(pos => {
-                    stats[player.name].positions[pos.position] =
-                        (stats[player.name].positions[pos.position] || 0) + 1;
+                    s.positions[pos.position] = (s.positions[pos.position] || 0) + 1;
                 });
             });
         });
@@ -648,7 +658,7 @@ class SoccerLineupGenerator {
                     <thead>
                         <tr>
                             <th>Player</th>
-                            <th class="sortable" data-sort="games">Games</th>
+                            <th class="sortable" data-sort="attendance" title="Games Attended / Games on Roster">Attend</th>
                             <th class="sortable" data-sort="quarters">Quarters</th>
                             <th class="sortable" data-sort="sitting">Sitting %</th>
                             <th class="sortable" data-sort="gk">GK</th>
@@ -664,6 +674,9 @@ class SoccerLineupGenerator {
                                 ? Math.round((s.totalSitting / totalPossibleQuarters) * 100)
                                 : 0;
                             const barWidth = Math.round((s.totalQuarters / maxQuarters) * 50);
+                            const attended = s.gamesAttended || s.gamesPlayed;
+                            const onRoster = s.gamesOnRoster || s.gamesPlayed;
+                            const attendanceDisplay = onRoster > 0 ? `${attended}/${onRoster}` : '-';
 
                             // Get top 3 positions
                             const positions = Object.entries(s.positions)
@@ -675,7 +688,7 @@ class SoccerLineupGenerator {
                             return `
                                 <tr>
                                     <td>${this.escapeHtmlAttribute(name)}</td>
-                                    <td>${s.gamesPlayed}</td>
+                                    <td title="${s.gamesAbsent || 0} absent, ${s.gamesInjured || 0} injured">${attendanceDisplay}</td>
                                     <td>${s.totalQuarters}<span class="stat-bar" style="width: ${barWidth}px;"></span></td>
                                     <td>${sittingPct}%</td>
                                     <td>${s.goalkeeperQuarters}</td>
@@ -748,6 +761,69 @@ class SoccerLineupGenerator {
         this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
         this.showNotification('Season history cleared', 'info');
+    }
+
+    // Export season stats to CSV
+    exportSeasonStatsCSV() {
+        if (this.savedGames.length === 0) {
+            this.showNotification('No games to export', 'error');
+            return;
+        }
+
+        const stats = this.getPlayerStats();
+        const playerNames = Object.keys(stats).filter(name => stats[name].gamesPlayed > 0);
+
+        if (playerNames.length === 0) {
+            this.showNotification('No player statistics available', 'error');
+            return;
+        }
+
+        // Sort by games played descending
+        playerNames.sort((a, b) => stats[b].gamesPlayed - stats[a].gamesPlayed);
+
+        // Build CSV content
+        const headers = ['Player', 'Games Attended', 'Absent', 'Injured', 'Attendance %', 'Quarters Played', 'Quarters Sitting', 'Sitting %', 'GK Games', 'Captain Games', 'Top Positions'];
+        const rows = playerNames.map(name => {
+            const s = stats[name];
+            const totalPossible = s.gamesPlayed * 4;
+            const sittingPct = totalPossible > 0 ? Math.round((s.totalSitting / totalPossible) * 100) : 0;
+            const attendancePct = s.gamesOnRoster > 0 ? Math.round((s.gamesAttended / s.gamesOnRoster) * 100) : 0;
+            const topPositions = Object.entries(s.positions)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([pos, count]) => `${pos}(${count})`)
+                .join('; ');
+
+            return [
+                name,
+                s.gamesAttended || s.gamesPlayed,
+                s.gamesAbsent || 0,
+                s.gamesInjured || 0,
+                `${attendancePct}%`,
+                s.totalQuarters,
+                s.totalSitting,
+                `${sittingPct}%`,
+                s.goalkeeperQuarters,
+                s.captainGames || 0,
+                topPositions
+            ];
+        });
+
+        // Convert to CSV string
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `season-stats-${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+        this.showNotification('Season stats exported to CSV', 'success');
     }
 
     // Setup tooltips
@@ -982,6 +1058,12 @@ class SoccerLineupGenerator {
         const clearSeasonBtn = document.getElementById('clearSeasonHistory');
         if (clearSeasonBtn) {
             clearSeasonBtn.addEventListener('click', () => this.clearSeasonHistory());
+        }
+
+        // Export season stats button
+        const exportSeasonBtn = document.getElementById('exportSeasonStats');
+        if (exportSeasonBtn) {
+            exportSeasonBtn.addEventListener('click', () => this.exportSeasonStatsCSV());
         }
 
         // Player evaluation form
