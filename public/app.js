@@ -336,6 +336,215 @@ class SoccerLineupGenerator {
         return stats;
     }
 
+    // Get lineup recommendations based on season history
+    getLineupRecommendations() {
+        const stats = this.getPlayerStats();
+        const availablePlayers = this.players.filter(p => p.status === 'available');
+
+        if (availablePlayers.length === 0 || this.savedGames.length === 0) {
+            return null;
+        }
+
+        const recommendations = {
+            shouldSit: [],
+            shouldKeep: [],
+            shouldCaptain: [],
+            needsOffense: [],
+            needsDefense: [],
+            positionVariety: []
+        };
+
+        // Calculate averages for each player
+        const playerData = availablePlayers.map(player => {
+            const s = stats[player.name] || { gamesPlayed: 0, totalSitting: 0, goalkeeperQuarters: 0, captainGames: 0, totalQuarters: 0, positions: {} };
+            const gamesPlayed = s.gamesPlayed || 0;
+
+            // Get offensive/defensive balance from saved games
+            let offenseQtrs = 0, defenseQtrs = 0;
+            this.savedGames.forEach(game => {
+                const gamePlayer = game.players.find(p => p.name === player.name);
+                if (gamePlayer) {
+                    offenseQtrs += gamePlayer.offensiveQuarters || 0;
+                    defenseQtrs += gamePlayer.defensiveQuarters || 0;
+                }
+            });
+
+            return {
+                name: player.name,
+                noKeeper: player.noKeeper,
+                gamesPlayed,
+                avgSitting: gamesPlayed > 0 ? s.totalSitting / gamesPlayed : 0,
+                gkCount: s.goalkeeperQuarters,
+                captainCount: s.captainGames || 0,
+                offenseQtrs,
+                defenseQtrs,
+                positionCount: Object.keys(s.positions).length,
+                positions: s.positions
+            };
+        });
+
+        // Players who should sit more (lowest sitting averages)
+        const bySitting = [...playerData].sort((a, b) => a.avgSitting - b.avgSitting);
+        const minSitting = bySitting[0]?.avgSitting || 0;
+        recommendations.shouldSit = bySitting
+            .filter(p => p.gamesPlayed > 0 && p.avgSitting <= minSitting + 0.5)
+            .slice(0, 3)
+            .map(p => ({ name: p.name, avgSitting: p.avgSitting.toFixed(1), gamesPlayed: p.gamesPlayed }));
+
+        // Players who should be goalkeeper (lowest GK count, excluding noKeeper)
+        const byGK = [...playerData]
+            .filter(p => !p.noKeeper && p.gamesPlayed > 0)
+            .sort((a, b) => a.gkCount - b.gkCount);
+        const minGK = byGK[0]?.gkCount || 0;
+        recommendations.shouldKeep = byGK
+            .filter(p => p.gkCount <= minGK)
+            .slice(0, 3)
+            .map(p => ({ name: p.name, gkCount: p.gkCount }));
+
+        // Players who should be captain (lowest captain count)
+        const byCaptain = [...playerData]
+            .filter(p => p.gamesPlayed > 0)
+            .sort((a, b) => a.captainCount - b.captainCount);
+        const minCaptain = byCaptain[0]?.captainCount || 0;
+        recommendations.shouldCaptain = byCaptain
+            .filter(p => p.captainCount <= minCaptain)
+            .slice(0, 3)
+            .map(p => ({ name: p.name, captainCount: p.captainCount }));
+
+        // Players needing more offense (high defense, low offense ratio)
+        const withBalance = playerData.filter(p => p.offenseQtrs + p.defenseQtrs > 0);
+        recommendations.needsOffense = withBalance
+            .filter(p => p.defenseQtrs > p.offenseQtrs)
+            .sort((a, b) => (b.defenseQtrs - b.offenseQtrs) - (a.defenseQtrs - a.offenseQtrs))
+            .slice(0, 3)
+            .map(p => ({ name: p.name, offense: p.offenseQtrs, defense: p.defenseQtrs }));
+
+        // Players needing more defense
+        recommendations.needsDefense = withBalance
+            .filter(p => p.offenseQtrs > p.defenseQtrs)
+            .sort((a, b) => (b.offenseQtrs - b.defenseQtrs) - (a.offenseQtrs - a.defenseQtrs))
+            .slice(0, 3)
+            .map(p => ({ name: p.name, offense: p.offenseQtrs, defense: p.defenseQtrs }));
+
+        // Players needing position variety (played fewer unique positions)
+        const byVariety = [...playerData]
+            .filter(p => p.gamesPlayed > 0)
+            .sort((a, b) => a.positionCount - b.positionCount);
+        const minPositions = byVariety[0]?.positionCount || 0;
+        recommendations.positionVariety = byVariety
+            .filter(p => p.positionCount <= minPositions + 1)
+            .slice(0, 3)
+            .map(p => ({
+                name: p.name,
+                positionCount: p.positionCount,
+                topPositions: Object.entries(p.positions)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 2)
+                    .map(([pos]) => pos)
+                    .join(', ')
+            }));
+
+        return recommendations;
+    }
+
+    // Render lineup recommendations section
+    renderRecommendations() {
+        const container = document.getElementById('lineupRecommendations');
+        if (!container) return;
+
+        const recommendations = this.getLineupRecommendations();
+
+        if (!recommendations) {
+            container.innerHTML = '<p class="empty-state">Play some games to see lineup recommendations for the next game.</p>';
+            return;
+        }
+
+        const sections = [];
+
+        if (recommendations.shouldSit.length > 0) {
+            sections.push(`
+                <div class="rec-section">
+                    <h4>🪑 Should Sit More</h4>
+                    <p class="rec-desc">These players have sat the least this season</p>
+                    <ul>${recommendations.shouldSit.map(p =>
+                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - avg ${p.avgSitting} sits/game</li>`
+                    ).join('')}</ul>
+                </div>
+            `);
+        }
+
+        if (recommendations.shouldKeep.length > 0) {
+            sections.push(`
+                <div class="rec-section">
+                    <h4>🧤 Goalkeeper Priority</h4>
+                    <p class="rec-desc">These players have played goalkeeper the least</p>
+                    <ul>${recommendations.shouldKeep.map(p =>
+                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.gkCount} GK games</li>`
+                    ).join('')}</ul>
+                </div>
+            `);
+        }
+
+        if (recommendations.shouldCaptain.length > 0) {
+            sections.push(`
+                <div class="rec-section">
+                    <h4>⭐ Captain Priority</h4>
+                    <p class="rec-desc">These players have been captain the least</p>
+                    <ul>${recommendations.shouldCaptain.map(p =>
+                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.captainCount} captain games</li>`
+                    ).join('')}</ul>
+                </div>
+            `);
+        }
+
+        if (recommendations.needsOffense.length > 0) {
+            sections.push(`
+                <div class="rec-section">
+                    <h4>⚽ Needs More Offense</h4>
+                    <p class="rec-desc">These players have played mostly defense</p>
+                    <ul>${recommendations.needsOffense.map(p =>
+                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.offense} off / ${p.defense} def quarters</li>`
+                    ).join('')}</ul>
+                </div>
+            `);
+        }
+
+        if (recommendations.needsDefense.length > 0) {
+            sections.push(`
+                <div class="rec-section">
+                    <h4>🛡️ Needs More Defense</h4>
+                    <p class="rec-desc">These players have played mostly offense</p>
+                    <ul>${recommendations.needsDefense.map(p =>
+                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.offense} off / ${p.defense} def quarters</li>`
+                    ).join('')}</ul>
+                </div>
+            `);
+        }
+
+        if (recommendations.positionVariety.length > 0) {
+            sections.push(`
+                <div class="rec-section">
+                    <h4>🔄 Needs Position Variety</h4>
+                    <p class="rec-desc">These players have played the fewest unique positions</p>
+                    <ul>${recommendations.positionVariety.map(p =>
+                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.positionCount} positions (${p.topPositions || 'none'})</li>`
+                    ).join('')}</ul>
+                </div>
+            `);
+        }
+
+        if (sections.length === 0) {
+            container.innerHTML = '<p class="empty-state">All players are well-balanced! No specific recommendations.</p>';
+        } else {
+            container.innerHTML = `
+                <div class="recommendations-grid">
+                    ${sections.join('')}
+                </div>
+                <p class="rec-note">These recommendations are automatically applied when you generate a lineup.</p>
+            `;
+        }
+    }
+
     // Render season stats tab
     renderSeasonStats() {
         const totalGamesEl = document.getElementById('totalGames');
@@ -448,6 +657,9 @@ class SoccerLineupGenerator {
                 </table>
             `;
         }
+
+        // Also render lineup recommendations
+        this.renderRecommendations();
     }
 
     // Delete a saved game
