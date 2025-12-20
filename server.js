@@ -1,7 +1,11 @@
-const express = require('express');
-const path = require('path');
-const { PDFExtract } = require('pdf.js-extract');
-const rateLimit = require('express-rate-limit');
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { PDFExtract } from 'pdf.js-extract';
+import rateLimit from 'express-rate-limit';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
