@@ -2881,13 +2881,27 @@ class SoccerLineupGenerator {
             if (name !== null) this.saveCurrentGame(name);
         });
 
-        // Add buttons to the new container
+        // Add buttons to the new container in logical groups
+
+        // Group 1: Regenerate (standalone)
         actionButtonsContainer.appendChild(regenerateBtnClone);
-        actionButtonsContainer.appendChild(copyBtnClone);
-        actionButtonsContainer.appendChild(shareBtnClone);
-        actionButtonsContainer.appendChild(csvBtnClone);
-        actionButtonsContainer.appendChild(exportBtnClone);
-        actionButtonsContainer.appendChild(printBtnClone);
+
+        // Group 2: Share actions
+        const shareGroup = document.createElement('div');
+        shareGroup.className = 'button-group';
+        shareGroup.appendChild(copyBtnClone);
+        shareGroup.appendChild(shareBtnClone);
+        actionButtonsContainer.appendChild(shareGroup);
+
+        // Group 3: Export actions
+        const exportGroup = document.createElement('div');
+        exportGroup.className = 'button-group';
+        exportGroup.appendChild(csvBtnClone);
+        exportGroup.appendChild(exportBtnClone);
+        exportGroup.appendChild(printBtnClone);
+        actionButtonsContainer.appendChild(exportGroup);
+
+        // Group 4: Save Game (standalone)
         actionButtonsContainer.appendChild(saveGameBtnClone);
 
         // Add player summary to the grid
