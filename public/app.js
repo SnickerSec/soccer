@@ -2161,10 +2161,8 @@ class SoccerLineupGenerator {
             if (validation.length > 0) {
                 this.showNotification(`Generated best possible lineup after ${attempts} attempts`, 'info');
             }
-        } else if (attempts > 1) {
-            this.showNotification(`Successfully generated lineup after ${attempts} attempts`, 'success');
         } else {
-            this.showNotification('Lineup generated successfully!', 'success');
+            this.showNotification('Lineup generated successfully', 'success');
         }
         
         // Automatically assign captains based on season history (rotation)
