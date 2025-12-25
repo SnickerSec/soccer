@@ -1027,10 +1027,14 @@ class SoccerLineupGenerator {
             button.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
         });
 
-        // Restore last used tab from localStorage
-        const lastTab = localStorage.getItem('lastUsedTab');
-        if (lastTab) {
-            this.switchTab(lastTab);
+        // Set initial tab: Season Tracker if roster exists, otherwise last used or default
+        if (this.players.length > 0) {
+            this.switchTab('season');
+        } else {
+            const lastTab = localStorage.getItem('lastUsedTab');
+            if (lastTab) {
+                this.switchTab(lastTab);
+            }
         }
 
         // Global dropdown close handler (added once)
