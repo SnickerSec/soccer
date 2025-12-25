@@ -2722,6 +2722,77 @@ class SoccerLineupGenerator {
         return issues;
     }
 
+    swapPlayers(fromQuarter, fromPosition, toQuarter, toPosition) {
+        // Don't swap with self
+        if (fromQuarter === toQuarter && fromPosition === toPosition) return;
+
+        // Find the quarter objects
+        const fromQ = this.lineup.find(q => q.quarter === fromQuarter);
+        const toQ = this.lineup.find(q => q.quarter === toQuarter);
+
+        if (!fromQ || !toQ) return;
+
+        // Get player names
+        const fromPlayer = fromQ.positions[fromPosition];
+        const toPlayer = toQ.positions[toPosition];
+
+        // Swap positions
+        fromQ.positions[fromPosition] = toPlayer;
+        toQ.positions[toPosition] = fromPlayer;
+
+        // Update player tracking data
+        this.updatePlayerTracking();
+
+        // Re-display with validation
+        this.displayLineup(this.validateLineup());
+
+        this.showNotification(`Swapped ${fromPlayer} ↔ ${toPlayer}`, 'success');
+    }
+
+    updatePlayerTracking() {
+        // Reset player tracking
+        this.players.forEach(player => {
+            player.quartersPlayed = [];
+            player.quartersSitting = [];
+            player.positionsPlayed = [];
+            player.defensiveQuarters = 0;
+            player.offensiveQuarters = 0;
+        });
+
+        // Rebuild from lineup
+        this.lineup.forEach(quarter => {
+            const playersInQuarter = new Set();
+
+            for (const [position, playerName] of Object.entries(quarter.positions)) {
+                const player = this.players.find(p => p.name === playerName);
+                if (player) {
+                    playersInQuarter.add(playerName);
+                    if (!player.quartersPlayed.includes(quarter.quarter)) {
+                        player.quartersPlayed.push(quarter.quarter);
+                    }
+                    player.positionsPlayed.push({ quarter: quarter.quarter, position });
+
+                    // Track defensive/offensive quarters
+                    const defensivePositions = ['Keeper', 'Left Defender', 'Right Defender', 'Center Back', 'Left Back', 'Right Back', 'Sweeper'];
+                    if (defensivePositions.includes(position)) {
+                        player.defensiveQuarters++;
+                    } else {
+                        player.offensiveQuarters++;
+                    }
+                }
+            }
+
+            // Update sitting quarters
+            this.players.forEach(player => {
+                if (!playersInQuarter.has(player.name) && player.available !== false) {
+                    if (!player.quartersSitting.includes(quarter.quarter)) {
+                        player.quartersSitting.push(quarter.quarter);
+                    }
+                }
+            });
+        });
+    }
+
     displayLineup(validationIssues) {
         const display = document.getElementById('lineupDisplay');
         const grid = document.getElementById('lineupGrid');
@@ -2771,7 +2842,47 @@ class SoccerLineupGenerator {
                 const isKeeper = position === 'Keeper';
 
                 const tr = document.createElement('tr');
-                if (isKeeper) tr.className = 'keeper-row';
+                tr.className = isKeeper ? 'keeper-row draggable-row' : 'draggable-row';
+                tr.draggable = true;
+                tr.dataset.quarter = quarter.quarter;
+                tr.dataset.position = position;
+                tr.dataset.player = playerName;
+
+                // Drag events
+                tr.addEventListener('dragstart', (e) => {
+                    tr.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', JSON.stringify({
+                        quarter: quarter.quarter,
+                        position: position,
+                        player: playerName
+                    }));
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                tr.addEventListener('dragend', () => {
+                    tr.classList.remove('dragging');
+                    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                });
+
+                tr.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    tr.classList.add('drag-over');
+                });
+
+                tr.addEventListener('dragleave', () => {
+                    tr.classList.remove('drag-over');
+                });
+
+                tr.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    tr.classList.remove('drag-over');
+                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    this.swapPlayers(
+                        data.quarter, data.position,
+                        quarter.quarter, position
+                    );
+                });
 
                 const tdPosition = document.createElement('td');
                 tdPosition.className = 'position';

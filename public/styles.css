@@ -1623,6 +1623,32 @@ small {
     background: #8e44ad;
 }
 
+/* Drag and Drop for Lineup */
+.draggable-row {
+    cursor: grab;
+    transition: all 0.2s ease;
+}
+
+.draggable-row:hover {
+    background: rgba(52, 152, 219, 0.1);
+}
+
+.draggable-row.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    background: rgba(52, 152, 219, 0.2);
+}
+
+.draggable-row.drag-over {
+    background: rgba(46, 204, 113, 0.3);
+    outline: 2px dashed #2ecc71;
+    outline-offset: -2px;
+}
+
+.draggable-row td {
+    padding: 6px 8px;
+}
+
 /* Soccer Field Visualization */
 .field-container {
     margin: 15px 0;
