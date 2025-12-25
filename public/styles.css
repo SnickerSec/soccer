@@ -496,8 +496,10 @@ small {
 
 .player-status-select.status-injured {
     border-color: var(--accent-red);
-    background: var(--error-bg);
+    background: var(--error-bg) url('assets/injured-icon.svg') no-repeat right 4px center;
+    background-size: 16px 16px;
     color: var(--accent-red);
+    padding-right: 24px;
 }
 
 .player-status-select.status-absent {

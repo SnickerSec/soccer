@@ -1579,7 +1579,7 @@ class SoccerLineupGenerator {
             statusSelect.setAttribute('aria-label', `Status for ${player.name}`);
             const statusOptions = [
                 { value: 'available', text: '●' },
-                { value: 'injured', text: '🩹' },
+                { value: 'injured', text: '✚' },
                 { value: 'absent', text: '✖' }
             ];
             statusOptions.forEach(opt => {
