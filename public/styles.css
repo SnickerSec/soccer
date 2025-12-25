@@ -1490,24 +1490,10 @@ small {
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
-    gap: 16px !important;
+    gap: 10px !important;
     flex-wrap: wrap !important;
     margin: 30px 0 20px 0 !important;
     text-align: center !important;
-}
-
-.action-buttons-inline .button-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 4px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.action-buttons-inline .button-group button {
-    border-radius: 4px;
 }
 
 .action-buttons-inline button {
@@ -1527,6 +1513,79 @@ small {
 
 .action-buttons-inline button span {
     font-size: 16px;
+}
+
+/* Dropdown styles */
+.action-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    background: #6c757d;
+    color: white;
+    transition: all 0.2s;
+}
+
+.dropdown-trigger:hover {
+    background: #5a6268;
+}
+
+.dropdown-arrow {
+    font-size: 10px;
+    margin-left: 2px;
+    transition: transform 0.2s;
+}
+
+.action-dropdown.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card-bg, #2a2a3a);
+    border: 1px solid var(--border-color, #3a3a4a);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    padding: 6px;
+    min-width: 140px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-50%) translateY(-10px);
+    transition: all 0.2s;
+    z-index: 100;
+}
+
+.action-dropdown.open .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+.dropdown-menu button {
+    width: 100%;
+    justify-content: flex-start;
+    background: transparent;
+    color: var(--text-color, #e0e0e0);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 2px 0;
+}
+
+.dropdown-menu button:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* Override .btn-export and .btn-print padding/margin when inside action-buttons-inline */
@@ -1946,9 +2005,13 @@ button:active {
         font-size: 13px !important;
     }
 
-    .action-buttons-inline .button-group {
-        padding: 3px;
-        gap: 2px;
+    .dropdown-trigger {
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+    }
+
+    .dropdown-menu {
+        min-width: 120px;
     }
     
     /* Notification adjustments for mobile */

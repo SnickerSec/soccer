@@ -2881,27 +2881,53 @@ class SoccerLineupGenerator {
             if (name !== null) this.saveCurrentGame(name);
         });
 
-        // Add buttons to the new container in logical groups
+        // Helper to create dropdown menu
+        const createDropdown = (label, icon, items) => {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'action-dropdown';
 
-        // Group 1: Regenerate (standalone)
+            const trigger = document.createElement('button');
+            trigger.className = 'dropdown-trigger';
+            trigger.innerHTML = `<span>${icon}</span> ${label} <span class="dropdown-arrow">▾</span>`;
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('open');
+                // Close other dropdowns
+                document.querySelectorAll('.action-dropdown.open').forEach(d => {
+                    if (d !== dropdown) d.classList.remove('open');
+                });
+            });
+
+            const menu = document.createElement('div');
+            menu.className = 'dropdown-menu';
+            items.forEach(item => {
+                menu.appendChild(item);
+            });
+
+            dropdown.appendChild(trigger);
+            dropdown.appendChild(menu);
+            return dropdown;
+        };
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.action-dropdown.open').forEach(d => d.classList.remove('open'));
+        });
+
+        // Add buttons to the new container
+
+        // Regenerate (standalone)
         actionButtonsContainer.appendChild(regenerateBtnClone);
 
-        // Group 2: Share actions
-        const shareGroup = document.createElement('div');
-        shareGroup.className = 'button-group';
-        shareGroup.appendChild(copyBtnClone);
-        shareGroup.appendChild(shareBtnClone);
-        actionButtonsContainer.appendChild(shareGroup);
+        // Share dropdown
+        const shareDropdown = createDropdown('Share', '📤', [copyBtnClone, shareBtnClone]);
+        actionButtonsContainer.appendChild(shareDropdown);
 
-        // Group 3: Export actions
-        const exportGroup = document.createElement('div');
-        exportGroup.className = 'button-group';
-        exportGroup.appendChild(csvBtnClone);
-        exportGroup.appendChild(exportBtnClone);
-        exportGroup.appendChild(printBtnClone);
-        actionButtonsContainer.appendChild(exportGroup);
+        // Export dropdown
+        const exportDropdown = createDropdown('Export', '📁', [csvBtnClone, exportBtnClone, printBtnClone]);
+        actionButtonsContainer.appendChild(exportDropdown);
 
-        // Group 4: Save Game (standalone)
+        // Save Game (standalone)
         actionButtonsContainer.appendChild(saveGameBtnClone);
 
         // Add player summary to the grid
