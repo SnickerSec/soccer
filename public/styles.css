@@ -824,7 +824,7 @@ small {
     font-style: italic;
 }
 
-/* Season Stats Tab */
+/* Season Tracker Tab */
 .season-summary {
     display: flex;
     gap: 30px;
