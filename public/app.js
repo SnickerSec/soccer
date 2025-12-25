@@ -1027,6 +1027,17 @@ class SoccerLineupGenerator {
             button.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
         });
 
+        // Restore last used tab from localStorage
+        const lastTab = localStorage.getItem('lastUsedTab');
+        if (lastTab) {
+            this.switchTab(lastTab);
+        }
+
+        // Global dropdown close handler (added once)
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.action-dropdown.open').forEach(d => d.classList.remove('open'));
+        });
+
         // File import
         document.getElementById('fileInput').addEventListener('change', (e) => this.handleFileImport(e));
 
@@ -1614,6 +1625,9 @@ class SoccerLineupGenerator {
     }
 
     switchTab(tabName) {
+        // Save last used tab to localStorage
+        localStorage.setItem('lastUsedTab', tabName);
+
         // Update tab buttons
         document.querySelectorAll('.tab-button').forEach(btn => {
             btn.classList.remove('active');
@@ -2848,7 +2862,7 @@ class SoccerLineupGenerator {
             regenerateBtn.className = 'btn-export';
             regenerateBtn.style.background = '#3498db';
             regenerateBtn.setAttribute('aria-label', 'Regenerate a new lineup with different positions');
-            regenerateBtn.textContent = 'Regenerate Lineup';
+            regenerateBtn.textContent = 'Regenerate';
             regenerateBtn.addEventListener('click', () => this.generateLineup());
         }
 
@@ -2906,11 +2920,6 @@ class SoccerLineupGenerator {
             dropdown.appendChild(menu);
             return dropdown;
         };
-
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', () => {
-            document.querySelectorAll('.action-dropdown.open').forEach(d => d.classList.remove('open'));
-        });
 
         // Add buttons to the new container
 
