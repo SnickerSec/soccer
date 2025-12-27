@@ -20,7 +20,7 @@ app.use((req, res, next) => {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://unpkg.com",
         "frame-ancestors 'none'",
         "form-action 'self'",
         "base-uri 'self'"

@@ -3,8 +3,8 @@
  * Handles offline-first synchronization between localStorage and Supabase
  */
 
-import { getSupabase, isSupabaseConfigured } from './supabase.js';
-import { isAuthenticated, getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
+import { getSupabase, isSupabaseConfigured, isAuthenticated } from './supabase.js';
+import { getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
 import {
     getTeams, createTeam, getPlayers, bulkUpsertPlayers,
     getGames, saveGame, bulkImportGames, deleteAllPlayers
