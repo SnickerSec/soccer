@@ -4220,16 +4220,19 @@ class SoccerLineupGenerator {
         // Remove any existing notification
         const existing = document.querySelector('.notification');
         if (existing) existing.remove();
-        
+
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.textContent = message;
-        
-        document.body.appendChild(notification);
-        
+
+        // Append to open modal if one exists, otherwise to body
+        const openModal = document.querySelector('dialog[open]');
+        const container = openModal || document.body;
+        container.appendChild(notification);
+
         // Trigger animation
         setTimeout(() => notification.classList.add('show'), 10);
-        
+
         // Auto-remove after 3 seconds
         setTimeout(() => {
             notification.classList.remove('show');
