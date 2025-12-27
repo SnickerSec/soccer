@@ -26,6 +26,30 @@
             <div class="header-top">
                 <h1>AYSO Roster Pro</h1>
                 <div class="header-controls">
+                    <!-- Sync Status -->
+                    <div id="syncStatus" class="sync-status hidden" title="Sync status">
+                        <span class="sync-icon">&#9729;</span>
+                        <span class="sync-text">Offline</span>
+                    </div>
+
+                    <!-- Team Selector -->
+                    <div id="teamSelector" class="team-selector hidden">
+                        <select id="currentTeam" aria-label="Select team">
+                            <option value="">Select Team...</option>
+                        </select>
+                        <button id="manageTeams" class="btn-icon" title="Manage teams" aria-label="Manage teams">&#9881;</button>
+                    </div>
+
+                    <!-- Auth Container -->
+                    <div id="authContainer" class="auth-container">
+                        <button id="signInBtn" class="btn-auth hidden" aria-label="Sign in to sync data">Sign In</button>
+                        <div id="userMenu" class="user-menu hidden">
+                            <img id="userAvatar" class="user-avatar" src="" alt="">
+                            <span id="userName" class="user-name"></span>
+                            <button id="signOutBtn" class="btn-icon btn-signout" title="Sign out" aria-label="Sign out">&#10005;</button>
+                        </div>
+                    </div>
+
                     <button id="themeToggle" class="btn-icon" aria-label="Toggle light/dark theme" title="Toggle theme">
                         <span class="theme-icon-dark">&#9790;</span>
                         <span class="theme-icon-light">&#9728;</span>
@@ -261,11 +285,101 @@
             </p>
             <p style="margin-top: 5px; font-size: 0.9rem;">All players must play at least 50% of every game | Balanced teams | Positive coaching</p>
             <p style="margin-top: 10px; font-size: 0.85rem; opacity: 0.8;">
-                🔒 Privacy First: All data stays in your browser | No tracking | No storage | No accounts required |
-                <a href="PRIVACY_AND_SAFETY.md" style="color: white; text-decoration: underline;">Learn More</a>
+                Privacy First: Works offline, data stays local | Optional cloud sync to share with co-coaches |
+                <a href="docs/PRIVACY_AND_SAFETY.md" style="color: white; text-decoration: underline;">Learn More</a>
             </p>
         </footer>
     </div>
+
+    <!-- Team Management Modal -->
+    <dialog id="teamModal" class="modal team-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="teamModalTitle">Manage Teams</h2>
+                <button class="btn-close" aria-label="Close" id="closeTeamModal">&#10005;</button>
+            </div>
+
+            <!-- Team List View -->
+            <div id="teamListView" class="modal-body">
+                <div id="teamList" class="team-list"></div>
+                <button id="createTeamBtn" class="btn-primary">+ Create New Team</button>
+            </div>
+
+            <!-- Create/Edit Team View -->
+            <div id="teamEditView" class="modal-body hidden">
+                <div class="input-group">
+                    <label for="teamNameInput">Team Name:</label>
+                    <input type="text" id="teamNameInput" placeholder="My Team" maxlength="50">
+                </div>
+                <div class="input-group">
+                    <label for="teamDivision">Age Division:</label>
+                    <select id="teamDivision">
+                        <option value="10U">10U</option>
+                        <option value="12U">12U</option>
+                        <option value="14U">14U</option>
+                        <option value="16U">16U</option>
+                        <option value="19U">19U</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button id="cancelTeamEdit" class="btn-secondary">Cancel</button>
+                    <button id="saveTeamBtn" class="btn-primary">Save Team</button>
+                </div>
+            </div>
+
+            <!-- Team Details View -->
+            <div id="teamDetailsView" class="modal-body hidden">
+                <h3 id="teamDetailsName"></h3>
+
+                <div class="team-members-section">
+                    <h4>Team Members</h4>
+                    <div id="memberList" class="member-list"></div>
+                </div>
+
+                <div class="invite-section">
+                    <h4>Invite Coach</h4>
+                    <div class="invite-controls">
+                        <select id="inviteRole">
+                            <option value="coach">Coach (can edit)</option>
+                            <option value="viewer">Viewer (read only)</option>
+                        </select>
+                        <button id="generateInviteLink" class="btn-primary">Generate Invite Link</button>
+                    </div>
+                    <div id="inviteLinkContainer" class="invite-link-container hidden">
+                        <input type="text" id="inviteLinkInput" readonly>
+                        <button id="copyInviteLink" class="btn-secondary">Copy</button>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="backToTeamList" class="btn-secondary">Back</button>
+                    <button id="deleteTeamBtn" class="btn-danger">Delete Team</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Accept Invite Modal -->
+    <dialog id="inviteModal" class="modal invite-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Team Invitation</h2>
+                <button class="btn-close" aria-label="Close" id="closeInviteModal">&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <p id="inviteMessage">You've been invited to join a team.</p>
+                <div id="inviteDetails" class="invite-details">
+                    <p><strong>Team:</strong> <span id="inviteTeamName"></span></p>
+                    <p><strong>Role:</strong> <span id="inviteRoleName"></span></p>
+                    <p><strong>Invited by:</strong> <span id="inviteByName"></span></p>
+                </div>
+                <div class="modal-actions">
+                    <button id="declineInvite" class="btn-secondary">Decline</button>
+                    <button id="acceptInvite" class="btn-primary">Accept Invitation</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
 
     <script type="module" src="app.js"></script>
 </body>

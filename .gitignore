@@ -6,3 +6,4 @@ npm-debug.log*
 dist/
 build/
 players.txttest-results/
+supabase/.temp/

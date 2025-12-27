@@ -43,7 +43,24 @@ const CONSTANTS = {
         SETTINGS: 'ayso_settings',
         VISITED: 'ayso_visited',
         THEME: 'ayso_theme',
-        LINEUP_HISTORY: 'ayso_lineup_history'
+        LINEUP_HISTORY: 'ayso_lineup_history',
+        SYNC_QUEUE: 'ayso_sync_queue',
+        MIGRATION_STATUS: 'ayso_migration_status',
+        CURRENT_TEAM: 'ayso_current_team'
+    },
+
+    // Cloud sync settings
+    CLOUD: {
+        SYNC_DEBOUNCE_MS: 2000,
+        INVITE_EXPIRY_DAYS: 7,
+        MAX_TEAMS: 10
+    },
+
+    // Team member roles
+    TEAM_ROLES: {
+        OWNER: 'owner',
+        COACH: 'coach',
+        VIEWER: 'viewer'
     },
 
     // Theme options
@@ -98,6 +115,8 @@ const CONSTANTS = {
 // Freeze the constants to prevent modification
 Object.freeze(CONSTANTS);
 Object.freeze(CONSTANTS.STORAGE_KEYS);
+Object.freeze(CONSTANTS.CLOUD);
+Object.freeze(CONSTANTS.TEAM_ROLES);
 Object.freeze(CONSTANTS.THEMES);
 Object.freeze(CONSTANTS.PLAYER_STATUS);
 Object.freeze(CONSTANTS.POSITION_TYPES);

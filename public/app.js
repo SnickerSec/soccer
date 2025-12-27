@@ -29,6 +29,39 @@ import {
     getFormationDescription
 } from './modules/formations.js';
 
+// Cloud sync imports
+import { isSupabaseConfigured } from './modules/supabase.js';
+import {
+    initAuth,
+    signInWithGoogle,
+    signOut,
+    getCurrentUser,
+    isCloudAvailable
+} from './modules/auth.js';
+import {
+    initSync,
+    sync,
+    pushPlayers,
+    pushGame,
+    getSyncStatus,
+    getCurrentTeamId,
+    setCurrentTeam,
+    SYNC_STATUS
+} from './modules/sync.js';
+import {
+    getTeams,
+    createTeam,
+    updateTeam,
+    deleteTeam,
+    getTeamMembers,
+    generateInviteLink,
+    getInviteInfo,
+    acceptInvite,
+    removeMember,
+    getInviteTokenFromUrl,
+    clearInviteTokenFromUrl
+} from './modules/team-manager.js';
+
 class SoccerLineupGenerator {
     constructor() {
         this.players = [];
@@ -59,6 +92,16 @@ class SoccerLineupGenerator {
         // Minimum quarters setting
         this.minQuartersPerPlayer = 2;
 
+        // Cloud sync state
+        this.isCloudEnabled = false;
+        this.currentUser = null;
+        this.teams = [];
+        this.currentTeamId = null;
+        this.currentTeamRole = null;
+
+        // Debounced sync for player changes
+        this.debouncedPushPlayers = debounce(() => this.syncPlayersToCloud(), CONSTANTS.CLOUD.SYNC_DEBOUNCE_MS);
+
         this.init();
     }
 
@@ -75,6 +118,506 @@ class SoccerLineupGenerator {
         this.initializeDefaults();
         this.showWelcomeMessage();
         this.updateUndoRedoButtons();
+
+        // Initialize cloud sync (async, non-blocking)
+        this.initCloud();
+    }
+
+    // ============================================
+    // CLOUD SYNC METHODS
+    // ============================================
+
+    async initCloud() {
+        // Check if cloud sync is configured
+        if (!isSupabaseConfigured()) {
+            console.log('Cloud sync not configured');
+            this.updateAuthUI(null);
+            return;
+        }
+
+        // Show sign in button
+        const signInBtn = document.getElementById('signInBtn');
+        if (signInBtn) {
+            signInBtn.classList.remove('hidden');
+        }
+
+        // Initialize auth and listen for changes
+        const user = await initAuth((event, user) => {
+            this.handleAuthChange(event, user);
+        });
+
+        if (user) {
+            await this.handleSignedIn(user);
+        }
+
+        // Check for invite token in URL
+        await this.checkForInviteToken();
+    }
+
+    async handleAuthChange(event, user) {
+        console.log('Auth change:', event, user);
+
+        if (event === 'signed_in' || event === 'initialized') {
+            await this.handleSignedIn(user);
+        } else if (event === 'signed_out') {
+            this.handleSignedOut();
+        }
+    }
+
+    async handleSignedIn(user) {
+        this.currentUser = user;
+        this.isCloudEnabled = true;
+        this.updateAuthUI(user);
+
+        // Initialize sync
+        const syncResult = await initSync((status, data) => {
+            this.handleSyncStatusChange(status, data);
+        });
+
+        if (syncResult.teamId) {
+            this.currentTeamId = syncResult.teamId;
+        }
+
+        // Load teams
+        await this.loadTeams();
+
+        // If we have a team, sync data
+        if (this.currentTeamId) {
+            const result = await sync();
+            if (result.success) {
+                // Reload data from localStorage (sync updated it)
+                this.loadData();
+                this.loadSavedGames();
+                this.updatePlayerList();
+                this.renderSeasonStats();
+            }
+        }
+    }
+
+    handleSignedOut() {
+        this.currentUser = null;
+        this.isCloudEnabled = false;
+        this.teams = [];
+        this.currentTeamId = null;
+        this.updateAuthUI(null);
+        this.updateSyncStatusUI(SYNC_STATUS.OFFLINE);
+        this.updateTeamSelector();
+    }
+
+    handleSyncStatusChange(status, data) {
+        this.updateSyncStatusUI(status);
+
+        // Handle realtime updates from other clients
+        if (data?.realtimeUpdate) {
+            this.handleRealtimeUpdate(data.realtimeUpdate);
+        }
+    }
+
+    handleRealtimeUpdate(payload) {
+        console.log('Realtime update:', payload);
+
+        // Refresh data when another client makes changes
+        if (payload.table === 'players' || payload.table === 'games') {
+            sync().then(result => {
+                if (result.success) {
+                    this.loadData();
+                    this.loadSavedGames();
+                    this.updatePlayerList();
+                    this.renderSeasonStats();
+                    this.showNotification('Data updated from cloud', 'info');
+                }
+            });
+        }
+    }
+
+    async loadTeams() {
+        if (!this.isCloudEnabled) return;
+
+        const result = await getTeams();
+        if (result.success) {
+            this.teams = result.data;
+            this.updateTeamSelector();
+
+            // Set current team if not set
+            if (!this.currentTeamId && this.teams.length > 0) {
+                this.currentTeamId = this.teams[0].id;
+                this.currentTeamRole = this.teams[0].role;
+            }
+        }
+    }
+
+    async syncPlayersToCloud() {
+        if (!this.isCloudEnabled || !this.currentTeamId) return;
+
+        const result = await pushPlayers(this.players);
+        if (!result.success && !result.queued) {
+            console.error('Failed to sync players:', result.error);
+        }
+    }
+
+    async syncGameToCloud(game) {
+        if (!this.isCloudEnabled || !this.currentTeamId) return;
+
+        const result = await pushGame(game);
+        if (!result.success && !result.queued) {
+            console.error('Failed to sync game:', result.error);
+        }
+    }
+
+    updateAuthUI(user) {
+        const signInBtn = document.getElementById('signInBtn');
+        const userMenu = document.getElementById('userMenu');
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+        const syncStatus = document.getElementById('syncStatus');
+        const teamSelector = document.getElementById('teamSelector');
+
+        if (user) {
+            // User is signed in
+            if (signInBtn) signInBtn.classList.add('hidden');
+            if (userMenu) {
+                userMenu.classList.remove('hidden');
+                if (userAvatar && user.avatarUrl) {
+                    userAvatar.src = user.avatarUrl;
+                    userAvatar.alt = user.displayName;
+                }
+                if (userName) {
+                    userName.textContent = user.displayName;
+                }
+            }
+            if (syncStatus) syncStatus.classList.remove('hidden');
+            if (teamSelector) teamSelector.classList.remove('hidden');
+        } else {
+            // User is signed out
+            if (signInBtn && isSupabaseConfigured()) {
+                signInBtn.classList.remove('hidden');
+            }
+            if (userMenu) userMenu.classList.add('hidden');
+            if (syncStatus) syncStatus.classList.add('hidden');
+            if (teamSelector) teamSelector.classList.add('hidden');
+        }
+    }
+
+    updateSyncStatusUI(status) {
+        const syncStatus = document.getElementById('syncStatus');
+        if (!syncStatus) return;
+
+        const icon = syncStatus.querySelector('.sync-icon');
+        const text = syncStatus.querySelector('.sync-text');
+
+        // Remove all status classes
+        syncStatus.classList.remove('syncing', 'synced', 'error', 'offline');
+
+        switch (status) {
+            case SYNC_STATUS.SYNCING:
+                syncStatus.classList.add('syncing');
+                if (icon) icon.innerHTML = '&#8635;'; // Rotating arrow
+                if (text) text.textContent = 'Syncing...';
+                break;
+            case SYNC_STATUS.SYNCED:
+                syncStatus.classList.add('synced');
+                if (icon) icon.innerHTML = '&#9745;'; // Checkmark
+                if (text) text.textContent = 'Synced';
+                break;
+            case SYNC_STATUS.ERROR:
+                syncStatus.classList.add('error');
+                if (icon) icon.innerHTML = '&#9888;'; // Warning
+                if (text) text.textContent = 'Sync Error';
+                break;
+            case SYNC_STATUS.OFFLINE:
+            default:
+                syncStatus.classList.add('offline');
+                if (icon) icon.innerHTML = '&#9729;'; // Cloud
+                if (text) text.textContent = 'Offline';
+                break;
+        }
+    }
+
+    updateTeamSelector() {
+        const select = document.getElementById('currentTeam');
+        if (!select) return;
+
+        select.innerHTML = '';
+
+        if (this.teams.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No teams';
+            select.appendChild(option);
+            return;
+        }
+
+        this.teams.forEach(team => {
+            const option = document.createElement('option');
+            option.value = team.id;
+            option.textContent = `${team.name} (${team.role})`;
+            if (team.id === this.currentTeamId) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
+
+    async switchTeam(teamId) {
+        if (teamId === this.currentTeamId) return;
+
+        this.currentTeamId = teamId;
+        const team = this.teams.find(t => t.id === teamId);
+        this.currentTeamRole = team?.role || 'viewer';
+
+        // Sync with new team
+        const result = await setCurrentTeam(teamId);
+        if (result.success) {
+            // Reload data
+            this.loadData();
+            this.loadSavedGames();
+            this.updatePlayerList();
+            this.renderSeasonStats();
+            this.showNotification(`Switched to ${team?.name}`, 'success');
+        }
+    }
+
+    async checkForInviteToken() {
+        const token = getInviteTokenFromUrl();
+        if (!token) return;
+
+        // Get invite info
+        const info = await getInviteInfo(token);
+        if (!info.success) {
+            this.showNotification('Invalid or expired invite link', 'error');
+            clearInviteTokenFromUrl();
+            return;
+        }
+
+        // Show invite modal
+        this.showInviteModal(token, info.data);
+    }
+
+    showInviteModal(token, inviteInfo) {
+        const modal = document.getElementById('inviteModal');
+        if (!modal) return;
+
+        document.getElementById('inviteTeamName').textContent = inviteInfo.teamName;
+        document.getElementById('inviteRoleName').textContent = inviteInfo.role;
+        document.getElementById('inviteByName').textContent = inviteInfo.invitedBy || 'Team owner';
+
+        // Store token for accept action
+        modal.dataset.token = token;
+
+        modal.showModal();
+    }
+
+    async handleAcceptInvite() {
+        const modal = document.getElementById('inviteModal');
+        const token = modal?.dataset.token;
+
+        if (!token) return;
+
+        // Must be signed in to accept
+        if (!this.currentUser) {
+            this.showNotification('Please sign in to accept the invitation', 'info');
+            await signInWithGoogle();
+            return;
+        }
+
+        const result = await acceptInvite(token);
+        if (result.success) {
+            clearInviteTokenFromUrl();
+            modal?.close();
+
+            // Reload teams and switch to new team
+            await this.loadTeams();
+            await this.switchTeam(result.data.teamId);
+
+            this.showNotification('Successfully joined the team!', 'success');
+        } else {
+            this.showNotification(result.error || 'Failed to accept invite', 'error');
+        }
+    }
+
+    // ============================================
+    // TEAM MANAGEMENT MODAL
+    // ============================================
+
+    showTeamModal() {
+        const modal = document.getElementById('teamModal');
+        if (!modal) return;
+
+        this.renderTeamList();
+        this.showTeamView('list');
+        modal.showModal();
+    }
+
+    showTeamView(view) {
+        const listView = document.getElementById('teamListView');
+        const editView = document.getElementById('teamEditView');
+        const detailsView = document.getElementById('teamDetailsView');
+        const title = document.getElementById('teamModalTitle');
+
+        listView?.classList.add('hidden');
+        editView?.classList.add('hidden');
+        detailsView?.classList.add('hidden');
+
+        switch (view) {
+            case 'list':
+                listView?.classList.remove('hidden');
+                if (title) title.textContent = 'Manage Teams';
+                break;
+            case 'create':
+                editView?.classList.remove('hidden');
+                if (title) title.textContent = 'Create Team';
+                document.getElementById('teamNameInput').value = '';
+                document.getElementById('teamDivision').value = '10U';
+                break;
+            case 'details':
+                detailsView?.classList.remove('hidden');
+                if (title) title.textContent = 'Team Details';
+                break;
+        }
+    }
+
+    renderTeamList() {
+        const container = document.getElementById('teamList');
+        if (!container) return;
+
+        if (this.teams.length === 0) {
+            container.innerHTML = '<p class="empty-state">No teams yet. Create one to get started!</p>';
+            return;
+        }
+
+        container.innerHTML = this.teams.map(team => `
+            <div class="team-list-item ${team.id === this.currentTeamId ? 'active' : ''}" data-team-id="${team.id}">
+                <div class="team-info">
+                    <span class="team-name">${escapeHtml(team.name)}</span>
+                    <span class="team-role">${team.role}</span>
+                </div>
+                <button class="btn-icon" data-action="team-details" title="Team settings">&#9881;</button>
+            </div>
+        `).join('');
+    }
+
+    async showTeamDetails(teamId) {
+        const team = this.teams.find(t => t.id === teamId);
+        if (!team) return;
+
+        document.getElementById('teamDetailsName').textContent = team.name;
+        document.getElementById('teamDetailsView').dataset.teamId = teamId;
+
+        // Load members
+        const result = await getTeamMembers(teamId);
+        const memberList = document.getElementById('memberList');
+
+        if (result.success && memberList) {
+            if (result.data.length === 0) {
+                memberList.innerHTML = '<p class="empty-state">No members yet</p>';
+            } else {
+                memberList.innerHTML = result.data.map(member => `
+                    <div class="member-item">
+                        ${member.avatarUrl ? `<img src="${member.avatarUrl}" alt="" class="member-avatar">` : '<span class="member-avatar-placeholder">&#128100;</span>'}
+                        <div class="member-info">
+                            <span class="member-name">${escapeHtml(member.displayName || member.email)}</span>
+                            <span class="member-role">${member.role}</span>
+                        </div>
+                        ${team.role === 'owner' && member.role !== 'owner' ? `
+                            <button class="btn-icon btn-remove-member" data-member-id="${member.id}" title="Remove member">&#10005;</button>
+                        ` : ''}
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Show/hide owner-only controls
+        const inviteSection = document.querySelector('.invite-section');
+        const deleteBtn = document.getElementById('deleteTeamBtn');
+
+        if (team.role === 'owner') {
+            inviteSection?.classList.remove('hidden');
+            if (deleteBtn) deleteBtn.style.display = 'block';
+        } else {
+            inviteSection?.classList.add('hidden');
+            if (deleteBtn) deleteBtn.style.display = 'none';
+        }
+
+        // Hide invite link container
+        document.getElementById('inviteLinkContainer')?.classList.add('hidden');
+
+        this.showTeamView('details');
+    }
+
+    async handleCreateTeam() {
+        const name = document.getElementById('teamNameInput')?.value.trim();
+        const division = document.getElementById('teamDivision')?.value;
+
+        if (!name) {
+            this.showNotification('Please enter a team name', 'error');
+            return;
+        }
+
+        const result = await createTeam(name, division);
+        if (result.success) {
+            await this.loadTeams();
+            await this.switchTeam(result.data.id);
+            this.showTeamView('list');
+            this.renderTeamList();
+            this.showNotification(`Team "${name}" created!`, 'success');
+        } else {
+            this.showNotification(result.error || 'Failed to create team', 'error');
+        }
+    }
+
+    async handleDeleteTeam() {
+        const teamId = document.getElementById('teamDetailsView')?.dataset.teamId;
+        const team = this.teams.find(t => t.id === teamId);
+
+        if (!team || team.role !== 'owner') return;
+
+        if (!confirm(`Are you sure you want to delete "${team.name}"? This cannot be undone.`)) {
+            return;
+        }
+
+        const result = await deleteTeam(teamId);
+        if (result.success) {
+            await this.loadTeams();
+            if (this.teams.length > 0) {
+                await this.switchTeam(this.teams[0].id);
+            } else {
+                this.currentTeamId = null;
+            }
+            this.showTeamView('list');
+            this.renderTeamList();
+            this.showNotification('Team deleted', 'success');
+        } else {
+            this.showNotification(result.error || 'Failed to delete team', 'error');
+        }
+    }
+
+    async handleGenerateInviteLink() {
+        const teamId = document.getElementById('teamDetailsView')?.dataset.teamId;
+        const role = document.getElementById('inviteRole')?.value || 'coach';
+
+        if (!teamId) return;
+
+        const result = await generateInviteLink(teamId, role);
+        if (result.success) {
+            const container = document.getElementById('inviteLinkContainer');
+            const input = document.getElementById('inviteLinkInput');
+
+            if (container && input) {
+                input.value = result.data.url;
+                container.classList.remove('hidden');
+            }
+        } else {
+            this.showNotification(result.error || 'Failed to generate invite link', 'error');
+        }
+    }
+
+    copyInviteLink() {
+        const input = document.getElementById('inviteLinkInput');
+        if (input) {
+            input.select();
+            document.execCommand('copy');
+            this.showNotification('Invite link copied!', 'success');
+        }
     }
 
     // Register Service Worker for offline support
@@ -296,6 +839,11 @@ class SoccerLineupGenerator {
         this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
         this.showNotification(`Game "${game.name}" saved!`, 'success');
+
+        // Sync to cloud
+        if (this.isCloudEnabled) {
+            this.syncGameToCloud(game);
+        }
     }
 
     // Update game notes
@@ -1161,6 +1709,130 @@ class SoccerLineupGenerator {
         if (playerList) {
             playerList.addEventListener('click', (e) => this.handlePlayerListClick(e));
             playerList.addEventListener('change', (e) => this.handlePlayerListChange(e));
+        }
+
+        // Cloud sync event listeners
+        this.setupCloudEventListeners();
+    }
+
+    setupCloudEventListeners() {
+        // Sign in button
+        const signInBtn = document.getElementById('signInBtn');
+        if (signInBtn) {
+            signInBtn.addEventListener('click', async () => {
+                const result = await signInWithGoogle();
+                if (!result.success) {
+                    this.showNotification(result.error || 'Sign in failed', 'error');
+                }
+            });
+        }
+
+        // Sign out button
+        const signOutBtn = document.getElementById('signOutBtn');
+        if (signOutBtn) {
+            signOutBtn.addEventListener('click', async () => {
+                await signOut();
+                this.showNotification('Signed out', 'info');
+            });
+        }
+
+        // Team selector
+        const teamSelect = document.getElementById('currentTeam');
+        if (teamSelect) {
+            teamSelect.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    this.switchTeam(e.target.value);
+                }
+            });
+        }
+
+        // Manage teams button
+        const manageTeamsBtn = document.getElementById('manageTeams');
+        if (manageTeamsBtn) {
+            manageTeamsBtn.addEventListener('click', () => this.showTeamModal());
+        }
+
+        // Team modal events
+        const closeTeamModal = document.getElementById('closeTeamModal');
+        if (closeTeamModal) {
+            closeTeamModal.addEventListener('click', () => {
+                document.getElementById('teamModal')?.close();
+            });
+        }
+
+        const createTeamBtn = document.getElementById('createTeamBtn');
+        if (createTeamBtn) {
+            createTeamBtn.addEventListener('click', () => this.showTeamView('create'));
+        }
+
+        const cancelTeamEdit = document.getElementById('cancelTeamEdit');
+        if (cancelTeamEdit) {
+            cancelTeamEdit.addEventListener('click', () => this.showTeamView('list'));
+        }
+
+        const saveTeamBtn = document.getElementById('saveTeamBtn');
+        if (saveTeamBtn) {
+            saveTeamBtn.addEventListener('click', () => this.handleCreateTeam());
+        }
+
+        const backToTeamList = document.getElementById('backToTeamList');
+        if (backToTeamList) {
+            backToTeamList.addEventListener('click', () => {
+                this.showTeamView('list');
+                this.renderTeamList();
+            });
+        }
+
+        const deleteTeamBtn = document.getElementById('deleteTeamBtn');
+        if (deleteTeamBtn) {
+            deleteTeamBtn.addEventListener('click', () => this.handleDeleteTeam());
+        }
+
+        const generateInviteLinkBtn = document.getElementById('generateInviteLink');
+        if (generateInviteLinkBtn) {
+            generateInviteLinkBtn.addEventListener('click', () => this.handleGenerateInviteLink());
+        }
+
+        const copyInviteLinkBtn = document.getElementById('copyInviteLink');
+        if (copyInviteLinkBtn) {
+            copyInviteLinkBtn.addEventListener('click', () => this.copyInviteLink());
+        }
+
+        // Team list delegation
+        const teamList = document.getElementById('teamList');
+        if (teamList) {
+            teamList.addEventListener('click', (e) => {
+                const button = e.target.closest('button[data-action="team-details"]');
+                if (button) {
+                    const teamItem = button.closest('.team-list-item');
+                    const teamId = teamItem?.dataset.teamId;
+                    if (teamId) {
+                        this.showTeamDetails(teamId);
+                    }
+                }
+            });
+        }
+
+        // Invite modal events
+        const closeInviteModal = document.getElementById('closeInviteModal');
+        if (closeInviteModal) {
+            closeInviteModal.addEventListener('click', () => {
+                document.getElementById('inviteModal')?.close();
+                clearInviteTokenFromUrl();
+            });
+        }
+
+        const declineInvite = document.getElementById('declineInvite');
+        if (declineInvite) {
+            declineInvite.addEventListener('click', () => {
+                document.getElementById('inviteModal')?.close();
+                clearInviteTokenFromUrl();
+            });
+        }
+
+        const acceptInviteBtn = document.getElementById('acceptInvite');
+        if (acceptInviteBtn) {
+            acceptInviteBtn.addEventListener('click', () => this.handleAcceptInvite());
         }
     }
 
@@ -3470,6 +4142,11 @@ class SoccerLineupGenerator {
 
     savePlayers() {
         this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.PLAYERS, JSON.stringify(this.players));
+
+        // Trigger debounced cloud sync
+        if (this.isCloudEnabled) {
+            this.debouncedPushPlayers();
+        }
     }
 
     saveSettings() {

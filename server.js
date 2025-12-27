@@ -16,11 +16,11 @@ app.use((req, res, next) => {
     // Content Security Policy
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://unpkg.com",
+        "script-src 'self' 'unsafe-inline' https://unpkg.com https://esm.sh",
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
+        "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self' data:",
-        "connect-src 'self'",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
         "frame-ancestors 'none'",
         "form-action 'self'",
         "base-uri 'self'"
