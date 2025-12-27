@@ -2411,6 +2411,11 @@ button:active {
     max-width: 500px;
     width: 90%;
     box-shadow: 0 10px 40px var(--shadow-color);
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
 }
 
 .modal::backdrop {
@@ -2615,6 +2620,7 @@ button:active {
 .invite-controls select {
     flex: 1;
     padding: 8px 12px;
+    margin: 10px;
     border-radius: 4px;
     background: var(--bg-input);
     border: 1px solid var(--border-color);
