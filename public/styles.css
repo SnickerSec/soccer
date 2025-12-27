@@ -123,18 +123,22 @@ header {
 
 .header-top {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
-    gap: 20px;
+    gap: 15px;
     margin-bottom: 10px;
-    position: relative;
+}
+
+.header-top h1 {
+    margin: 0;
+    white-space: nowrap;
 }
 
 .header-controls {
-    position: absolute;
-    right: 0;
     display: flex;
+    align-items: center;
     gap: 8px;
+    flex-shrink: 0;
 }
 
 .btn-icon {
@@ -2165,10 +2169,12 @@ button:active {
     /* Mobile header controls */
     .header-top {
         flex-wrap: wrap;
+        justify-content: center;
     }
 
     .header-controls {
-        position: static;
+        width: 100%;
+        justify-content: center;
         margin-top: 10px;
     }
 
