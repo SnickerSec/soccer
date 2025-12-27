@@ -276,7 +276,7 @@ export async function bulkUpsertPlayers(teamId, players) {
 
     try {
         const playerData = players.map((p, index) => ({
-            id: p.id || undefined,
+            ...(p.id ? { id: p.id } : {}),
             team_id: teamId,
             name: p.name,
             number: p.number || null,
