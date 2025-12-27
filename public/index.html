@@ -23,40 +23,32 @@
 
     <div class="container">
         <header>
-            <div class="header-top">
-                <h1>AYSO Roster Pro</h1>
-                <div class="header-controls">
-                    <!-- Sync Status -->
-                    <div id="syncStatus" class="sync-status hidden" title="Sync status">
-                        <span class="sync-icon">&#9729;</span>
-                        <span class="sync-text">Offline</span>
-                    </div>
-
-                    <!-- Team Selector -->
-                    <div id="teamSelector" class="team-selector hidden">
-                        <select id="currentTeam" aria-label="Select team">
-                            <option value="">Select Team...</option>
-                        </select>
-                        <button id="manageTeams" class="btn-icon" title="Manage teams" aria-label="Manage teams">&#9881;</button>
-                    </div>
-
-                    <!-- Auth Container -->
-                    <div id="authContainer" class="auth-container">
-                        <button id="signInBtn" class="btn-auth hidden" aria-label="Sign in to sync data">Sign In</button>
-                        <div id="userMenu" class="user-menu hidden">
-                            <img id="userAvatar" class="user-avatar" src="" alt="">
-                            <span id="userName" class="user-name"></span>
-                            <button id="signOutBtn" class="btn-icon btn-signout" title="Sign out" aria-label="Sign out">&#10005;</button>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
+            <h1>AYSO Roster Pro</h1>
             <p class="subtitle">Smart lineup generator with fair rotation for youth soccer</p>
-            <div class="keyboard-help" title="Keyboard Shortcuts">
-                <span style="font-size: 0.85rem; opacity: 0.8;">
-                    Shortcuts: Ctrl+G (Generate) | Ctrl+D (Demo) | Ctrl+P (Print) | Ctrl+E (Export)
-                </span>
+            <div class="header-controls">
+                <!-- Sync Status -->
+                <div id="syncStatus" class="sync-status hidden" title="Sync status">
+                    <span class="sync-icon">&#9729;</span>
+                    <span class="sync-text">Offline</span>
+                </div>
+
+                <!-- Team Selector -->
+                <div id="teamSelector" class="team-selector hidden">
+                    <select id="currentTeam" aria-label="Select team">
+                        <option value="">Select Team...</option>
+                    </select>
+                    <button id="manageTeams" class="btn-icon" title="Manage teams" aria-label="Manage teams">&#9881;</button>
+                </div>
+
+                <!-- Auth Container -->
+                <div id="authContainer" class="auth-container">
+                    <button id="signInBtn" class="btn-auth hidden" aria-label="Sign in to sync data">Sign In</button>
+                    <div id="userMenu" class="user-menu hidden">
+                        <img id="userAvatar" class="user-avatar" src="" alt="">
+                        <span id="userName" class="user-name"></span>
+                        <button id="signOutBtn" class="btn-icon btn-signout" title="Sign out" aria-label="Sign out">&#10005;</button>
+                    </div>
+                </div>
             </div>
         </header>
 
