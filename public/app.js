@@ -242,6 +242,8 @@ class SoccerLineupGenerator {
             if (!this.currentTeamId && this.teams.length > 0) {
                 this.currentTeamId = this.teams[0].id;
                 this.currentTeamRole = this.teams[0].role;
+                // Update sync module with the selected team
+                await setCurrentTeam(this.currentTeamId);
             }
         }
     }
