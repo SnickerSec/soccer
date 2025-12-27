@@ -22,31 +22,24 @@ export async function getTeams() {
     }
 
     try {
+        // Simple query - RLS handles filtering to user's teams
         const { data, error } = await supabase
             .from('teams')
-            .select(`
-                *,
-                team_members!inner (
-                    role,
-                    joined_at
-                )
-            `)
-            .eq('team_members.user_id', user.id)
-            .not('team_members.joined_at', 'is', null)
+            .select('*')
             .order('created_at', { ascending: false });
 
         if (error) {
             return { success: false, error: error.message };
         }
 
-        // Flatten the response
+        // Get user's role for each team
         const teams = data.map(team => ({
             id: team.id,
             name: team.name,
             ageDivision: team.age_division,
             createdBy: team.created_by,
             createdAt: team.created_at,
-            role: team.team_members[0]?.role || 'viewer'
+            role: team.created_by === user.id ? 'owner' : 'member'
         }));
 
         return { success: true, data: teams };
