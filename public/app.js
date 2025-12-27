@@ -2379,6 +2379,12 @@ class SoccerLineupGenerator {
         if (tabName === 'season') {
             this.renderSeasonStats();
         }
+
+        // Hide game settings section on evaluation tab
+        const settingsSection = document.querySelector('.settings-section');
+        if (settingsSection) {
+            settingsSection.style.display = tabName === 'evaluation' ? 'none' : 'block';
+        }
     }
 
     updateEvaluationList() {

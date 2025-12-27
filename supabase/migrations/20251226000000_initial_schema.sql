@@ -86,11 +86,8 @@ CREATE TABLE user_settings (
 -- ============================================
 
 CREATE INDEX idx_team_members_team ON team_members(team_id);
-CREATE INDEX idx_team_members_user ON team_members(user_id);
-CREATE INDEX idx_team_members_invite ON team_members(invite_token) WHERE invite_token IS NOT NULL;
 CREATE INDEX idx_players_team ON players(team_id);
 CREATE INDEX idx_players_sort ON players(team_id, sort_order);
-CREATE INDEX idx_games_team ON games(team_id);
 CREATE INDEX idx_games_date ON games(team_id, game_date DESC);
 
 -- ============================================
@@ -258,7 +255,7 @@ CREATE POLICY "Users can manage own settings" ON user_settings
 CREATE OR REPLACE FUNCTION generate_invite_token()
 RETURNS TEXT AS $$
 BEGIN
-    RETURN encode(gen_random_bytes(24), 'base64');
+    RETURN encode(extensions.gen_random_bytes(24), 'base64');
 END;
 $$ LANGUAGE plpgsql;
 
