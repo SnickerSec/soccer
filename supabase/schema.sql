@@ -86,9 +86,14 @@ CREATE TABLE user_settings (
 -- ============================================
 
 CREATE INDEX idx_team_members_team ON team_members(team_id);
+CREATE INDEX idx_team_members_user_id ON team_members(user_id);
+CREATE INDEX idx_team_members_invited_by ON team_members(invited_by);
 CREATE INDEX idx_players_team ON players(team_id);
 CREATE INDEX idx_players_sort ON players(team_id, sort_order);
 CREATE INDEX idx_games_date ON games(team_id, game_date DESC);
+CREATE INDEX idx_games_created_by ON games(created_by);
+CREATE INDEX idx_teams_created_by ON teams(created_by);
+CREATE INDEX idx_user_settings_default_team ON user_settings(default_team_id);
 
 -- ============================================
 -- TRIGGERS
