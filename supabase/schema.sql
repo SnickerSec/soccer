@@ -101,7 +101,7 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = '';
 
 -- Apply updated_at triggers
 CREATE TRIGGER profiles_updated BEFORE UPDATE ON profiles
@@ -119,7 +119,7 @@ CREATE TRIGGER user_settings_updated BEFORE UPDATE ON user_settings
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO profiles (id, email, display_name, avatar_url)
+    INSERT INTO public.profiles (id, email, display_name, avatar_url)
     VALUES (
         NEW.id,
         NEW.email,
@@ -127,12 +127,12 @@ BEGIN
         NEW.raw_user_meta_data->>'avatar_url'
     );
 
-    INSERT INTO user_settings (user_id)
+    INSERT INTO public.user_settings (user_id)
     VALUES (NEW.id);
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
@@ -142,11 +142,11 @@ CREATE TRIGGER on_auth_user_created
 CREATE OR REPLACE FUNCTION handle_new_team()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO team_members (team_id, user_id, role, joined_at)
+    INSERT INTO public.team_members (team_id, user_id, role, joined_at)
     VALUES (NEW.id, NEW.created_by, 'owner', NOW());
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 CREATE TRIGGER on_team_created
     AFTER INSERT ON teams
@@ -171,7 +171,7 @@ DECLARE
     user_role TEXT;
 BEGIN
     SELECT role INTO user_role
-    FROM team_members
+    FROM public.team_members
     WHERE team_id = team_uuid
       AND user_id = auth.uid()
       AND joined_at IS NOT NULL;
@@ -182,7 +182,7 @@ BEGIN
     IF required_role = 'owner' THEN RETURN user_role = 'owner'; END IF;
     RETURN FALSE;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 -- Profiles policies
 CREATE POLICY "Users can view own profile" ON profiles
@@ -257,7 +257,7 @@ RETURNS TEXT AS $$
 BEGIN
     RETURN encode(extensions.gen_random_bytes(24), 'base64');
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = '';
 
 -- Create team invite
 CREATE OR REPLACE FUNCTION create_team_invite(
@@ -270,18 +270,18 @@ DECLARE
     v_token TEXT;
 BEGIN
     -- Check if user is team owner
-    IF NOT user_has_team_access(p_team_id, 'owner') THEN
+    IF NOT public.user_has_team_access(p_team_id, 'owner') THEN
         RAISE EXCEPTION 'Only team owners can create invites';
     END IF;
 
-    v_token := generate_invite_token();
+    v_token := public.generate_invite_token();
 
-    INSERT INTO team_members (team_id, role, invite_token, invite_expires_at, invited_by)
+    INSERT INTO public.team_members (team_id, role, invite_token, invite_expires_at, invited_by)
     VALUES (p_team_id, p_role, v_token, NOW() + p_expires_in, auth.uid());
 
     RETURN v_token;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 -- Accept team invite
 CREATE OR REPLACE FUNCTION accept_team_invite(p_token TEXT)
@@ -292,7 +292,7 @@ DECLARE
 BEGIN
     -- Find and validate invite
     SELECT id, team_id INTO v_member_id, v_team_id
-    FROM team_members
+    FROM public.team_members
     WHERE invite_token = p_token
       AND invite_expires_at > NOW()
       AND joined_at IS NULL;
@@ -303,18 +303,18 @@ BEGIN
 
     -- Check if user already a member
     IF EXISTS (
-        SELECT 1 FROM team_members
+        SELECT 1 FROM public.team_members
         WHERE team_id = v_team_id
           AND user_id = auth.uid()
           AND joined_at IS NOT NULL
     ) THEN
         -- Delete the unused invite
-        DELETE FROM team_members WHERE id = v_member_id;
+        DELETE FROM public.team_members WHERE id = v_member_id;
         RAISE EXCEPTION 'Already a member of this team';
     END IF;
 
     -- Accept invite
-    UPDATE team_members
+    UPDATE public.team_members
     SET user_id = auth.uid(),
         joined_at = NOW(),
         invite_token = NULL,
@@ -323,7 +323,7 @@ BEGIN
 
     RETURN v_team_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 -- Get team info for invite token (public, no auth required)
 CREATE OR REPLACE FUNCTION get_invite_info(p_token TEXT)
@@ -335,11 +335,11 @@ BEGIN
         tm.role,
         p.display_name,
         tm.invite_expires_at
-    FROM team_members tm
-    JOIN teams t ON t.id = tm.team_id
-    LEFT JOIN profiles p ON p.id = tm.invited_by
+    FROM public.team_members tm
+    JOIN public.teams t ON t.id = tm.team_id
+    LEFT JOIN public.profiles p ON p.id = tm.invited_by
     WHERE tm.invite_token = p_token
       AND tm.invite_expires_at > NOW()
       AND tm.joined_at IS NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
