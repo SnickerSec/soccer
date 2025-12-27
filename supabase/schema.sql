@@ -186,42 +186,37 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 -- Profiles policies
 CREATE POLICY "Users can view own profile" ON profiles
-    FOR SELECT USING (auth.uid() = id);
+    FOR SELECT USING ((select auth.uid()) = id);
 CREATE POLICY "Users can update own profile" ON profiles
-    FOR UPDATE USING (auth.uid() = id);
+    FOR UPDATE USING ((select auth.uid()) = id);
 
--- Teams policies
-CREATE POLICY "Team members can view teams" ON teams
-    FOR SELECT USING (user_has_team_access(id, 'viewer'));
-CREATE POLICY "Authenticated users can create teams" ON teams
-    FOR INSERT WITH CHECK (auth.uid() = created_by);
-CREATE POLICY "Team owners can update teams" ON teams
-    FOR UPDATE USING (user_has_team_access(id, 'owner'));
-CREATE POLICY "Team owners can delete teams" ON teams
-    FOR DELETE USING (user_has_team_access(id, 'owner'));
+-- Teams policies (simple, based on created_by)
+CREATE POLICY "teams_select" ON teams
+    FOR SELECT TO authenticated
+    USING (created_by = (select auth.uid()));
+CREATE POLICY "teams_insert" ON teams
+    FOR INSERT TO authenticated
+    WITH CHECK (created_by = (select auth.uid()));
+CREATE POLICY "teams_update" ON teams
+    FOR UPDATE TO authenticated
+    USING (created_by = (select auth.uid()));
+CREATE POLICY "teams_delete" ON teams
+    FOR DELETE TO authenticated
+    USING (created_by = (select auth.uid()));
 
--- Team members policies
-CREATE POLICY "Team members can view team members" ON team_members
-    FOR SELECT USING (
-        user_has_team_access(team_id, 'viewer')
-        OR user_id = auth.uid()
-        OR (invite_token IS NOT NULL AND invite_expires_at > NOW())
-    );
-CREATE POLICY "Owners can invite members" ON team_members
-    FOR INSERT WITH CHECK (
-        user_has_team_access(team_id, 'owner')
-        OR (user_id = auth.uid() AND invite_token IS NOT NULL)
-    );
-CREATE POLICY "Owners can update members, users can accept invites" ON team_members
-    FOR UPDATE USING (
-        user_has_team_access(team_id, 'owner')
-        OR user_id = auth.uid()
-    );
-CREATE POLICY "Owners can remove members, users can leave" ON team_members
-    FOR DELETE USING (
-        user_has_team_access(team_id, 'owner')
-        OR user_id = auth.uid()
-    );
+-- Team members policies (simple, based on user_id)
+CREATE POLICY "team_members_select" ON team_members
+    FOR SELECT TO authenticated
+    USING (user_id = (select auth.uid()));
+CREATE POLICY "team_members_insert" ON team_members
+    FOR INSERT TO authenticated
+    WITH CHECK (user_id = (select auth.uid()));
+CREATE POLICY "team_members_update" ON team_members
+    FOR UPDATE TO authenticated
+    USING (user_id = (select auth.uid()));
+CREATE POLICY "team_members_delete" ON team_members
+    FOR DELETE TO authenticated
+    USING (user_id = (select auth.uid()));
 
 -- Players policies
 CREATE POLICY "Team members can view players" ON players
@@ -245,7 +240,7 @@ CREATE POLICY "Coaches can delete games" ON games
 
 -- User settings policies
 CREATE POLICY "Users can manage own settings" ON user_settings
-    FOR ALL USING (auth.uid() = user_id);
+    FOR ALL USING ((select auth.uid()) = user_id);
 
 -- ============================================
 -- HELPER FUNCTIONS
