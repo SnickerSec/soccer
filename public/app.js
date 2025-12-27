@@ -468,8 +468,13 @@ class SoccerLineupGenerator {
             case 'create':
                 editView?.classList.remove('hidden');
                 if (title) title.textContent = 'Create Team';
+                if (editView) editView.dataset.editingTeamId = '';
                 document.getElementById('teamNameInput').value = '';
                 document.getElementById('teamDivision').value = '10U';
+                break;
+            case 'edit':
+                editView?.classList.remove('hidden');
+                if (title) title.textContent = 'Edit Team';
                 break;
             case 'details':
                 detailsView?.classList.remove('hidden');
@@ -531,13 +536,16 @@ class SoccerLineupGenerator {
         // Show/hide owner-only controls
         const inviteSection = document.querySelector('.invite-section');
         const deleteBtn = document.getElementById('deleteTeamBtn');
+        const editBtn = document.getElementById('editTeamBtn');
 
         if (team.role === 'owner') {
             inviteSection?.classList.remove('hidden');
             if (deleteBtn) deleteBtn.style.display = 'block';
+            if (editBtn) editBtn.style.display = 'block';
         } else {
             inviteSection?.classList.add('hidden');
             if (deleteBtn) deleteBtn.style.display = 'none';
+            if (editBtn) editBtn.style.display = 'none';
         }
 
         // Hide invite link container
@@ -546,24 +554,53 @@ class SoccerLineupGenerator {
         this.showTeamView('details');
     }
 
-    async handleCreateTeam() {
+    showEditTeam(teamId) {
+        const team = this.teams.find(t => t.id === teamId);
+        if (!team) return;
+
+        const editView = document.getElementById('teamEditView');
+        if (editView) editView.dataset.editingTeamId = teamId;
+
+        document.getElementById('teamNameInput').value = team.name;
+        document.getElementById('teamDivision').value = team.ageDivision || '10U';
+
+        this.showTeamView('edit');
+    }
+
+    async handleSaveTeam() {
         const name = document.getElementById('teamNameInput')?.value.trim();
         const division = document.getElementById('teamDivision')?.value;
+        const editingTeamId = document.getElementById('teamEditView')?.dataset.editingTeamId;
 
         if (!name) {
             this.showNotification('Please enter a team name', 'error');
             return;
         }
 
-        const result = await createTeam(name, division);
-        if (result.success) {
-            await this.loadTeams();
-            await this.switchTeam(result.data.id);
-            this.showTeamView('list');
-            this.renderTeamList();
-            this.showNotification(`Team "${name}" created!`, 'success');
+        if (editingTeamId) {
+            // Editing existing team
+            const result = await updateTeam(editingTeamId, { name, ageDivision: division });
+            if (result.success) {
+                await this.loadTeams();
+                this.showTeamView('list');
+                this.renderTeamList();
+                this.updateTeamSelector();
+                this.showNotification(`Team renamed to "${name}"`, 'success');
+            } else {
+                this.showNotification(result.error || 'Failed to update team', 'error');
+            }
         } else {
-            this.showNotification(result.error || 'Failed to create team', 'error');
+            // Creating new team
+            const result = await createTeam(name, division);
+            if (result.success) {
+                await this.loadTeams();
+                await this.switchTeam(result.data.id);
+                this.showTeamView('list');
+                this.renderTeamList();
+                this.showNotification(`Team "${name}" created!`, 'success');
+            } else {
+                this.showNotification(result.error || 'Failed to create team', 'error');
+            }
         }
     }
 
@@ -1774,7 +1811,15 @@ class SoccerLineupGenerator {
 
         const saveTeamBtn = document.getElementById('saveTeamBtn');
         if (saveTeamBtn) {
-            saveTeamBtn.addEventListener('click', () => this.handleCreateTeam());
+            saveTeamBtn.addEventListener('click', () => this.handleSaveTeam());
+        }
+
+        const editTeamBtn = document.getElementById('editTeamBtn');
+        if (editTeamBtn) {
+            editTeamBtn.addEventListener('click', () => {
+                const teamId = document.getElementById('teamDetailsView')?.dataset.teamId;
+                if (teamId) this.showEditTeam(teamId);
+            });
         }
 
         const backToTeamList = document.getElementById('backToTeamList');
