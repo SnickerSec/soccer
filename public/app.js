@@ -887,7 +887,7 @@ class SoccerLineupGenerator {
 
     // Update game notes
     updateGameNotes(gameId, notes) {
-        const game = this.savedGames.find(g => g.id === gameId);
+        const game = this.savedGames.find(g => String(g.id) === String(gameId));
         if (!game) return;
 
         game.notes = notes;
@@ -898,7 +898,7 @@ class SoccerLineupGenerator {
 
     // Edit game notes dialog
     editGameNotes(gameId) {
-        const game = this.savedGames.find(g => g.id === gameId);
+        const game = this.savedGames.find(g => String(g.id) === String(gameId));
         if (!game) return;
 
         const notes = prompt('Enter notes for this game:', game.notes || '');
@@ -908,7 +908,7 @@ class SoccerLineupGenerator {
     }
 
     loadSavedGame(gameId) {
-        const game = this.savedGames.find(g => g.id === gameId);
+        const game = this.savedGames.find(g => String(g.id) === String(gameId));
         if (!game) {
             this.showNotification('Game not found', 'error');
             return;
@@ -1323,14 +1323,14 @@ class SoccerLineupGenerator {
 
     // Delete a saved game
     deleteGame(gameId) {
-        const game = this.savedGames.find(g => g.id === gameId);
+        const game = this.savedGames.find(g => String(g.id) === String(gameId));
         if (!game) return;
 
         if (!confirm(`Are you sure you want to delete "${game.name}"?`)) {
             return;
         }
 
-        this.savedGames = this.savedGames.filter(g => g.id !== gameId);
+        this.savedGames = this.savedGames.filter(g => String(g.id) !== String(gameId));
         this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
         this.showNotification(`Deleted "${game.name}"`, 'info');
@@ -1338,7 +1338,7 @@ class SoccerLineupGenerator {
 
     // View a saved game's lineup
     viewGameDetails(gameId) {
-        const game = this.savedGames.find(g => g.id === gameId);
+        const game = this.savedGames.find(g => String(g.id) === String(gameId));
         if (!game) {
             this.showNotification('Game not found', 'error');
             return;
@@ -1674,7 +1674,7 @@ class SoccerLineupGenerator {
                 if (!button) return;
 
                 const action = button.dataset.action;
-                const gameId = parseInt(button.dataset.gameId);
+                const gameId = button.dataset.gameId;
 
                 if (action === 'view-game') {
                     this.viewGameDetails(gameId);
