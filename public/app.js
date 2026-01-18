@@ -3461,13 +3461,43 @@ class SoccerLineupGenerator {
 
         if (!fromQ || !toQ) return;
 
+        // Handle sitting players (position starts with "Sitting:")
+        const fromIsSitting = fromPosition.startsWith('Sitting:');
+        const toIsSitting = toPosition.startsWith('Sitting:');
+
         // Get player names
-        const fromPlayer = fromQ.positions[fromPosition];
-        const toPlayer = toQ.positions[toPosition];
+        let fromPlayer, toPlayer;
+
+        if (fromIsSitting) {
+            fromPlayer = fromPosition.substring('Sitting:'.length);
+        } else {
+            fromPlayer = fromQ.positions[fromPosition];
+        }
+
+        if (toIsSitting) {
+            toPlayer = toPosition.substring('Sitting:'.length);
+        } else {
+            toPlayer = toQ.positions[toPosition];
+        }
+
+        // Can't swap two sitting players
+        if (fromIsSitting && toIsSitting) {
+            this.showNotification('Cannot swap two sitting players', 'error');
+            return;
+        }
 
         // Swap positions
-        fromQ.positions[fromPosition] = toPlayer;
-        toQ.positions[toPosition] = fromPlayer;
+        if (fromIsSitting) {
+            // Sitting player moves to a playing position, playing player sits
+            toQ.positions[toPosition] = fromPlayer;
+        } else if (toIsSitting) {
+            // Playing player moves to sit, sitting player takes their position
+            fromQ.positions[fromPosition] = toPlayer;
+        } else {
+            // Normal swap between two playing positions
+            fromQ.positions[fromPosition] = toPlayer;
+            toQ.positions[toPosition] = fromPlayer;
+        }
 
         // Update player tracking data
         this.updatePlayerTracking();
@@ -3640,41 +3670,75 @@ class SoccerLineupGenerator {
                 table.appendChild(tr);
             });
 
-            // Show sitting players
+            // Show sitting players - individual rows for each
             const sittingPlayers = this.players.filter(p => p.quartersSitting.includes(quarter.quarter));
-            if (sittingPlayers.length > 0) {
+            sittingPlayers.forEach((p, idx) => {
                 const tr = document.createElement('tr');
                 tr.className = 'sitting-row';
+                tr.draggable = true;
+
+                // Drag events for sitting players
+                tr.addEventListener('dragstart', (e) => {
+                    tr.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', JSON.stringify({
+                        quarter: quarter.quarter,
+                        position: `Sitting:${p.name}`,
+                        player: p.name
+                    }));
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                tr.addEventListener('dragend', () => {
+                    tr.classList.remove('dragging');
+                    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                });
+
+                tr.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    tr.classList.add('drag-over');
+                });
+
+                tr.addEventListener('dragleave', () => {
+                    tr.classList.remove('drag-over');
+                });
+
+                tr.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    tr.classList.remove('drag-over');
+                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    this.swapPlayers(
+                        data.quarter, data.position,
+                        quarter.quarter, `Sitting:${p.name}`
+                    );
+                });
 
                 const tdPosition = document.createElement('td');
                 tdPosition.className = 'position';
-                tdPosition.textContent = 'Resting:';
+                tdPosition.textContent = idx === 0 ? 'Resting:' : '';
                 tr.appendChild(tdPosition);
 
                 const tdPlayer = document.createElement('td');
                 tdPlayer.className = 'player-name';
-                sittingPlayers.forEach((p, idx) => {
-                    if (idx > 0) tdPlayer.appendChild(document.createTextNode(', '));
-                    if (p.number) {
-                        const numberSpan = document.createElement('span');
-                        numberSpan.className = 'player-number';
-                        numberSpan.textContent = `#${p.number}`;
-                        tdPlayer.appendChild(numberSpan);
-                        tdPlayer.appendChild(document.createTextNode(' '));
-                    }
-                    if (p.isCaptain) {
-                        const starSpan = document.createElement('span');
-                        starSpan.className = 'captain-star';
-                        starSpan.textContent = '⭐';
-                        tdPlayer.appendChild(starSpan);
-                        tdPlayer.appendChild(document.createTextNode(' '));
-                    }
-                    tdPlayer.appendChild(document.createTextNode(p.name));
-                });
+                if (p.number) {
+                    const numberSpan = document.createElement('span');
+                    numberSpan.className = 'player-number';
+                    numberSpan.textContent = `#${p.number}`;
+                    tdPlayer.appendChild(numberSpan);
+                    tdPlayer.appendChild(document.createTextNode(' '));
+                }
+                if (p.isCaptain) {
+                    const starSpan = document.createElement('span');
+                    starSpan.className = 'captain-star';
+                    starSpan.textContent = '⭐';
+                    tdPlayer.appendChild(starSpan);
+                    tdPlayer.appendChild(document.createTextNode(' '));
+                }
+                tdPlayer.appendChild(document.createTextNode(p.name));
                 tr.appendChild(tdPlayer);
 
                 table.appendChild(tr);
-            }
+            });
 
             quarterDiv.appendChild(table);
             grid.appendChild(quarterDiv);
