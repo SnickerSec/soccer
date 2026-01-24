@@ -1882,39 +1882,33 @@ button:active {
         font-size: 0.85em;
     }
 
-    /* Force dark text for printing */
+    /* Force all text black for printing */
+    .lineup-section,
+    .lineup-section * {
+        color: #000 !important;
+    }
+
     .quarter-lineup {
         background: white !important;
         border-color: #333 !important;
-        color: #000 !important;
     }
 
     .quarter-lineup h3 {
         background: #eee !important;
-        color: #000 !important;
         border-bottom: 2px solid #333 !important;
-    }
-
-    .quarter-lineup td,
-    .quarter-lineup .position,
-    .quarter-lineup .player-name {
-        color: #000 !important;
-    }
-
-    .player-number {
-        background: transparent !important;
-        color: #000 !important;
-        border: 1px solid #333 !important;
     }
 
     .quarter-lineup tr {
         border-color: #ccc !important;
     }
 
+    .player-number {
+        background: transparent !important;
+        border: 1px solid #333 !important;
+    }
+
     .player-summary,
-    .player-summary th,
-    .player-summary td {
-        color: #000 !important;
+    .player-summary * {
         background: white !important;
         border-color: #333 !important;
     }
