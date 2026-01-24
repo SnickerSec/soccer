@@ -1802,30 +1802,20 @@ button:active {
 
 /* Print Styles */
 @media print {
-    @page {
-        size: landscape;
-        margin: 0.3cm;
-    }
-
-    html, body {
-        background: white !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: hidden !important;
-        height: auto !important;
-        width: 100% !important;
+    body {
+        background: white;
+        padding: 0;
+        margin: 0;
     }
 
     .container {
         box-shadow: none;
         border-radius: 0;
-        max-width: 100% !important;
-        width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: hidden !important;
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
     }
-    
+
     .player-section,
     .settings-section,
     .generate-section,
@@ -1840,61 +1830,49 @@ button:active {
     footer {
         display: none !important;
     }
-    
+
     .lineup-section {
         background: white;
-        padding: 10px;
-        overflow: hidden !important;
+        padding: 5px;
     }
-    
+
     /* Hide the Game Lineup header and validation messages */
     .lineup-section h2,
     .validation-messages {
         display: none !important;
     }
-    
+
     /* Hide soccer field visualizations when printing */
     .field-container,
     .soccer-field,
     .field-legend {
         display: none !important;
     }
-    
-    /* Ensure all quarters fit on one page in 2x2 grid */
+
+    /* 2x2 grid layout for quarters */
     .lineup-grid {
         display: grid !important;
-        grid-template-columns: repeat(2, 1fr) !important;
-        grid-template-rows: repeat(2, auto) !important;
-        gap: 8px !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px;
         page-break-inside: avoid;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: hidden !important;
-        width: 100% !important;
     }
 
     .quarter-lineup {
         page-break-inside: avoid;
-        padding: 5px !important;
-        font-size: 0.7em !important;
-        overflow: hidden !important;
-        margin: 0 !important;
+        padding: 8px;
+        font-size: 11px;
+        border: 1px solid #333;
     }
 
     .quarter-lineup h3 {
-        margin: -5px -5px 5px !important;
-        padding: 4px !important;
-        font-size: 0.9em !important;
+        margin: -8px -8px 8px;
+        padding: 6px;
+        font-size: 12px;
     }
 
     .quarter-lineup td {
-        padding: 2px 4px !important;
-        font-size: 0.75em !important;
-        line-height: 1.2 !important;
-    }
-
-    .quarter-lineup table {
-        margin: 0 !important;
+        padding: 3px 5px;
+        font-size: 11px;
     }
 
     /* Force all text black for printing */
