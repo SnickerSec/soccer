@@ -61,6 +61,7 @@ import {
     getInviteTokenFromUrl,
     clearInviteTokenFromUrl
 } from './modules/team-manager.js';
+import { deleteGame as deleteGameFromCloud } from './modules/cloud-storage.js';
 
 class SoccerLineupGenerator {
     constructor() {
@@ -1322,7 +1323,7 @@ class SoccerLineupGenerator {
     }
 
     // Delete a saved game
-    deleteGame(gameId) {
+    async deleteGame(gameId) {
         const game = this.savedGames.find(g => String(g.id) === String(gameId));
         if (!game) return;
 
@@ -1333,6 +1334,15 @@ class SoccerLineupGenerator {
         this.savedGames = this.savedGames.filter(g => String(g.id) !== String(gameId));
         this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
+
+        // Also delete from cloud if cloud sync is enabled
+        if (this.isCloudEnabled && this.currentTeamId) {
+            const result = await deleteGameFromCloud(gameId);
+            if (!result.success) {
+                console.error('Failed to delete game from cloud:', result.error);
+            }
+        }
+
         this.showNotification(`Deleted "${game.name}"`, 'info');
     }
 
