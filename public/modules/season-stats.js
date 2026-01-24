@@ -34,10 +34,6 @@ export function calculatePlayerStats(players, savedGames) {
             s.totalQuarters += player.quartersPlayed?.length || 0;
             s.totalSitting += player.quartersSitting?.length || 0;
 
-            if (player.goalieQuarter) {
-                s.goalkeeperQuarters++;
-            }
-
             // Track captain assignments
             if (game.captains?.includes(player.name) || player.isCaptain) {
                 s.captainGames++;
@@ -47,6 +43,12 @@ export function calculatePlayerStats(players, savedGames) {
             player.positionsPlayed?.forEach(pos => {
                 s.positions[pos.position] = (s.positions[pos.position] || 0) + 1;
             });
+
+            // Count goalkeeper games from actual positions played (more reliable than goalieQuarter field)
+            const keeperQuartersThisGame = player.positionsPlayed?.filter(pos => pos.position === 'Keeper').length || 0;
+            if (keeperQuartersThisGame > 0) {
+                s.goalkeeperQuarters++;
+            }
         });
     });
 
