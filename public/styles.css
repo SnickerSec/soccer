@@ -1802,12 +1802,19 @@ button:active {
 
 /* Print Styles */
 @media print {
+    @page {
+        size: landscape;
+        margin: 0.5cm;
+    }
+
     body {
         background: white;
         padding: 0;
         overflow: hidden !important;
+        transform: scale(0.95);
+        transform-origin: top left;
     }
-    
+
     html, body {
         overflow: hidden !important;
         height: auto !important;
