@@ -1804,26 +1804,25 @@ button:active {
 @media print {
     @page {
         size: landscape;
-        margin: 0.5cm;
-    }
-
-    body {
-        background: white;
-        padding: 0;
-        overflow: hidden !important;
-        transform: scale(0.95);
-        transform-origin: top left;
+        margin: 0.3cm;
     }
 
     html, body {
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
         overflow: hidden !important;
         height: auto !important;
+        width: 100% !important;
     }
-    
+
     .container {
         box-shadow: none;
         border-radius: 0;
-        max-width: 100%;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
         overflow: hidden !important;
     }
     
@@ -1861,32 +1860,41 @@ button:active {
         display: none !important;
     }
     
-    /* Ensure all quarters fit on one page */
+    /* Ensure all quarters fit on one page in 2x2 grid */
     .lineup-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        grid-template-rows: repeat(2, auto) !important;
+        gap: 8px !important;
         page-break-inside: avoid;
-        margin-bottom: 10px;
+        margin: 0 !important;
+        padding: 0 !important;
         overflow: hidden !important;
+        width: 100% !important;
     }
-    
+
     .quarter-lineup {
         page-break-inside: avoid;
-        padding: 10px;
-        font-size: 0.9em;
+        padding: 5px !important;
+        font-size: 0.7em !important;
         overflow: hidden !important;
+        margin: 0 !important;
     }
-    
+
     .quarter-lineup h3 {
-        margin: -10px -10px 10px;
-        padding: 8px;
-        font-size: 1em;
+        margin: -5px -5px 5px !important;
+        padding: 4px !important;
+        font-size: 0.9em !important;
     }
-    
+
     .quarter-lineup td {
-        padding: 5px;
-        font-size: 0.85em;
+        padding: 2px 4px !important;
+        font-size: 0.75em !important;
+        line-height: 1.2 !important;
+    }
+
+    .quarter-lineup table {
+        margin: 0 !important;
     }
 
     /* Force all text black for printing */
