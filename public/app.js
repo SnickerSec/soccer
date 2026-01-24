@@ -970,8 +970,13 @@ class SoccerLineupGenerator {
                 s.totalQuarters += player.quartersPlayed?.length || 0;
                 s.totalSitting += player.quartersSitting?.length || 0;
 
-                // Track captain assignments (check both new captains array and legacy isCaptain flag)
-                if (game.captains?.includes(player.name) || player.isCaptain) {
+                // Track captain assignments - prefer game.captains array, only use isCaptain for old games without captains array
+                if (game.captains && game.captains.length > 0) {
+                    if (game.captains.includes(player.name)) {
+                        s.captainGames++;
+                    }
+                } else if (player.isCaptain) {
+                    // Fallback for old games that don't have captains array
                     s.captainGames++;
                 }
 
