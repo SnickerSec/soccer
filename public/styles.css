@@ -1881,7 +1881,37 @@ button:active {
         padding: 5px;
         font-size: 0.85em;
     }
-    
+
+    /* Force dark text for printing */
+    .quarter-lineup {
+        background: white !important;
+        border-color: #333 !important;
+        color: #000 !important;
+    }
+
+    .quarter-lineup h3 {
+        background: #333 !important;
+        color: white !important;
+    }
+
+    .quarter-lineup td,
+    .quarter-lineup .position,
+    .quarter-lineup .player-name {
+        color: #000 !important;
+    }
+
+    .quarter-lineup tr {
+        border-color: #ccc !important;
+    }
+
+    .player-summary,
+    .player-summary th,
+    .player-summary td {
+        color: #000 !important;
+        background: white !important;
+        border-color: #333 !important;
+    }
+
     /* Keep the entire game lineup section on one page */
     #lineupResult {
         page-break-inside: avoid;
