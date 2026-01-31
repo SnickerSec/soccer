@@ -358,6 +358,30 @@
         </div>
     </dialog>
 
+    <!-- Save Game Modal -->
+    <dialog id="saveGameModal" class="modal save-game-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Save Game</h2>
+                <button class="btn-close" aria-label="Close" id="closeSaveGameModal">&#10005;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="saveGameName">Game Name:</label>
+                    <input type="text" id="saveGameName" placeholder="e.g., vs Tigers" maxlength="50">
+                </div>
+                <div class="input-group">
+                    <label for="saveGameDate">Game Date:</label>
+                    <input type="date" id="saveGameDate">
+                </div>
+                <div class="modal-actions">
+                    <button id="cancelSaveGame" class="btn-secondary">Cancel</button>
+                    <button id="confirmSaveGame" class="btn-primary">Save Game</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
     <script type="module" src="app.js"></script>
 </body>
 </html>

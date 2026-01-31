@@ -854,16 +854,19 @@ class SoccerLineupGenerator {
         }
     }
 
-    saveCurrentGame(gameName, notes = '') {
+    saveCurrentGame(gameName, notes = '', gameDate = null) {
         if (this.lineup.length === 0) {
             this.showNotification('Generate a lineup first', 'error');
             return;
         }
 
+        // Use provided date or default to now
+        const date = gameDate ? new Date(gameDate + 'T12:00:00').toISOString() : new Date().toISOString();
+
         const game = {
             id: Date.now(),
             name: gameName || `Game ${this.savedGames.length + 1}`,
-            date: new Date().toISOString(),
+            date: date,
             notes: notes || '',
             players: JSON.parse(JSON.stringify(this.players)),
             lineup: JSON.parse(JSON.stringify(this.lineup)),
@@ -884,6 +887,43 @@ class SoccerLineupGenerator {
         if (this.isCloudEnabled) {
             this.syncGameToCloud(game);
         }
+    }
+
+    // Show save game modal
+    showSaveGameModal() {
+        if (this.lineup.length === 0) {
+            this.showNotification('Generate a lineup first', 'error');
+            return;
+        }
+
+        const modal = document.getElementById('saveGameModal');
+        if (!modal) return;
+
+        // Reset form fields
+        const nameInput = document.getElementById('saveGameName');
+        const dateInput = document.getElementById('saveGameDate');
+
+        if (nameInput) nameInput.value = '';
+        if (dateInput) {
+            // Default to today's date
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+
+        modal.showModal();
+    }
+
+    // Handle save game confirmation
+    handleConfirmSaveGame() {
+        const modal = document.getElementById('saveGameModal');
+        const nameInput = document.getElementById('saveGameName');
+        const dateInput = document.getElementById('saveGameDate');
+
+        const name = nameInput?.value.trim() || '';
+        const date = dateInput?.value || null;
+
+        this.saveCurrentGame(name, '', date);
+        modal?.close();
     }
 
     // Update game notes
@@ -1675,8 +1715,7 @@ class SoccerLineupGenerator {
         if (shareBtn) shareBtn.addEventListener('click', () => this.shareLineup());
         if (csvBtn) csvBtn.addEventListener('click', () => this.exportToCSV());
         if (saveGameBtn) saveGameBtn.addEventListener('click', () => {
-            const name = prompt('Enter a name for this game (e.g., "vs Tigers 12/10"):');
-            if (name !== null) this.saveCurrentGame(name);
+            this.showSaveGameModal();
         });
 
         // Season stats tab - event delegation for game actions
@@ -1893,6 +1932,26 @@ class SoccerLineupGenerator {
         const acceptInviteBtn = document.getElementById('acceptInvite');
         if (acceptInviteBtn) {
             acceptInviteBtn.addEventListener('click', () => this.handleAcceptInvite());
+        }
+
+        // Save game modal events
+        const closeSaveGameModal = document.getElementById('closeSaveGameModal');
+        if (closeSaveGameModal) {
+            closeSaveGameModal.addEventListener('click', () => {
+                document.getElementById('saveGameModal')?.close();
+            });
+        }
+
+        const cancelSaveGame = document.getElementById('cancelSaveGame');
+        if (cancelSaveGame) {
+            cancelSaveGame.addEventListener('click', () => {
+                document.getElementById('saveGameModal')?.close();
+            });
+        }
+
+        const confirmSaveGame = document.getElementById('confirmSaveGame');
+        if (confirmSaveGame) {
+            confirmSaveGame.addEventListener('click', () => this.handleConfirmSaveGame());
         }
     }
 
