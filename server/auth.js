@@ -7,6 +7,13 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import pool from './db.js';
 
 export function configurePassport() {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        console.warn('\x1b[33m⚠  WARNING: GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET not set. OAuth disabled.\x1b[0m');
+        passport.serializeUser((user, done) => done(null, user.id));
+        passport.deserializeUser((id, done) => done(null, null));
+        return;
+    }
+
     passport.use(new GoogleStrategy(
         {
             clientID: process.env.GOOGLE_CLIENT_ID,
