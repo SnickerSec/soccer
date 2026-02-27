@@ -1,5 +1,5 @@
 // Service Worker for AYSO Roster Pro - Offline Support
-const CACHE_NAME = 'ayso-roster-pro-v10';
+const CACHE_NAME = 'ayso-roster-pro-v11';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -51,6 +51,12 @@ self.addEventListener('fetch', (event) => {
 
     // Skip external requests (like unpkg CDN)
     if (!event.request.url.startsWith(self.location.origin)) {
+        return;
+    }
+
+    // Never cache API or auth requests
+    const url = new URL(event.request.url);
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) {
         return;
     }
 

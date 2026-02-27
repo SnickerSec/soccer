@@ -30,7 +30,7 @@ import {
 } from './modules/formations.js';
 
 // Cloud sync imports
-import { isSupabaseConfigured } from './modules/supabase.js';
+import { isSupabaseConfigured } from './modules/api-client.js';
 import {
     initAuth,
     signInWithGoogle,

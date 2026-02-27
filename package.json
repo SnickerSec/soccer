@@ -17,10 +17,15 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
+    "connect-pg-simple": "^10.0.0",
     "express": "^4.22.1",
     "express-rate-limit": "^8.2.1",
+    "express-session": "^1.19.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "pdf-lib": "^1.17.1",
-    "pdf.js-extract": "^0.2.1"
+    "pdf.js-extract": "^0.2.1",
+    "pg": "^8.18.0"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
@@ -46,6 +51,9 @@
     ],
     "transform": {},
     "testEnvironment": "node",
-    "moduleFileExtensions": ["js", "mjs"]
+    "moduleFileExtensions": [
+      "js",
+      "mjs"
+    ]
   }
 }

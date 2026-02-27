@@ -3,6 +3,19 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { PDFExtract } from 'pdf.js-extract';
 import rateLimit from 'express-rate-limit';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import passport from 'passport';
+import pool from './server/db.js';
+import { configurePassport } from './server/auth.js';
+
+// Route imports
+import authRoutes from './server/routes/auth.js';
+import teamRoutes from './server/routes/teams.js';
+import playerRoutes from './server/routes/players.js';
+import gameRoutes from './server/routes/games.js';
+import settingsRoutes from './server/routes/settings.js';
+import inviteRoutes from './server/routes/invites.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,13 +29,13 @@ app.use((req, res, next) => {
     // Content Security Policy
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://unpkg.com https://esm.sh",
+        "script-src 'self' 'unsafe-inline' https://unpkg.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://unpkg.com https://esm.sh",
+        "connect-src 'self'",
         "frame-ancestors 'none'",
-        "form-action 'self'",
+        "form-action 'self' https://accounts.google.com",
         "base-uri 'self'"
     ].join('; '));
 
@@ -57,7 +70,58 @@ const apiLimiter = rateLimit({
     message: 'Too many API requests, please try again later.'
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+
+// Warn if using default session secret
+if (!process.env.SESSION_SECRET) {
+    console.warn('\x1b[33m⚠  WARNING: SESSION_SECRET is not set. Using insecure default. Set SESSION_SECRET env var in production.\x1b[0m');
+}
+
+// Session middleware
+const PgSession = connectPgSimple(session);
+app.use(session({
+    store: new PgSession({
+        pool,
+        tableName: 'session',
+        createTableIfMissing: true
+    }),
+    secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        sameSite: 'lax'
+    }
+}));
+
+// Passport middleware
+configurePassport();
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Stricter rate limiting for auth endpoints
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many auth requests, please try again later.'
+});
+
+app.use('/auth', authLimiter);
+
+// Apply API rate limiter to /api/* routes
+app.use('/api', apiLimiter);
+
+// Mount routes
+app.use(authRoutes);
+app.use(teamRoutes);
+app.use(playerRoutes);
+app.use(gameRoutes);
+app.use(settingsRoutes);
+app.use(inviteRoutes);
 
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
@@ -68,7 +132,7 @@ app.get('/health', (req, res) => {
 });
 
 // API endpoint to analyze PDF and detect form fields
-app.get('/api/analyze-form', apiLimiter, async (req, res) => {
+app.get('/api/analyze-form', async (req, res) => {
     try {
         const pdfPath = path.join(__dirname, 'public', 'assets', 'Player Evaluation Form 2025.pdf');
 
@@ -158,7 +222,7 @@ app.get('/api/analyze-form', apiLimiter, async (req, res) => {
         });
     } catch (error) {
         console.error('Error analyzing PDF:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: 'Failed to analyze PDF' });
     }
 });
 

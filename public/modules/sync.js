@@ -1,9 +1,9 @@
 /**
  * Sync Engine Module
- * Handles offline-first synchronization between localStorage and Supabase
+ * Handles offline-first synchronization between localStorage and the server
  */
 
-import { getSupabase, isSupabaseConfigured, isAuthenticated } from './supabase.js';
+import { isSupabaseConfigured, isAuthenticated } from './api-client.js';
 import { getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
 import {
     getTeams, createTeam, getPlayers, bulkUpsertPlayers,
@@ -25,7 +25,6 @@ let syncStatus = SYNC_STATUS.OFFLINE;
 let currentTeamId = null;
 let lastSyncTime = null;
 let syncListeners = [];
-let realtimeSubscription = null;
 
 /**
  * Initialize the sync engine
@@ -71,7 +70,6 @@ export async function initSync(onStatusChange) {
 
 /**
  * Update sync status and notify listeners
- * @param {string} status
  */
 function updateStatus(status) {
     syncStatus = status;
@@ -86,7 +84,6 @@ function updateStatus(status) {
 
 /**
  * Add a sync status listener
- * @param {Function} listener
  */
 export function addSyncListener(listener) {
     syncListeners.push(listener);
@@ -94,7 +91,6 @@ export function addSyncListener(listener) {
 
 /**
  * Remove a sync status listener
- * @param {Function} listener
  */
 export function removeSyncListener(listener) {
     syncListeners = syncListeners.filter(l => l !== listener);
@@ -102,7 +98,6 @@ export function removeSyncListener(listener) {
 
 /**
  * Get current sync status
- * @returns {string}
  */
 export function getSyncStatus() {
     return syncStatus;
@@ -110,7 +105,6 @@ export function getSyncStatus() {
 
 /**
  * Get current team ID
- * @returns {string|null}
  */
 export function getCurrentTeamId() {
     return currentTeamId;
@@ -118,8 +112,6 @@ export function getCurrentTeamId() {
 
 /**
  * Set current team and sync
- * @param {string} teamId
- * @returns {Promise<{success: boolean, players?: Array, games?: Array}>}
  */
 export async function setCurrentTeam(teamId) {
     currentTeamId = teamId;
@@ -133,7 +125,6 @@ export async function setCurrentTeam(teamId) {
 
 /**
  * Perform a full sync with the cloud
- * @returns {Promise<{success: boolean, players?: Array, games?: Array, error?: string}>}
  */
 export async function sync() {
     if (!currentTeamId) {
@@ -170,9 +161,6 @@ export async function sync() {
         lastSyncTime = new Date();
         updateStatus(SYNC_STATUS.SYNCED);
 
-        // Set up realtime subscription
-        await subscribeToTeamChanges();
-
         return {
             success: true,
             players: playersResult.data,
@@ -187,8 +175,6 @@ export async function sync() {
 
 /**
  * Push local players to cloud
- * @param {Array} players
- * @returns {Promise<{success: boolean, error?: string}>}
  */
 export async function pushPlayers(players) {
     if (!currentTeamId) {
@@ -227,8 +213,6 @@ export async function pushPlayers(players) {
 
 /**
  * Push a saved game to cloud
- * @param {object} game
- * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
 export async function pushGame(game) {
     if (!currentTeamId) {
@@ -279,9 +263,6 @@ export async function pushGame(game) {
 
 /**
  * Queue a change for later sync (when offline)
- * @param {string} entityType
- * @param {string} action
- * @param {any} data
  */
 function queueChange(entityType, action, data) {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
@@ -296,7 +277,6 @@ function queueChange(entityType, action, data) {
 
 /**
  * Process queued changes when back online
- * @returns {Promise<{success: boolean, processed: number}>}
  */
 export async function processQueue() {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
@@ -336,53 +316,6 @@ export async function processQueue() {
 
     safeSetToStorage('ayso_sync_queue', JSON.stringify(remaining));
     return { success: true, processed };
-}
-
-/**
- * Subscribe to realtime changes for the current team
- */
-async function subscribeToTeamChanges() {
-    if (realtimeSubscription) {
-        await realtimeSubscription.unsubscribe();
-    }
-
-    const supabase = await getSupabase();
-    if (!supabase || !currentTeamId) return;
-
-    realtimeSubscription = supabase
-        .channel(`team:${currentTeamId}`)
-        .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'players', filter: `team_id=eq.${currentTeamId}` },
-            handleRealtimeChange
-        )
-        .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'games', filter: `team_id=eq.${currentTeamId}` },
-            handleRealtimeChange
-        )
-        .subscribe();
-}
-
-/**
- * Handle realtime changes from other clients
- * @param {object} payload
- */
-function handleRealtimeChange(payload) {
-    console.log('Realtime change:', payload);
-
-    // Notify listeners to refresh
-    syncListeners.forEach(listener => {
-        try {
-            listener(SYNC_STATUS.SYNCED, {
-                teamId: currentTeamId,
-                lastSync: new Date(),
-                realtimeUpdate: payload
-            });
-        } catch (error) {
-            console.error('Realtime listener error:', error);
-        }
-    });
 }
 
 /**
@@ -456,10 +389,6 @@ async function migrateLocalDataToCloud() {
  * Clean up sync engine
  */
 export async function cleanup() {
-    if (realtimeSubscription) {
-        await realtimeSubscription.unsubscribe();
-        realtimeSubscription = null;
-    }
     syncListeners = [];
     currentTeamId = null;
     updateStatus(SYNC_STATUS.OFFLINE);
