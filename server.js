@@ -33,13 +33,13 @@ app.use((req, res, next) => {
     // Content Security Policy
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://unpkg.com",
+        "script-src 'self' 'unsafe-inline' https://unpkg.com https://esm.sh",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://unpkg.com",
+        "connect-src 'self' https://unpkg.com https://esm.sh https://mokykxzodxdjgmhyraje.supabase.co",
         "frame-ancestors 'none'",
-        "form-action 'self' https://accounts.google.com",
+        "form-action 'self' https://accounts.google.com https://mokykxzodxdjgmhyraje.supabase.co",
         "base-uri 'self'"
     ].join('; '));
 
@@ -104,17 +104,6 @@ app.use(session({
 configurePassport();
 app.use(passport.initialize());
 app.use(passport.session());
-
-// Stricter rate limiting for auth endpoints
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: 'Too many auth requests, please try again later.'
-});
-
-app.use('/auth', authLimiter);
 
 // Apply API rate limiter to /api/* routes
 app.use('/api', apiLimiter);

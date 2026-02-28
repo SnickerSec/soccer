@@ -1,64 +1,112 @@
 /**
  * Authentication Module
- * Handles Google OAuth sign-in/sign-out and session management
+ * Handles Google OAuth sign-in/sign-out via Supabase, with backend session sync
  */
 
-import { api, getUser, isAuthenticated, isSupabaseConfigured, clearUserCache } from './api-client.js';
+import { getSupabase, getSession, isSupabaseConfigured, onAuthStateChange } from './supabase.js';
+import { api, clearUserCache } from './api-client.js';
 
 // Auth state
 let currentUser = null;
 let authListeners = [];
+let sessionSyncInProgress = false;
 
 /**
- * Sign in with Google OAuth
- * Redirects to the server-side OAuth flow
+ * Exchange a Supabase access token for a backend session
+ */
+async function syncSessionToBackend(accessToken) {
+    if (sessionSyncInProgress) return;
+    sessionSyncInProgress = true;
+    try {
+        await api.post('/api/auth/supabase-session', { accessToken });
+    } catch (e) {
+        console.error('Backend session sync failed:', e);
+    } finally {
+        sessionSyncInProgress = false;
+    }
+}
+
+/**
+ * Sign in with Google OAuth via Supabase
  */
 export async function signInWithGoogle() {
-    window.location.href = '/auth/google';
-    return { success: true };
+    const supabase = await getSupabase();
+    if (!supabase) {
+        return { success: false, error: 'Cloud sync not configured' };
+    }
+
+    try {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin,
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'consent'
+                }
+            }
+        });
+
+        if (error) {
+            console.error('Google sign-in error:', error);
+            return { success: false, error: error.message };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Sign-in failed:', error);
+        return { success: false, error: error.message };
+    }
 }
 
 /**
  * Sign out the current user
  */
 export async function signOut() {
+    const supabase = await getSupabase();
     currentUser = null;
     clearUserCache();
-    await api.post('/api/auth/logout');
+
+    if (supabase) {
+        await supabase.auth.signOut();
+    }
+
+    try {
+        await api.post('/api/auth/logout');
+    } catch (e) {
+        // Session may already be gone
+    }
+
     window.location.href = '/';
     return { success: true };
 }
 
 /**
- * Get the current authenticated user with profile info
+ * Get the current authenticated user
  */
 export async function getCurrentUser() {
     if (currentUser) {
         return currentUser;
     }
 
-    const user = await getUser();
-    if (!user) {
-        return null;
+    // Try backend session first (fastest path after sync)
+    try {
+        const result = await api.get('/api/auth/me');
+        if (result.success && result.data) {
+            currentUser = {
+                id: result.data.id,
+                email: result.data.email,
+                displayName: result.data.displayName || result.data.email?.split('@')[0],
+                avatarUrl: result.data.avatarUrl,
+                createdAt: result.data.createdAt
+            };
+            return currentUser;
+        }
+    } catch (e) {
+        // Backend session not available
     }
 
-    currentUser = {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName || user.email?.split('@')[0],
-        avatarUrl: user.avatarUrl,
-        createdAt: user.createdAt
-    };
-
-    return currentUser;
-}
-
-/**
- * Update the user's profile
- */
-export async function updateProfile(updates) {
-    // Not implemented in new API yet — placeholder
-    return { success: false, error: 'Not implemented' };
+    return null;
 }
 
 /**
@@ -71,11 +119,32 @@ export async function initAuth(onAuthChange) {
         authListeners.push(onAuthChange);
     }
 
-    // Check current session via API
-    const user = await getCurrentUser();
-    if (user) {
-        notifyListeners('initialized', user);
-        return user;
+    // Set up Supabase auth listener
+    await onAuthStateChange(async (event, session) => {
+        if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event)) {
+            if (session?.access_token) {
+                await syncSessionToBackend(session.access_token);
+            }
+            currentUser = null;
+            clearUserCache();
+            const user = await getCurrentUser();
+            if (user) notifyListeners('signed_in', user);
+        } else if (event === 'SIGNED_OUT') {
+            currentUser = null;
+            clearUserCache();
+            notifyListeners('signed_out', null);
+        }
+    });
+
+    // Check for existing Supabase session on load
+    const session = await getSession();
+    if (session?.access_token) {
+        await syncSessionToBackend(session.access_token);
+        const user = await getCurrentUser();
+        if (user) {
+            notifyListeners('initialized', user);
+            return user;
+        }
     }
 
     return null;
