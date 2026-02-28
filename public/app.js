@@ -675,9 +675,17 @@ class SoccerLineupGenerator {
         }
     }
 
-    // Check URL for shared lineup data
+    // Check URL for shared lineup data or auth errors
     checkForSharedLineup() {
         const urlParams = new URLSearchParams(window.location.search);
+
+        const error = urlParams.get('error');
+        if (error === 'oauth_disabled') {
+            this.showNotification('Sign-in is not available on this server.', 'error');
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+        }
+
         const sharedData = urlParams.get('lineup');
 
         if (sharedData) {
