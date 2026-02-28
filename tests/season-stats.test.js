@@ -20,6 +20,7 @@ const mockSavedGames = [
             {
                 name: 'Alice',
                 status: 'available',
+                isCaptain: true,
                 quartersPlayed: [1, 2, 3],
                 quartersSitting: [4],
                 goalieQuarter: 1,
