@@ -1,25 +1,17 @@
 /**
  * Passport session configuration
- * OAuth is handled by Supabase; this just manages the server-side session.
+ * OAuth is handled by Supabase. The full user object is stored directly
+ * in the session so no database lookup is needed on each request.
  */
 
 import passport from 'passport';
-import pool from './db.js';
 
 export function configurePassport() {
     passport.serializeUser((user, done) => {
-        done(null, user.id);
+        done(null, user);
     });
 
-    passport.deserializeUser(async (id, done) => {
-        try {
-            const result = await pool.query(
-                'SELECT * FROM profiles WHERE id = $1',
-                [id]
-            );
-            done(null, result.rows[0] || null);
-        } catch (error) {
-            done(error, null);
-        }
+    passport.deserializeUser((user, done) => {
+        done(null, user);
     });
 }

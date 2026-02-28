@@ -3,7 +3,6 @@
  */
 
 import { Router } from 'express';
-import pool from '../db.js';
 
 const router = Router();
 
@@ -39,49 +38,16 @@ router.post('/api/auth/supabase-session', async (req, res, next) => {
             return res.status(400).json({ success: false, error: 'No email in token' });
         }
 
-        const displayName = supabaseUser.user_metadata?.full_name
-            || supabaseUser.user_metadata?.name
-            || email.split('@')[0];
-        const avatarUrl = supabaseUser.user_metadata?.avatar_url || null;
-
-        // Upsert the user in Railway's profiles table
-        const client = await pool.connect();
-        let user;
-        try {
-            await client.query('BEGIN');
-
-            const existing = await client.query(
-                'SELECT * FROM profiles WHERE email = $1',
-                [email]
-            );
-
-            if (existing.rows.length > 0) {
-                await client.query(
-                    'UPDATE profiles SET display_name = $1, avatar_url = $2 WHERE id = $3',
-                    [displayName, avatarUrl, existing.rows[0].id]
-                );
-                user = existing.rows[0];
-            } else {
-                const inserted = await client.query(
-                    `INSERT INTO profiles (email, display_name, avatar_url)
-                     VALUES ($1, $2, $3) RETURNING *`,
-                    [email, displayName, avatarUrl]
-                );
-                user = inserted.rows[0];
-
-                await client.query(
-                    'INSERT INTO user_settings (user_id) VALUES ($1)',
-                    [user.id]
-                );
-            }
-
-            await client.query('COMMIT');
-        } catch (err) {
-            await client.query('ROLLBACK');
-            throw err;
-        } finally {
-            client.release();
-        }
+        // Build user object directly from Supabase data — no separate DB needed
+        const user = {
+            id: supabaseUser.id,
+            email,
+            display_name: supabaseUser.user_metadata?.full_name
+                || supabaseUser.user_metadata?.name
+                || email.split('@')[0],
+            avatar_url: supabaseUser.user_metadata?.avatar_url || null,
+            created_at: supabaseUser.created_at
+        };
 
         // Establish Passport session
         req.login(user, (err) => {

@@ -4,10 +4,8 @@ import { fileURLToPath } from 'url';
 import { PDFExtract } from 'pdf.js-extract';
 import rateLimit from 'express-rate-limit';
 import session from 'express-session';
-import connectPgSimple from 'connect-pg-simple';
 import passport from 'passport';
 import { csrfSync } from 'csrf-sync';
-import pool from './server/db.js';
 import { configurePassport } from './server/auth.js';
 
 // Route imports
@@ -81,21 +79,15 @@ if (!process.env.SESSION_SECRET) {
     console.warn('\x1b[33m⚠  WARNING: SESSION_SECRET is not set. Using insecure default. Set SESSION_SECRET env var in production.\x1b[0m');
 }
 
-// Session middleware
-const PgSession = connectPgSimple(session);
+// Session middleware (in-memory store; Supabase JWT re-establishes session on each page load)
 app.use(session({
-    store: new PgSession({
-        pool,
-        tableName: 'session',
-        createTableIfMissing: true
-    }),
     secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
     resave: false,
     saveUninitialized: false,
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        maxAge: 24 * 60 * 60 * 1000, // 1 day
         sameSite: 'lax'
     }
 }));
