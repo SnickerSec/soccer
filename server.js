@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import passport from 'passport';
+import { csrfSync } from 'csrf-sync';
 import pool from './server/db.js';
 import { configurePassport } from './server/auth.js';
 
@@ -114,6 +115,21 @@ app.use('/auth', authLimiter);
 
 // Apply API rate limiter to /api/* routes
 app.use('/api', apiLimiter);
+
+// CSRF protection
+const { csrfSynchronisedProtection, generateToken } = csrfSync({
+    getTokenFromRequest: (req) => req.headers['x-csrf-token'],
+    ignoredMethods: ['GET', 'HEAD', 'OPTIONS']
+});
+
+// Endpoint to get a CSRF token (must be before protection middleware)
+app.get('/api/csrf-token', (req, res) => {
+    const token = generateToken(req);
+    res.json({ token });
+});
+
+// Apply CSRF protection to all /api routes
+app.use('/api', csrfSynchronisedProtection);
 
 // Mount routes
 app.use(authRoutes);
@@ -224,6 +240,14 @@ app.get('/api/analyze-form', async (req, res) => {
         console.error('Error analyzing PDF:', error);
         res.status(500).json({ success: false, error: 'Failed to analyze PDF' });
     }
+});
+
+// CSRF error handler
+app.use((err, req, res, next) => {
+    if (err.code === 'EBADCSRFTOKEN' || err.message === 'invalid csrf token') {
+        return res.status(403).json({ error: 'Invalid or missing CSRF token' });
+    }
+    next(err);
 });
 
 app.listen(PORT, () => {

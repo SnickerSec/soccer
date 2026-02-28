@@ -4,16 +4,41 @@
  */
 
 let cachedUser = null;
+let csrfToken = null;
+
+const STATE_CHANGING_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH'];
+
+/**
+ * Fetch a CSRF token from the server and cache it
+ */
+async function ensureCsrfToken() {
+    if (csrfToken) return;
+    try {
+        const res = await fetch('/api/csrf-token', { credentials: 'include' });
+        const data = await res.json();
+        csrfToken = data.token;
+    } catch (e) {
+        // Server may not be available
+    }
+}
 
 /**
  * Make an authenticated API request
  */
 async function request(method, url, body = null) {
+    if (STATE_CHANGING_METHODS.includes(method)) {
+        await ensureCsrfToken();
+    }
+
     const options = {
         method,
         credentials: 'include',
         headers: {}
     };
+
+    if (STATE_CHANGING_METHODS.includes(method) && csrfToken) {
+        options.headers['x-csrf-token'] = csrfToken;
+    }
 
     if (body !== null) {
         options.headers['Content-Type'] = 'application/json';
@@ -58,6 +83,7 @@ export async function getUser() {
         const result = await api.get('/api/auth/me');
         if (result.success && result.data) {
             cachedUser = result.data;
+            await ensureCsrfToken();
             return cachedUser;
         }
     } catch (e) {
