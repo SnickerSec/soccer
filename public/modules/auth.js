@@ -24,7 +24,8 @@ export async function signInWithGoogle() {
 export async function signOut() {
     currentUser = null;
     clearUserCache();
-    window.location.href = '/auth/logout';
+    await api.post('/api/auth/logout');
+    window.location.href = '/';
     return { success: true };
 }
 
