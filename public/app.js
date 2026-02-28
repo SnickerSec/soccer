@@ -2936,17 +2936,16 @@ class SoccerLineupGenerator {
             this.lineup = [];
 
             // Calculate how many quarters each player should sit
-            const totalPlayerQuarters = this.players.length * this.quarters;
+            const totalPlayerQuarters = availablePlayers.length * this.quarters;
             const totalFieldQuarters = this.playersOnField * this.quarters;
             const totalSittingQuarters = totalPlayerQuarters - totalFieldQuarters;
-            const avgSittingPerPlayer = totalSittingQuarters / this.players.length;
-            
+
             // Determine sitting distribution
-            const sittingSchedule = this.determineSittingSchedule();
-            
+            const sittingSchedule = this.determineSittingSchedule(availablePlayers);
+
             // Generate lineup for each quarter
             for (let quarter = 1; quarter <= this.quarters; quarter++) {
-                const quarterLineup = this.generateQuarterLineup(quarter, sittingSchedule);
+                const quarterLineup = this.generateQuarterLineup(quarter, sittingSchedule, availablePlayers);
                 this.lineup.push(quarterLineup);
             }
 
@@ -3039,8 +3038,8 @@ class SoccerLineupGenerator {
         this.savePlayers();
     }
 
-    determineSittingSchedule() {
-        const totalPlayers = this.players.length;
+    determineSittingSchedule(players) {
+        const totalPlayers = players.length;
         const playersPerQuarter = this.playersOnField;
         const sittingPerQuarter = totalPlayers - playersPerQuarter;
 
@@ -3056,7 +3055,7 @@ class SoccerLineupGenerator {
         };
 
         // Create a copy of players to track sitting assignments
-        const playersCopy = this.players.map(p => ({
+        const playersCopy = players.map(p => ({
             name: p.name,
             mustRest: p.mustRest,
             sittingQuarters: []
@@ -3097,7 +3096,7 @@ class SoccerLineupGenerator {
 
         // First pass: Ensure players who must rest get at least 1 sitting quarter
         mustRestPlayers.forEach(player => {
-            let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule);
+            let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule, totalPlayers);
             if (assignedQuarter !== -1) {
                 player.sittingQuarters.push(assignedQuarter);
                 schedule[assignedQuarter].push(player.name);
@@ -3114,7 +3113,7 @@ class SoccerLineupGenerator {
                 if (player.sittingQuarters.length > i) return;
 
                 // Find a quarter where the player hasn't sat yet and won't sit consecutively
-                let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule);
+                let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule, totalPlayers);
                 if (assignedQuarter !== -1) {
                     player.sittingQuarters.push(assignedQuarter);
                     schedule[assignedQuarter].push(player.name);
@@ -3145,7 +3144,7 @@ class SoccerLineupGenerator {
             const neededSits = minSitsPerPlayer + 1;
             if (player.sittingQuarters.length >= neededSits) continue;
 
-            let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule);
+            let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule, totalPlayers);
             if (assignedQuarter !== -1) {
                 player.sittingQuarters.push(assignedQuarter);
                 schedule[assignedQuarter].push(player.name);
@@ -3156,7 +3155,7 @@ class SoccerLineupGenerator {
         return schedule;
     }
 
-    findNonConsecutiveSittingQuarter(currentSittingQuarters, schedule) {
+    findNonConsecutiveSittingQuarter(currentSittingQuarters, schedule, availableCount) {
         // Try to find a quarter where:
         // 1. Player hasn't sat yet
         // 2. Won't create consecutive sitting
@@ -3166,7 +3165,7 @@ class SoccerLineupGenerator {
         
         for (let q of quartersToTry) {
             // Check if quarter is not full
-            const maxSitting = this.players.length - this.playersOnField;
+            const maxSitting = availableCount - this.playersOnField;
             if (schedule[q].length >= maxSitting) continue;
             
             // Check if player already sits this quarter
@@ -3188,7 +3187,7 @@ class SoccerLineupGenerator {
         
         // If no perfect quarter found, still avoid consecutive sitting
         for (let q = 1; q <= 4; q++) {
-            const maxSitting = this.players.length - this.playersOnField;
+            const maxSitting = availableCount - this.playersOnField;
             if (schedule[q].length < maxSitting && !currentSittingQuarters.includes(q)) {
                 // Still check for consecutive sitting even in fallback
                 let isConsecutive = false;
@@ -3207,7 +3206,7 @@ class SoccerLineupGenerator {
         return -1;
     }
 
-    generateQuarterLineup(quarter, sittingSchedule) {
+    generateQuarterLineup(quarter, sittingSchedule, players) {
         const quarterLineup = {
             quarter: quarter,
             positions: {}
@@ -3217,7 +3216,7 @@ class SoccerLineupGenerator {
         const sittingPlayers = sittingSchedule[quarter] || [];
         
         // Get players who will play this quarter
-        const playingPlayers = this.players.filter(p => !sittingPlayers.includes(p.name));
+        const playingPlayers = players.filter(p => !sittingPlayers.includes(p.name));
         
         // Categorize positions as offensive or defensive
         const defensivePositions = this.positions.filter(p => 
@@ -3266,7 +3265,7 @@ class SoccerLineupGenerator {
         });
 
         // Mark sitting players
-        this.players.forEach(player => {
+        players.forEach(player => {
             if (sittingPlayers.includes(player.name)) {
                 player.quartersSitting.push(quarter);
             }
