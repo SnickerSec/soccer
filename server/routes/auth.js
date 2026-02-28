@@ -4,23 +4,27 @@
 
 import { Router } from 'express';
 import passport from 'passport';
+import { isOAuthConfigured } from '../auth.js';
 
 const router = Router();
 
 // Initiate Google OAuth
-router.get('/auth/google', passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    accessType: 'offline',
-    prompt: 'consent'
-}));
+router.get('/auth/google', (req, res, next) => {
+    if (!isOAuthConfigured) return res.redirect('/?error=oauth_disabled');
+    passport.authenticate('google', {
+        scope: ['profile', 'email'],
+        accessType: 'offline',
+        prompt: 'consent'
+    })(req, res, next);
+});
 
 // OAuth callback
-router.get('/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/' }),
-    (req, res) => {
-        res.redirect('/');
-    }
-);
+router.get('/auth/google/callback', (req, res, next) => {
+    if (!isOAuthConfigured) return res.redirect('/');
+    passport.authenticate('google', { failureRedirect: '/' })(req, res, next);
+}, (req, res) => {
+    res.redirect('/');
+});
 
 // Logout
 router.post('/api/auth/logout', (req, res, next) => {

@@ -23,6 +23,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust Railway's proxy so express-rate-limit can read X-Forwarded-For correctly
+app.set('trust proxy', 1);
 const pdfExtract = new PDFExtract();
 
 // Security headers middleware
