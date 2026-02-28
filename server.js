@@ -37,7 +37,7 @@ app.use((req, res, next) => {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self' data:",
-        "connect-src 'self'",
+        "connect-src 'self' https://unpkg.com",
         "frame-ancestors 'none'",
         "form-action 'self' https://accounts.google.com",
         "base-uri 'self'"
