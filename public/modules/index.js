@@ -5,7 +5,6 @@ export * from './season-stats.js';
 export * from './formations.js';
 
 // Cloud sync modules
-export * from './supabase.js';
 export * from './api-client.js';
 export * from './auth.js';
 export * from './cloud-storage.js';

@@ -59,9 +59,12 @@ export const api = {
 /**
  * Check if cloud backend is configured (always true with self-hosted)
  */
-export function isSupabaseConfigured() {
+export function isCloudConfigured() {
     return true;
 }
+
+/** @deprecated Use isCloudConfigured */
+export const isSupabaseConfigured = isCloudConfigured;
 
 /**
  * Get current session (check auth status)

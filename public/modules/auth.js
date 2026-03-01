@@ -1,75 +1,27 @@
 /**
  * Authentication Module
- * Handles Google OAuth sign-in/sign-out via Supabase, with backend session sync
+ * Handles Google OAuth sign-in/sign-out via direct server-side flow
  */
 
-import { getSupabase, getSession, isSupabaseConfigured, onAuthStateChange } from './supabase.js';
 import { api, clearUserCache } from './api-client.js';
 
 // Auth state
 let currentUser = null;
 let authListeners = [];
-let sessionSyncInProgress = false;
 
 /**
- * Exchange a Supabase access token for a backend session
+ * Sign in with Google OAuth (redirects to server-side flow)
  */
-async function syncSessionToBackend(accessToken) {
-    if (sessionSyncInProgress) return;
-    sessionSyncInProgress = true;
-    try {
-        await api.post('/api/auth/supabase-session', { accessToken });
-    } catch (e) {
-        console.error('Backend session sync failed:', e);
-    } finally {
-        sessionSyncInProgress = false;
-    }
-}
-
-/**
- * Sign in with Google OAuth via Supabase
- */
-export async function signInWithGoogle() {
-    const supabase = await getSupabase();
-    if (!supabase) {
-        return { success: false, error: 'Cloud sync not configured' };
-    }
-
-    try {
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: window.location.origin,
-                queryParams: {
-                    access_type: 'offline',
-                    prompt: 'consent'
-                }
-            }
-        });
-
-        if (error) {
-            console.error('Google sign-in error:', error);
-            return { success: false, error: error.message };
-        }
-
-        return { success: true };
-    } catch (error) {
-        console.error('Sign-in failed:', error);
-        return { success: false, error: error.message };
-    }
+export function signInWithGoogle() {
+    window.location.href = '/auth/google';
 }
 
 /**
  * Sign out the current user
  */
 export async function signOut() {
-    const supabase = await getSupabase();
     currentUser = null;
     clearUserCache();
-
-    if (supabase) {
-        await supabase.auth.signOut();
-    }
 
     try {
         await api.post('/api/auth/logout');
@@ -89,7 +41,6 @@ export async function getCurrentUser() {
         return currentUser;
     }
 
-    // Try backend session first (fastest path after sync)
     try {
         const result = await api.get('/api/auth/me');
         if (result.success && result.data) {
@@ -119,35 +70,11 @@ export async function initAuth(onAuthChange) {
         authListeners.push(onAuthChange);
     }
 
-    // Set up Supabase auth listener
-    await onAuthStateChange(async (event, session) => {
-        if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event)) {
-            if (session?.access_token) {
-                await syncSessionToBackend(session.access_token);
-            }
-            currentUser = null;
-            clearUserCache();
-            const user = await getCurrentUser();
-            if (user) notifyListeners('signed_in', user);
-        } else if (event === 'SIGNED_OUT') {
-            currentUser = null;
-            clearUserCache();
-            notifyListeners('signed_out', null);
-        }
-    });
-
-    // Check for existing Supabase session on load
-    const session = await getSession();
-    if (session?.access_token) {
-        await syncSessionToBackend(session.access_token);
-        const user = await getCurrentUser();
-        if (user) {
-            notifyListeners('initialized', user);
-            return user;
-        }
+    const user = await getCurrentUser();
+    if (user) {
+        notifyListeners('initialized', user);
     }
-
-    return null;
+    return user;
 }
 
 /**
@@ -181,7 +108,14 @@ function notifyListeners(event, user) {
  * Check if cloud sync is available
  */
 export function isCloudAvailable() {
-    return isSupabaseConfigured();
+    return isCloudConfigured();
+}
+
+/**
+ * Check if cloud backend is configured (always true with self-hosted)
+ */
+export function isCloudConfigured() {
+    return true;
 }
 
 /**

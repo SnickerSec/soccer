@@ -4,9 +4,11 @@ import { fileURLToPath } from 'url';
 import { PDFExtract } from 'pdf.js-extract';
 import rateLimit from 'express-rate-limit';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import passport from 'passport';
 import { csrfSync } from 'csrf-sync';
 import { configurePassport } from './server/auth.js';
+import pool from './server/db.js';
 
 // Route imports
 import authRoutes from './server/routes/auth.js';
@@ -31,13 +33,13 @@ app.use((req, res, next) => {
     // Content Security Policy
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://unpkg.com https://esm.sh",
+        "script-src 'self' 'unsafe-inline' https://unpkg.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://unpkg.com https://esm.sh https://mokykxzodxdjgmhyraje.supabase.co",
+        "connect-src 'self' https://unpkg.com",
         "frame-ancestors 'none'",
-        "form-action 'self' https://accounts.google.com https://mokykxzodxdjgmhyraje.supabase.co",
+        "form-action 'self' https://accounts.google.com",
         "base-uri 'self'"
     ].join('; '));
 
@@ -79,15 +81,17 @@ if (!process.env.SESSION_SECRET) {
     console.warn('\x1b[33m⚠  WARNING: SESSION_SECRET is not set. Using insecure default. Set SESSION_SECRET env var in production.\x1b[0m');
 }
 
-// Session middleware (in-memory store; Supabase JWT re-establishes session on each page load)
+// Session middleware (PostgreSQL-backed via connect-pg-simple)
+const PgStore = connectPgSimple(session);
 app.use(session({
+    store: new PgStore({ pool, tableName: 'session' }),
     secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
     resave: false,
     saveUninitialized: false,
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000, // 1 day
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: 'lax'
     }
 }));
