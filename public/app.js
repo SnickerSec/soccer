@@ -494,10 +494,10 @@ class SoccerLineupGenerator {
         }
 
         container.innerHTML = this.teams.map(team => `
-            <div class="team-list-item ${team.id === this.currentTeamId ? 'active' : ''}" data-team-id="${team.id}">
+            <div class="team-list-item ${team.id === this.currentTeamId ? 'active' : ''}" data-team-id="${escapeHtml(String(team.id))}">
                 <div class="team-info">
                     <span class="team-name">${escapeHtml(team.name)}</span>
-                    <span class="team-role">${team.role}</span>
+                    <span class="team-role">${escapeHtml(team.role)}</span>
                 </div>
                 <button class="btn-icon" data-action="team-details" title="Team settings">&#9881;</button>
             </div>
@@ -519,18 +519,20 @@ class SoccerLineupGenerator {
             if (result.data.length === 0) {
                 memberList.innerHTML = '<p class="empty-state">No members yet</p>';
             } else {
-                memberList.innerHTML = result.data.map(member => `
+                memberList.innerHTML = result.data.map(member => {
+                    const safeAvatarUrl = member.avatarUrl && /^https?:\/\//.test(member.avatarUrl) ? escapeHtml(member.avatarUrl) : '';
+                    return `
                     <div class="member-item">
-                        ${member.avatarUrl ? `<img src="${member.avatarUrl}" alt="" class="member-avatar">` : '<span class="member-avatar-placeholder">&#128100;</span>'}
+                        ${safeAvatarUrl ? `<img src="${safeAvatarUrl}" alt="" class="member-avatar">` : '<span class="member-avatar-placeholder">&#128100;</span>'}
                         <div class="member-info">
                             <span class="member-name">${escapeHtml(member.displayName || member.email)}</span>
-                            <span class="member-role">${member.role}</span>
+                            <span class="member-role">${escapeHtml(member.role)}</span>
                         </div>
                         ${team.role === 'owner' && member.role !== 'owner' ? `
-                            <button class="btn-icon btn-remove-member" data-member-id="${member.id}" title="Remove member">&#10005;</button>
+                            <button class="btn-icon btn-remove-member" data-member-id="${escapeHtml(String(member.id))}" title="Remove member">&#10005;</button>
                         ` : ''}
                     </div>
-                `).join('');
+                `;}).join('');
             }
         }
 
@@ -1230,7 +1232,7 @@ class SoccerLineupGenerator {
                     <h4>🔄 Needs Position Variety</h4>
                     <p class="rec-desc">These players have played the fewest unique positions</p>
                     <ul>${recommendations.positionVariety.map(p =>
-                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.positionCount} positions (${p.topPositions || 'none'})</li>`
+                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.positionCount} positions (${this.escapeHtmlAttribute(p.topPositions || 'none')})</li>`
                     ).join('')}</ul>
                 </div>
             `);
@@ -1279,21 +1281,25 @@ class SoccerLineupGenerator {
                     year: 'numeric'
                 });
                 const playerCount = game.players.filter(p => p.status === 'available').length;
+                const safeId = this.escapeHtmlAttribute(String(game.id));
+                const safeName = this.escapeHtmlAttribute(game.name);
+                const safeFormation = this.escapeHtmlAttribute(game.settings.formation);
+                const safeDivision = this.escapeHtmlAttribute(game.settings.ageDivision);
                 const notesHtml = game.notes
                     ? `<span class="game-notes">${this.escapeHtmlAttribute(game.notes)}</span>`
                     : '';
                 return `
-                    <div class="game-history-item" data-game-id="${game.id}">
+                    <div class="game-history-item" data-game-id="${safeId}">
                         <div class="game-info">
-                            <span class="game-name">${this.escapeHtmlAttribute(game.name)}</span>
+                            <span class="game-name">${safeName}</span>
                             <span class="game-date">${formattedDate}</span>
-                            <span class="game-meta">${playerCount} players | ${game.settings.formation} | ${game.settings.ageDivision}</span>
+                            <span class="game-meta">${playerCount} players | ${safeFormation} | ${safeDivision}</span>
                             ${notesHtml}
                         </div>
                         <div class="game-actions">
-                            <button class="btn-view-game" data-action="view-game" data-game-id="${game.id}" aria-label="View ${this.escapeHtmlAttribute(game.name)}">View</button>
-                            <button class="btn-notes-game" data-action="notes-game" data-game-id="${game.id}" aria-label="Edit notes for ${this.escapeHtmlAttribute(game.name)}">Notes</button>
-                            <button class="btn-delete-game" data-action="delete-game" data-game-id="${game.id}" aria-label="Delete ${this.escapeHtmlAttribute(game.name)}">Delete</button>
+                            <button class="btn-view-game" data-action="view-game" data-game-id="${safeId}" aria-label="View ${safeName}">View</button>
+                            <button class="btn-notes-game" data-action="notes-game" data-game-id="${safeId}" aria-label="Edit notes for ${safeName}">Notes</button>
+                            <button class="btn-delete-game" data-action="delete-game" data-game-id="${safeId}" aria-label="Delete ${safeName}">Delete</button>
                         </div>
                     </div>
                 `;
@@ -1349,7 +1355,7 @@ class SoccerLineupGenerator {
                             const positions = Object.entries(s.positions)
                                 .sort((a, b) => b[1] - a[1])
                                 .slice(0, 3)
-                                .map(([pos, count]) => `${pos} (${count})`)
+                                .map(([pos, count]) => `${this.escapeHtmlAttribute(pos)} (${count})`)
                                 .join(', ') || '-';
 
                             return `
@@ -2821,7 +2827,8 @@ class SoccerLineupGenerator {
             '19U': '<strong>19U Rules:</strong> 11v11 format on full-size field. All standard soccer rules apply. Highest youth level with competitive, physical play.'
         };
         
-        rulesDiv.innerHTML = `<p>${rules[this.ageDivision] || rules['10U']}</p>`;
+        const ruleHtml = Object.prototype.hasOwnProperty.call(rules, this.ageDivision) ? rules[this.ageDivision] : rules['10U'];
+        rulesDiv.innerHTML = `<p>${ruleHtml}</p>`;
     }
     
     updateFormationDescription() {
@@ -2845,7 +2852,8 @@ class SoccerLineupGenerator {
         
         const descDiv = document.getElementById('formationDescription');
         if (descDiv) {
-            descDiv.innerHTML = `<p>${descriptions[this.formation] || descriptions['2-3-1']}</p>`;
+            const descHtml = Object.prototype.hasOwnProperty.call(descriptions, this.formation) ? descriptions[this.formation] : descriptions['2-3-1'];
+            descDiv.innerHTML = `<p>${descHtml}</p>`;
         }
     }
     
@@ -2867,11 +2875,11 @@ class SoccerLineupGenerator {
         const overlay = document.createElement('div');
         overlay.className = 'loading-overlay';
         overlay.id = 'loadingOverlay';
-        overlay.innerHTML = `
-            <div class="loading-spinner"></div>
-            <div class="loading-text">${message}</div>
-            <div class="loading-progress" id="loadingProgress"></div>
-        `;
+        const loadingText = document.createElement('div');
+        loadingText.className = 'loading-text';
+        loadingText.textContent = message;
+        overlay.innerHTML = '<div class="loading-spinner"></div><div class="loading-progress" id="loadingProgress"></div>';
+        overlay.insertBefore(loadingText, overlay.querySelector('.loading-progress'));
         document.body.appendChild(overlay);
     }
 
@@ -3883,7 +3891,12 @@ class SoccerLineupGenerator {
 
             const trigger = document.createElement('button');
             trigger.className = 'dropdown-trigger';
-            trigger.innerHTML = `<span>${icon}</span> ${label} <span class="dropdown-arrow">▾</span>`;
+            const iconSpan = document.createElement('span');
+            iconSpan.textContent = icon;
+            const arrowSpan = document.createElement('span');
+            arrowSpan.className = 'dropdown-arrow';
+            arrowSpan.textContent = '▾';
+            trigger.append(iconSpan, ` ${label} `, arrowSpan);
             trigger.addEventListener('click', (e) => {
                 e.stopPropagation();
                 dropdown.classList.toggle('open');

@@ -112,8 +112,8 @@ app.get('/api/csrf-token', (req, res) => {
     res.json({ token });
 });
 
-// Apply CSRF protection to all /api routes
-app.use('/api', csrfSynchronisedProtection);
+// Apply CSRF protection to all state-changing requests (POST, PUT, DELETE, PATCH)
+app.use(csrfSynchronisedProtection);
 
 // Mount routes
 app.use(authRoutes);
