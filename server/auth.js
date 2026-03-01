@@ -29,19 +29,15 @@ export function configurePassport() {
                     const displayName = profile.displayName || email?.split('@')[0];
                     const avatarUrl = profile.photos?.[0]?.value || null;
 
-                    // 1. Try upsert by google_id
+                    // 1. Try to match existing profile by google_id
                     let { rows } = await pool.query(
-                        `INSERT INTO profiles (google_id, email, display_name, avatar_url)
-                         VALUES ($1, $2, $3, $4)
-                         ON CONFLICT (google_id) DO UPDATE
-                           SET email = EXCLUDED.email,
-                               display_name = EXCLUDED.display_name,
-                               avatar_url = EXCLUDED.avatar_url
+                        `UPDATE profiles SET email = $2, display_name = $3, avatar_url = $4
+                         WHERE google_id = $1
                          RETURNING *`,
                         [googleId, email, displayName, avatarUrl]
                     );
 
-                    // 2. If insert failed (no google_id match but email exists), backfill google_id
+                    // 2. No google_id match — check by email and backfill google_id
                     if (rows.length === 0 && email) {
                         ({ rows } = await pool.query(
                             `UPDATE profiles SET google_id = $1, display_name = $2, avatar_url = $3
@@ -51,9 +47,14 @@ export function configurePassport() {
                         ));
                     }
 
-                    // 3. Should have a row by now; if not, something unexpected happened
+                    // 3. No existing profile — create new
                     if (rows.length === 0) {
-                        return done(new Error('Failed to upsert profile'));
+                        ({ rows } = await pool.query(
+                            `INSERT INTO profiles (google_id, email, display_name, avatar_url)
+                             VALUES ($1, $2, $3, $4)
+                             RETURNING *`,
+                            [googleId, email, displayName, avatarUrl]
+                        ));
                     }
 
                     done(null, rows[0]);
