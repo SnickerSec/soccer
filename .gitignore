@@ -7,3 +7,4 @@ dist/
 build/
 players.txttest-results/
 supabase/.temp/
+db/export/
