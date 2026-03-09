@@ -109,6 +109,7 @@ const { csrfSynchronisedProtection, generateToken } = csrfSync({
     getTokenFromRequest: (req) => req.headers['x-csrf-token'],
     ignoredMethods: ['GET', 'HEAD', 'OPTIONS']
 });
+app.use(csrfSynchronisedProtection);
 
 // Endpoint to get a CSRF token (must be before protection middleware)
 app.get('/api/csrf-token', (req, res) => {
