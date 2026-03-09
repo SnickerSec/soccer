@@ -31,7 +31,7 @@ if (!DATABASE_URL) {
 }
 
 function loadJSON(filename) {
-    const filePath = path.join(__dirname, 'export', filename);
+    const filePath = path.join(__dirname, 'export', path.basename(filename));
     if (!existsSync(filePath)) {
         console.log(`  Skipping ${filename} (not found)`);
         return [];
