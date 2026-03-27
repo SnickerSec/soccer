@@ -461,6 +461,121 @@ small {
     color: white;
 }
 
+/* Player rating button */
+.pref-checkbox.player-rating-btn {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.pref-checkbox.player-rating-btn:hover {
+    border-color: #f1c40f;
+    color: #f1c40f;
+}
+
+.pref-checkbox.player-rating-btn.active {
+    background: #f1c40f;
+    border-color: #f1c40f;
+    color: #333;
+    font-weight: 700;
+}
+
+/* Rating dialog */
+.rating-dialog {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.rating-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.rating-dialog h3 {
+    margin: 0 0 16px;
+    font-size: 1.1rem;
+}
+
+.rating-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.rating-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.rating-row label {
+    font-size: 0.9rem;
+    min-width: 90px;
+    color: var(--text-secondary);
+}
+
+.rating-stars {
+    display: flex;
+    gap: 4px;
+}
+
+.rating-star {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: var(--border-color);
+    padding: 2px;
+    line-height: 1;
+    transition: color 0.15s, transform 0.1s;
+}
+
+.rating-star:hover {
+    transform: scale(1.2);
+}
+
+.rating-star.filled {
+    color: #f1c40f;
+}
+
+.rating-dialog-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.rating-dialog-buttons button {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.rating-dialog-buttons .btn-primary {
+    background: var(--accent-green);
+    color: white;
+}
+
+.rating-dialog-buttons .btn-primary:hover {
+    filter: brightness(1.1);
+}
+
+.rating-dialog-buttons .btn-secondary {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.rating-dialog-buttons .btn-secondary:hover {
+    background: var(--bg-hover);
+}
+
 /* Player status dropdown */
 .player-status-select {
     padding: 4px 6px;

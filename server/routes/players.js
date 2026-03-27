@@ -25,7 +25,9 @@ router.get('/api/teams/:teamId/players', requireTeamAccess('viewer'), async (req
             noKeeper: p.no_keeper,
             status: p.status,
             preferredPositions: p.preferred_positions || [],
-            sortOrder: p.sort_order
+            sortOrder: p.sort_order,
+            overallRating: p.overall_rating,
+            positionalRatings: p.positional_ratings || {}
         }));
 
         res.json({ success: true, data: players });
@@ -59,8 +61,8 @@ router.post('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req
         for (let i = 0; i < players.length; i++) {
             const p = players[i];
             const result = await client.query(
-                `INSERT INTO players (team_id, name, number, is_captain, must_rest, no_keeper, status, preferred_positions, sort_order)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                `INSERT INTO players (team_id, name, number, is_captain, must_rest, no_keeper, status, preferred_positions, sort_order, overall_rating, positional_ratings)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                  ON CONFLICT (team_id, name) DO UPDATE SET
                     number = EXCLUDED.number,
                     is_captain = EXCLUDED.is_captain,
@@ -68,7 +70,9 @@ router.post('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req
                     no_keeper = EXCLUDED.no_keeper,
                     status = EXCLUDED.status,
                     preferred_positions = EXCLUDED.preferred_positions,
-                    sort_order = EXCLUDED.sort_order
+                    sort_order = EXCLUDED.sort_order,
+                    overall_rating = EXCLUDED.overall_rating,
+                    positional_ratings = EXCLUDED.positional_ratings
                  RETURNING *`,
                 [
                     teamId,
@@ -79,7 +83,9 @@ router.post('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req
                     p.noKeeper || false,
                     p.status || 'available',
                     p.preferredPositions || [],
-                    p.sortOrder ?? i
+                    p.sortOrder ?? i,
+                    p.overallRating || null,
+                    JSON.stringify(p.positionalRatings || {})
                 ]
             );
             results.push(result.rows[0]);
@@ -96,7 +102,9 @@ router.post('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req
             noKeeper: p.no_keeper,
             status: p.status,
             preferredPositions: p.preferred_positions || [],
-            sortOrder: p.sort_order
+            sortOrder: p.sort_order,
+            overallRating: p.overall_rating,
+            positionalRatings: p.positional_ratings || {}
         }));
 
         res.json({ success: true, data });

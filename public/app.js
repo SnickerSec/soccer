@@ -1996,6 +1996,9 @@ class SoccerLineupGenerator {
                     this.toggleNoKeeperPreference(playerName);
                 } else if (prefType === 'mustRest') {
                     this.toggleRestPreference(playerName);
+                } else if (prefType === 'rating') {
+                    this.openRatingDialog(playerName);
+                    return; // Don't update player list yet
                 }
                 this.updatePlayerList();
             }
@@ -2223,6 +2226,8 @@ class SoccerLineupGenerator {
             noKeeper: false,
             status: CONSTANTS.PLAYER_STATUS.AVAILABLE,
             preferredPositions: [],
+            overallRating: null,
+            positionalRatings: {},
             quartersPlayed: [],
             quartersSitting: [],
             positionsPlayed: [],
@@ -2385,6 +2390,18 @@ class SoccerLineupGenerator {
             mustRestBtn.title = 'Must Rest';
             mustRestBtn.textContent = 'R';
             prefsDiv.appendChild(mustRestBtn);
+
+            // Rating button
+            const ratingBtn = document.createElement('button');
+            ratingBtn.type = 'button';
+            const hasRating = player.overallRating != null;
+            ratingBtn.className = `pref-checkbox player-rating-btn${hasRating ? ' active' : ''}`;
+            ratingBtn.dataset.player = player.name;
+            ratingBtn.dataset.pref = 'rating';
+            ratingBtn.setAttribute('aria-label', `Set ratings for ${player.name}`);
+            ratingBtn.title = hasRating ? `Overall: ${player.overallRating}/5` : 'Set Rating';
+            ratingBtn.textContent = hasRating ? player.overallRating : '★';
+            prefsDiv.appendChild(ratingBtn);
 
             // Status select
             const statusSelect = document.createElement('select');
@@ -2634,6 +2651,131 @@ class SoccerLineupGenerator {
         } else {
             this.showNotification(`${playerName} may play keeper`, 'info');
         }
+    }
+
+    openRatingDialog(playerName) {
+        const player = this.players.find(p => p.name === playerName);
+        if (!player) return;
+
+        // Remove any existing rating dialog
+        const existing = document.querySelector('.rating-dialog');
+        if (existing) existing.remove();
+
+        const dialog = document.createElement('dialog');
+        dialog.className = 'rating-dialog';
+
+        const categories = [
+            { key: 'overall', label: 'Overall', value: player.overallRating || 0 },
+            { key: 'keeper', label: 'Goalkeeper', value: (player.positionalRatings || {}).keeper || 0 },
+            { key: 'defense', label: 'Defense', value: (player.positionalRatings || {}).defense || 0 },
+            { key: 'midfield', label: 'Midfield', value: (player.positionalRatings || {}).midfield || 0 },
+            { key: 'offense', label: 'Offense', value: (player.positionalRatings || {}).offense || 0 }
+        ];
+
+        const title = document.createElement('h3');
+        title.textContent = `Ratings: ${playerName}`;
+        dialog.appendChild(title);
+
+        const form = document.createElement('div');
+        form.className = 'rating-form';
+
+        categories.forEach(cat => {
+            const row = document.createElement('div');
+            row.className = 'rating-row';
+
+            const label = document.createElement('label');
+            label.textContent = cat.label;
+            row.appendChild(label);
+
+            const starsDiv = document.createElement('div');
+            starsDiv.className = 'rating-stars';
+            starsDiv.dataset.category = cat.key;
+
+            for (let i = 1; i <= 5; i++) {
+                const star = document.createElement('button');
+                star.type = 'button';
+                star.className = `rating-star${i <= cat.value ? ' filled' : ''}`;
+                star.dataset.value = i;
+                star.textContent = '★';
+                star.addEventListener('click', () => {
+                    // Toggle off if clicking same value
+                    const currentVal = parseInt(starsDiv.dataset.currentValue) || 0;
+                    const newVal = currentVal === i ? 0 : i;
+                    starsDiv.dataset.currentValue = newVal;
+                    starsDiv.querySelectorAll('.rating-star').forEach((s, idx) => {
+                        s.classList.toggle('filled', idx < newVal);
+                    });
+                });
+                starsDiv.appendChild(star);
+            }
+            starsDiv.dataset.currentValue = cat.value;
+
+            row.appendChild(starsDiv);
+            form.appendChild(row);
+        });
+
+        dialog.appendChild(form);
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'rating-dialog-buttons';
+
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = 'Clear All';
+        clearBtn.className = 'btn-secondary';
+        clearBtn.addEventListener('click', () => {
+            form.querySelectorAll('.rating-stars').forEach(starsDiv => {
+                starsDiv.dataset.currentValue = 0;
+                starsDiv.querySelectorAll('.rating-star').forEach(s => s.classList.remove('filled'));
+            });
+        });
+        btnRow.appendChild(clearBtn);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'btn-secondary';
+        cancelBtn.addEventListener('click', () => {
+            dialog.close();
+            dialog.remove();
+        });
+        btnRow.appendChild(cancelBtn);
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.className = 'btn-primary';
+        saveBtn.addEventListener('click', () => {
+            const overall = parseInt(form.querySelector('[data-category="overall"]').dataset.currentValue) || 0;
+            const keeper = parseInt(form.querySelector('[data-category="keeper"]').dataset.currentValue) || 0;
+            const defense = parseInt(form.querySelector('[data-category="defense"]').dataset.currentValue) || 0;
+            const midfield = parseInt(form.querySelector('[data-category="midfield"]').dataset.currentValue) || 0;
+            const offense = parseInt(form.querySelector('[data-category="offense"]').dataset.currentValue) || 0;
+
+            player.overallRating = overall || null;
+            player.positionalRatings = {};
+            if (keeper) player.positionalRatings.keeper = keeper;
+            if (defense) player.positionalRatings.defense = defense;
+            if (midfield) player.positionalRatings.midfield = midfield;
+            if (offense) player.positionalRatings.offense = offense;
+
+            this.savePlayers();
+            this.updatePlayerList();
+            dialog.close();
+            dialog.remove();
+            this.showNotification(`Ratings updated for ${playerName}`, 'success');
+        });
+        btnRow.appendChild(saveBtn);
+
+        dialog.appendChild(btnRow);
+
+        // Close on backdrop click
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) {
+                dialog.close();
+                dialog.remove();
+            }
+        });
+
+        document.body.appendChild(dialog);
+        dialog.showModal();
     }
 
     updatePlayerNumber(playerIndex, value) {
@@ -3172,8 +3314,107 @@ class SoccerLineupGenerator {
                 playersAssigned++;
             }
         }
-        
+
+        // Post-process: balance overall ratings across quarters by swapping sitting assignments
+        this.balanceSittingByRating(schedule, allPlayersCombined, players);
+
         return schedule;
+    }
+
+    /**
+     * Attempt swaps in the sitting schedule to equalize total overall rating per quarter.
+     * Only swaps players between quarters if it doesn't violate consecutive-sitting rules.
+     */
+    balanceSittingByRating(schedule, playersCopy, players) {
+        // Build a rating lookup from the original player objects
+        const ratingOf = {};
+        let hasAnyRating = false;
+        players.forEach(p => {
+            ratingOf[p.name] = p.overallRating || 3; // default 3 if unrated
+            if (p.overallRating) hasAnyRating = true;
+        });
+        if (!hasAnyRating) return; // no ratings set, skip balancing
+
+        const quarters = [1, 2, 3, 4];
+        const allNames = players.map(p => p.name);
+
+        // Helper: compute total rating of players NOT sitting in a quarter
+        const quarterRating = (q) => {
+            const sitting = new Set(schedule[q]);
+            return allNames.reduce((sum, name) => sitting.has(name) ? sum : sum + ratingOf[name], 0);
+        };
+
+        // Build lookup from playersCopy for sitting quarters
+        const copyByName = {};
+        playersCopy.forEach(p => { copyByName[p.name] = p; });
+
+        // Try swaps to reduce rating variance across quarters (up to 20 iterations)
+        for (let iter = 0; iter < 20; iter++) {
+            const ratings = quarters.map(q => ({ q, rating: quarterRating(q) }));
+            ratings.sort((a, b) => a.rating - b.rating);
+            const weakest = ratings[0];
+            const strongest = ratings[ratings.length - 1];
+
+            // If difference is small enough, stop
+            if (strongest.rating - weakest.rating <= 1) break;
+
+            // Try to swap: move a high-rated player out of sitting in the weakest quarter
+            // and swap with a lower-rated player sitting in the strongest quarter
+            const sittingInWeak = schedule[weakest.q];
+            const sittingInStrong = schedule[strongest.q];
+
+            let bestSwap = null;
+            let bestImprovement = 0;
+
+            for (const nameA of sittingInWeak) {
+                for (const nameB of sittingInStrong) {
+                    if (nameA === nameB) continue;
+                    const ratingDiff = ratingOf[nameA] - ratingOf[nameB];
+                    if (ratingDiff <= 0) continue; // only swap if it helps
+
+                    // Check that swap doesn't create consecutive sitting
+                    const copyA = copyByName[nameA];
+                    const copyB = copyByName[nameB];
+                    if (!copyA || !copyB) continue;
+
+                    // Simulate: A moves from weakest.q to strongest.q, B does the reverse
+                    const newSittingA = copyA.sittingQuarters.filter(q => q !== weakest.q).concat(strongest.q);
+                    const newSittingB = copyB.sittingQuarters.filter(q => q !== strongest.q).concat(weakest.q);
+
+                    if (this.hasConsecutive(newSittingA) || this.hasConsecutive(newSittingB)) continue;
+
+                    if (ratingDiff > bestImprovement) {
+                        bestImprovement = ratingDiff;
+                        bestSwap = { nameA, nameB, qWeak: weakest.q, qStrong: strongest.q };
+                    }
+                }
+            }
+
+            if (!bestSwap) break;
+
+            // Apply the swap
+            const { nameA, nameB, qWeak, qStrong } = bestSwap;
+            schedule[qWeak] = schedule[qWeak].filter(n => n !== nameA);
+            schedule[qWeak].push(nameB);
+            schedule[qStrong] = schedule[qStrong].filter(n => n !== nameB);
+            schedule[qStrong].push(nameA);
+
+            // Update tracking
+            const copyA = copyByName[nameA];
+            const copyB = copyByName[nameB];
+            copyA.sittingQuarters = copyA.sittingQuarters.filter(q => q !== qWeak);
+            copyA.sittingQuarters.push(qStrong);
+            copyB.sittingQuarters = copyB.sittingQuarters.filter(q => q !== qStrong);
+            copyB.sittingQuarters.push(qWeak);
+        }
+    }
+
+    hasConsecutive(quarters) {
+        const sorted = [...quarters].sort((a, b) => a - b);
+        for (let i = 0; i < sorted.length - 1; i++) {
+            if (sorted[i + 1] - sorted[i] === 1) return true;
+        }
+        return false;
     }
 
     findNonConsecutiveSittingQuarter(currentSittingQuarters, schedule, availableCount) {
@@ -3364,6 +3605,15 @@ class SoccerLineupGenerator {
                     score += 100;
                 }
 
+                // Positional rating bonus (0-150 points)
+                // Players rated higher at a position's category get a bonus
+                const posRatings = player.positionalRatings || {};
+                const posRatingCategory = this.getPositionRatingCategory(position);
+                const posRating = posRatings[posRatingCategory] || 0;
+                if (posRating > 0) {
+                    score += posRating * 30; // 30-150 bonus based on 1-5 rating
+                }
+
                 // Add small random factor to vary assignments
                 score += Math.random() * 5;
 
@@ -3397,6 +3647,14 @@ class SoccerLineupGenerator {
         return assignments;
     }
     
+    getPositionRatingCategory(position) {
+        if (position === 'Keeper') return 'keeper';
+        if (position.includes('Back')) return 'defense';
+        if (position.includes('Mid') || position === 'Midfield') return 'midfield';
+        // Strikers, Wings, Forwards, Attacking positions
+        return 'offense';
+    }
+
     sortPlayersByRoleBalance(players) {
         return players.sort((a, b) => {
             const aDefensive = a.defensiveQuarters || 0;
@@ -3476,6 +3734,22 @@ class SoccerLineupGenerator {
             const lowestGKGroup = potentialKeepers.filter(p =>
                 (seasonStats[p.name]?.goalkeeperQuarters || 0) === minGK
             );
+
+            // If any players have keeper ratings, prefer higher-rated keepers within the group
+            const hasKeeperRatings = lowestGKGroup.some(p => (p.positionalRatings || {}).keeper);
+            if (hasKeeperRatings) {
+                lowestGKGroup.sort((a, b) => {
+                    const rA = (a.positionalRatings || {}).keeper || 0;
+                    const rB = (b.positionalRatings || {}).keeper || 0;
+                    return rB - rA;
+                });
+                // Get top-rated group and pick randomly from them
+                const topRating = (lowestGKGroup[0].positionalRatings || {}).keeper || 0;
+                const topRatedKeepers = lowestGKGroup.filter(p =>
+                    ((p.positionalRatings || {}).keeper || 0) === topRating
+                );
+                return topRatedKeepers[Math.floor(Math.random() * topRatedKeepers.length)];
+            }
 
             // Random selection within the lowest GK group for variety
             return lowestGKGroup[Math.floor(Math.random() * lowestGKGroup.length)];
