@@ -981,177 +981,13 @@ class SoccerLineupGenerator {
     }
 
     getPlayerStats() {
-        const stats = {};
-
-        const createEmptyStats = () => ({
-            gamesPlayed: 0,
-            gamesOnRoster: 0,
-            gamesAttended: 0,
-            gamesAbsent: 0,
-            gamesInjured: 0,
-            totalQuarters: 0,
-            totalSitting: 0,
-            goalkeeperQuarters: 0,
-            captainGames: 0,
-            positions: {}
-        });
-
-        this.players.forEach(player => {
-            stats[player.name] = createEmptyStats();
-        });
-
-        this.savedGames.forEach(game => {
-            game.players.forEach(player => {
-                if (!stats[player.name]) {
-                    stats[player.name] = createEmptyStats();
-                }
-
-                const s = stats[player.name];
-
-                // Track attendance
-                s.gamesOnRoster++;
-                if (player.status === 'available') {
-                    s.gamesAttended++;
-                    s.gamesPlayed++;
-                } else if (player.status === 'absent') {
-                    s.gamesAbsent++;
-                } else if (player.status === 'injured') {
-                    s.gamesInjured++;
-                }
-
-                s.totalQuarters += player.quartersPlayed?.length || 0;
-                s.totalSitting += player.quartersSitting?.length || 0;
-
-                // Track captain assignments from player snapshot (isCaptain flag is set when game is saved)
-                if (player.isCaptain) {
-                    s.captainGames++;
-                }
-
-                // Track positions played
-                player.positionsPlayed?.forEach(pos => {
-                    s.positions[pos.position] = (s.positions[pos.position] || 0) + 1;
-                });
-
-                // Count goalkeeper games from actual positions played (more reliable than goalieQuarter field)
-                const keeperQuartersThisGame = player.positionsPlayed?.filter(pos => pos.position === 'Keeper').length || 0;
-                if (keeperQuartersThisGame > 0) {
-                    s.goalkeeperQuarters++;
-                }
-            });
-        });
-
-        return stats;
+        return calculatePlayerStats(this.players, this.savedGames);
     }
 
     // Get lineup recommendations based on season history
     getLineupRecommendations() {
         const stats = this.getPlayerStats();
-        const availablePlayers = this.players.filter(p => p.status === 'available');
-
-        if (availablePlayers.length === 0 || this.savedGames.length === 0) {
-            return null;
-        }
-
-        const recommendations = {
-            shouldSit: [],
-            shouldKeep: [],
-            shouldCaptain: [],
-            needsOffense: [],
-            needsDefense: [],
-            positionVariety: []
-        };
-
-        // Calculate averages for each player
-        const playerData = availablePlayers.map(player => {
-            const s = stats[player.name] || { gamesPlayed: 0, totalSitting: 0, goalkeeperQuarters: 0, captainGames: 0, totalQuarters: 0, positions: {} };
-            const gamesPlayed = s.gamesPlayed || 0;
-
-            // Get offensive/defensive balance from saved games
-            let offenseQtrs = 0, defenseQtrs = 0;
-            this.savedGames.forEach(game => {
-                const gamePlayer = game.players.find(p => p.name === player.name);
-                if (gamePlayer) {
-                    offenseQtrs += gamePlayer.offensiveQuarters || 0;
-                    defenseQtrs += gamePlayer.defensiveQuarters || 0;
-                }
-            });
-
-            return {
-                name: player.name,
-                noKeeper: player.noKeeper,
-                gamesPlayed,
-                avgSitting: gamesPlayed > 0 ? s.totalSitting / gamesPlayed : 0,
-                gkCount: s.goalkeeperQuarters,
-                captainCount: s.captainGames || 0,
-                offenseQtrs,
-                defenseQtrs,
-                positionCount: Object.keys(s.positions).length,
-                positions: s.positions
-            };
-        });
-
-        // Players who should sit more (lowest sitting averages)
-        const bySitting = [...playerData].sort((a, b) => a.avgSitting - b.avgSitting);
-        const minSitting = bySitting[0]?.avgSitting || 0;
-        recommendations.shouldSit = bySitting
-            .filter(p => p.gamesPlayed > 0 && p.avgSitting <= minSitting + 0.5)
-            .slice(0, 3)
-            .map(p => ({ name: p.name, avgSitting: p.avgSitting.toFixed(1), gamesPlayed: p.gamesPlayed }));
-
-        // Players who should be goalkeeper (lowest GK count, excluding noKeeper)
-        const byGK = [...playerData]
-            .filter(p => !p.noKeeper && p.gamesPlayed > 0)
-            .sort((a, b) => a.gkCount - b.gkCount);
-        const minGK = byGK[0]?.gkCount || 0;
-        recommendations.shouldKeep = byGK
-            .filter(p => p.gkCount <= minGK)
-            .slice(0, 3)
-            .map(p => ({ name: p.name, gkCount: p.gkCount }));
-
-        // Players who should be captain (lowest captain count)
-        const byCaptain = [...playerData]
-            .filter(p => p.gamesPlayed > 0)
-            .sort((a, b) => a.captainCount - b.captainCount);
-        const minCaptain = byCaptain[0]?.captainCount || 0;
-        recommendations.shouldCaptain = byCaptain
-            .filter(p => p.captainCount <= minCaptain)
-            .slice(0, 3)
-            .map(p => ({ name: p.name, captainCount: p.captainCount }));
-
-        // Players needing more offense (high defense, low offense ratio)
-        const withBalance = playerData.filter(p => p.offenseQtrs + p.defenseQtrs > 0);
-        recommendations.needsOffense = withBalance
-            .filter(p => p.defenseQtrs > p.offenseQtrs)
-            .sort((a, b) => (b.defenseQtrs - b.offenseQtrs) - (a.defenseQtrs - a.offenseQtrs))
-            .slice(0, 3)
-            .map(p => ({ name: p.name, offense: p.offenseQtrs, defense: p.defenseQtrs }));
-
-        // Players needing more defense
-        recommendations.needsDefense = withBalance
-            .filter(p => p.offenseQtrs > p.defenseQtrs)
-            .sort((a, b) => (b.offenseQtrs - b.defenseQtrs) - (a.offenseQtrs - a.defenseQtrs))
-            .slice(0, 3)
-            .map(p => ({ name: p.name, offense: p.offenseQtrs, defense: p.defenseQtrs }));
-
-        // Players needing position variety (played fewer unique positions)
-        const byVariety = [...playerData]
-            .filter(p => p.gamesPlayed > 0)
-            .sort((a, b) => a.positionCount - b.positionCount);
-        const minPositions = byVariety[0]?.positionCount || 0;
-        recommendations.positionVariety = byVariety
-            .filter(p => p.positionCount <= minPositions + 1)
-            .slice(0, 3)
-            .map(p => ({
-                name: p.name,
-                positionCount: p.positionCount,
-                topPositions: Object.entries(p.positions)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 2)
-                    .map(([pos]) => pos)
-                    .join(', ')
-            }));
-
-        return recommendations;
+        return getLineupRecommendations(this.players, this.savedGames, stats);
     }
 
     // Render lineup recommendations section
@@ -1570,6 +1406,22 @@ class SoccerLineupGenerator {
 
     safeRemoveFromStorage(key) {
         return safeRemoveFromStorage(key);
+    }
+
+    shuffleArray(array) {
+        return shuffleArray(array);
+    }
+
+    deepClone(obj) {
+        return deepClone(obj);
+    }
+
+    formatDate(date, options) {
+        return formatDate(date, options);
+    }
+
+    escapeHtml(str) {
+        return escapeHtml(str);
     }
 
     // Undo/Redo system
@@ -3061,94 +2913,98 @@ class SoccerLineupGenerator {
             this.showNotification(`Note: With ${availablePlayers.length} players, some rotation rules may be challenging. Recommend ${recommendedPlayers}+ players.`, 'warning');
         }
 
-        // Cache season stats for performance during generation
-        this.seasonStatsCache = this.getPlayerStats();
-
-        const maxAttempts = CONSTANTS.MAX_GENERATION_ATTEMPTS;
-        let attempts = 0;
-        let validation = [];
-        let bestLineup = null;
-        let bestValidationCount = Infinity;
-
         // Show loading indicator
         this.showLoading('Generating lineup...');
         const generateBtn = document.getElementById('generateLineup');
         const originalText = generateBtn.textContent;
         generateBtn.disabled = true;
 
-        // Keep trying until we get a valid lineup or hit max attempts
-        do {
-            attempts++;
-            this.updateLoadingProgress(`Attempt ${attempts} of ${maxAttempts}`);
+        // Get season stats for the worker
+        const seasonStats = this.getPlayerStats();
 
-            // Add a small delay to allow UI to update
-            if (attempts > 1) {
-                await new Promise(resolve => setTimeout(resolve, CONSTANTS.GENERATION_DELAY_MS));
-            }
+        // Prepare data for the worker
+        const workerData = {
+            players: JSON.parse(JSON.stringify(availablePlayers)),
+            positions: getPositionsForFormation(this.playersOnField, this.formation),
+            playersOnField: this.playersOnField,
+            quarters: this.quarters,
+            maxAttempts: CONSTANTS.MAX_GENERATION_ATTEMPTS,
+            seasonStats: seasonStats
+        };
+
+        try {
+            const result = await this.runLineupWorker(workerData);
             
-            // Reset player stats
-            this.players.forEach(player => {
-                player.quartersPlayed = [];
-                player.quartersSitting = [];
-                player.positionsPlayed = [];
-                player.goalieQuarter = null;
-                player.defensiveQuarters = 0;
-                player.offensiveQuarters = 0;
+            this.lineup = result.lineup;
+            const validation = result.validation;
+            
+            // Update players with the results from the worker
+            // (The worker returns the players with their updated stats/positions)
+            result.players.forEach(updatedPlayer => {
+                const player = this.players.find(p => p.name === updatedPlayer.name);
+                if (player) {
+                    player.quartersPlayed = updatedPlayer.quartersPlayed;
+                    player.quartersSitting = updatedPlayer.quartersSitting;
+                    player.positionsPlayed = updatedPlayer.positionsPlayed;
+                    player.goalieQuarter = updatedPlayer.goalieQuarter;
+                    player.defensiveQuarters = updatedPlayer.defensiveQuarters;
+                    player.offensiveQuarters = updatedPlayer.offensiveQuarters;
+                }
             });
 
-            this.lineup = [];
+            // Automatically assign captains based on season history (rotation)
+            this.assignCaptains(seasonStats);
 
-            // Calculate how many quarters each player should sit
-            const totalPlayerQuarters = availablePlayers.length * this.quarters;
-            const totalFieldQuarters = this.playersOnField * this.quarters;
-            const totalSittingQuarters = totalPlayerQuarters - totalFieldQuarters;
-
-            // Determine sitting distribution
-            const sittingSchedule = this.determineSittingSchedule(availablePlayers);
-
-            // Generate lineup for each quarter
-            for (let quarter = 1; quarter <= this.quarters; quarter++) {
-                const quarterLineup = this.generateQuarterLineup(quarter, sittingSchedule, availablePlayers);
-                this.lineup.push(quarterLineup);
-            }
-
-            // Validate the generated lineup
-            validation = this.validateLineup();
+            this.displayLineup(validation);
+            this.savePlayers();
             
-            // Keep track of the best lineup found
-            if (validation.length < bestValidationCount) {
-                bestValidationCount = validation.length;
-                bestLineup = JSON.parse(JSON.stringify(this.lineup));
-            }
-            
-        } while (validation.length > 0 && attempts < maxAttempts);
-
-        // Hide loading and reset button
-        this.hideLoading();
-        generateBtn.textContent = originalText;
-        generateBtn.disabled = false;
-
-        // If we hit max attempts, use the best lineup found
-        if (attempts >= maxAttempts && validation.length > 0) {
-            if (bestLineup) {
-                this.lineup = bestLineup;
-                validation = this.validateLineup();
-            }
-            console.warn(`Generated lineup after ${attempts} attempts with ${validation.length} minor issues.`);
             if (validation.length > 0) {
-                this.showNotification(`Generated best possible lineup after ${attempts} attempts`, 'info');
+                this.showNotification(`Generated best possible lineup with ${validation.length} minor issues`, 'info');
+            } else {
+                this.showNotification('Lineup generated successfully', 'success');
             }
-        } else {
-            this.showNotification('Lineup generated successfully', 'success');
+        } catch (error) {
+            console.error('Lineup generation error:', error);
+            this.showNotification('Failed to generate lineup: ' + error, 'error');
+        } finally {
+            this.hideLoading();
+            generateBtn.textContent = originalText;
+            generateBtn.disabled = false;
         }
-        
-        // Automatically assign captains based on season history (rotation)
+    }
+
+    runLineupWorker(data) {
+        return new Promise((resolve, reject) => {
+            const worker = new Worker('/lineup-worker.js');
+            
+            worker.onmessage = (e) => {
+                const { type, result, attempts, validation, error } = e.data;
+                
+                if (type === 'progress') {
+                    this.updateLoadingProgress(`Attempt ${attempts} (Issues: ${validation})`);
+                } else if (type === 'complete') {
+                    worker.terminate();
+                    resolve(result);
+                } else if (type === 'error') {
+                    worker.terminate();
+                    reject(error);
+                }
+            };
+            
+            worker.onerror = (error) => {
+                worker.terminate();
+                reject(error.message);
+            };
+            
+            worker.postMessage({ type: 'generate', data });
+        });
+    }
+
+    assignCaptains(seasonStats) {
         this.captains = [];
         this.players.forEach(p => p.isCaptain = false);
 
         if (this.players.length >= 2) {
-            const seasonStats = this.seasonStatsCache || this.getPlayerStats();
-
             // Filter to available players only
             const availablePlayers = this.players.filter(p =>
                 p.status === CONSTANTS.PLAYER_STATUS.AVAILABLE || !p.status
@@ -3193,570 +3049,6 @@ class SoccerLineupGenerator {
             // Update player list to reflect new captains
             this.updatePlayerList();
         }
-
-        // Clear season stats cache
-        this.seasonStatsCache = null;
-
-        this.displayLineup(validation);
-        this.savePlayers();
-    }
-
-    determineSittingSchedule(players) {
-        const totalPlayers = players.length;
-        const playersPerQuarter = this.playersOnField;
-        const sittingPerQuarter = totalPlayers - playersPerQuarter;
-
-        // Get season stats for sitting priority
-        const seasonStats = this.seasonStatsCache || this.getPlayerStats();
-
-        // Initialize sitting schedule
-        const schedule = {
-            1: [],
-            2: [],
-            3: [],
-            4: []
-        };
-
-        // Create a copy of players to track sitting assignments
-        const playersCopy = players.map(p => ({
-            name: p.name,
-            mustRest: p.mustRest,
-            sittingQuarters: []
-        }));
-
-        // Separate players who must rest from others
-        const mustRestPlayers = playersCopy.filter(p => p.mustRest);
-        const regularPlayers = playersCopy.filter(p => !p.mustRest);
-
-        // Sort regular players by season sitting history (ascending avg sitting = higher priority to sit now)
-        // Players who've sat less across the season should sit more now
-        regularPlayers.sort((a, b) => {
-            const statsA = seasonStats[a.name] || { totalSitting: 0, gamesPlayed: 0 };
-            const statsB = seasonStats[b.name] || { totalSitting: 0, gamesPlayed: 0 };
-
-            // Calculate average sitting per game (normalize for players with different game counts)
-            const avgSitA = statsA.gamesPlayed > 0 ? statsA.totalSitting / statsA.gamesPlayed : 0;
-            const avgSitB = statsB.gamesPlayed > 0 ? statsB.totalSitting / statsB.gamesPlayed : 0;
-
-            // Players with lower average sitting should sit more (appear first)
-            return avgSitA - avgSitB;
-        });
-
-        // Add small randomness within similar sitting averages to prevent deterministic lineups
-        // Group players with similar averages and shuffle within groups
-        this.shuffleWithinSimilarGroups(regularPlayers, (p) => {
-            const stats = seasonStats[p.name] || { totalSitting: 0, gamesPlayed: 0 };
-            return stats.gamesPlayed > 0 ? Math.round(stats.totalSitting / stats.gamesPlayed * 2) / 2 : 0;
-        });
-
-        // Calculate how many times each player should sit
-        const totalSittingSlots = sittingPerQuarter * this.quarters;
-        const minSitsPerPlayer = Math.floor(totalSittingSlots / totalPlayers);
-        const playersWithExtraSit = totalSittingSlots % totalPlayers;
-        
-        // Assign sitting quarters to ensure even distribution and no consecutive sitting
-        let quarterIndex = 0;
-
-        // First pass: Ensure players who must rest get at least 1 sitting quarter
-        mustRestPlayers.forEach(player => {
-            let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule, totalPlayers);
-            if (assignedQuarter !== -1) {
-                player.sittingQuarters.push(assignedQuarter);
-                schedule[assignedQuarter].push(player.name);
-            }
-        });
-
-        // Combine all players for remaining assignments
-        const allPlayersCombined = [...mustRestPlayers, ...regularPlayers];
-
-        // Second pass: assign minimum sits to all players (skipping those already assigned)
-        for (let i = 0; i < minSitsPerPlayer; i++) {
-            allPlayersCombined.forEach((player, idx) => {
-                // Skip if player already has enough sits
-                if (player.sittingQuarters.length > i) return;
-
-                // Find a quarter where the player hasn't sat yet and won't sit consecutively
-                let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule, totalPlayers);
-                if (assignedQuarter !== -1) {
-                    player.sittingQuarters.push(assignedQuarter);
-                    schedule[assignedQuarter].push(player.name);
-                }
-            });
-        }
-
-        // Third pass: select players who need to sit extra based on season history
-        // Players who've sat less this season get priority for extra sits
-        const playersForExtraSit = [...allPlayersCombined];
-        playersForExtraSit.sort((a, b) => {
-            const statsA = seasonStats[a.name] || { totalSitting: 0, gamesPlayed: 0 };
-            const statsB = seasonStats[b.name] || { totalSitting: 0, gamesPlayed: 0 };
-            const avgSitA = statsA.gamesPlayed > 0 ? statsA.totalSitting / statsA.gamesPlayed : 0;
-            const avgSitB = statsB.gamesPlayed > 0 ? statsB.totalSitting / statsB.gamesPlayed : 0;
-            return avgSitA - avgSitB;
-        });
-        // Shuffle within similar groups for variety
-        this.shuffleWithinSimilarGroups(playersForExtraSit, (p) => {
-            const stats = seasonStats[p.name] || { totalSitting: 0, gamesPlayed: 0 };
-            return stats.gamesPlayed > 0 ? Math.round(stats.totalSitting / stats.gamesPlayed * 2) / 2 : 0;
-        });
-
-        let playersAssigned = 0;
-        for (let i = 0; i < playersForExtraSit.length && playersAssigned < playersWithExtraSit; i++) {
-            const player = playersForExtraSit[i];
-            // Skip if they already have enough quarters
-            const neededSits = minSitsPerPlayer + 1;
-            if (player.sittingQuarters.length >= neededSits) continue;
-
-            let assignedQuarter = this.findNonConsecutiveSittingQuarter(player.sittingQuarters, schedule, totalPlayers);
-            if (assignedQuarter !== -1) {
-                player.sittingQuarters.push(assignedQuarter);
-                schedule[assignedQuarter].push(player.name);
-                playersAssigned++;
-            }
-        }
-
-        // Post-process: balance overall ratings across quarters by swapping sitting assignments
-        this.balanceSittingByRating(schedule, allPlayersCombined, players);
-
-        return schedule;
-    }
-
-    /**
-     * Attempt swaps in the sitting schedule to equalize total overall rating per quarter.
-     * Only swaps players between quarters if it doesn't violate consecutive-sitting rules.
-     */
-    balanceSittingByRating(schedule, playersCopy, players) {
-        // Build a rating lookup from the original player objects
-        const ratingOf = {};
-        let hasAnyRating = false;
-        players.forEach(p => {
-            ratingOf[p.name] = p.overallRating || 3; // default 3 if unrated
-            if (p.overallRating) hasAnyRating = true;
-        });
-        if (!hasAnyRating) return; // no ratings set, skip balancing
-
-        const quarters = [1, 2, 3, 4];
-        const allNames = players.map(p => p.name);
-
-        // Helper: compute total rating of players NOT sitting in a quarter
-        const quarterRating = (q) => {
-            const sitting = new Set(schedule[q]);
-            return allNames.reduce((sum, name) => sitting.has(name) ? sum : sum + ratingOf[name], 0);
-        };
-
-        // Build lookup from playersCopy for sitting quarters
-        const copyByName = {};
-        playersCopy.forEach(p => { copyByName[p.name] = p; });
-
-        // Try swaps to reduce rating variance across quarters (up to 20 iterations)
-        for (let iter = 0; iter < 20; iter++) {
-            const ratings = quarters.map(q => ({ q, rating: quarterRating(q) }));
-            ratings.sort((a, b) => a.rating - b.rating);
-            const weakest = ratings[0];
-            const strongest = ratings[ratings.length - 1];
-
-            // If difference is small enough, stop
-            if (strongest.rating - weakest.rating <= 1) break;
-
-            // Try to swap: move a high-rated player out of sitting in the weakest quarter
-            // and swap with a lower-rated player sitting in the strongest quarter
-            const sittingInWeak = schedule[weakest.q];
-            const sittingInStrong = schedule[strongest.q];
-
-            let bestSwap = null;
-            let bestImprovement = 0;
-
-            for (const nameA of sittingInWeak) {
-                for (const nameB of sittingInStrong) {
-                    if (nameA === nameB) continue;
-                    const ratingDiff = ratingOf[nameA] - ratingOf[nameB];
-                    if (ratingDiff <= 0) continue; // only swap if it helps
-
-                    // Check that swap doesn't create consecutive sitting
-                    const copyA = copyByName[nameA];
-                    const copyB = copyByName[nameB];
-                    if (!copyA || !copyB) continue;
-
-                    // Simulate: A moves from weakest.q to strongest.q, B does the reverse
-                    const newSittingA = copyA.sittingQuarters.filter(q => q !== weakest.q).concat(strongest.q);
-                    const newSittingB = copyB.sittingQuarters.filter(q => q !== strongest.q).concat(weakest.q);
-
-                    if (this.hasConsecutive(newSittingA) || this.hasConsecutive(newSittingB)) continue;
-
-                    if (ratingDiff > bestImprovement) {
-                        bestImprovement = ratingDiff;
-                        bestSwap = { nameA, nameB, qWeak: weakest.q, qStrong: strongest.q };
-                    }
-                }
-            }
-
-            if (!bestSwap) break;
-
-            // Apply the swap
-            const { nameA, nameB, qWeak, qStrong } = bestSwap;
-            schedule[qWeak] = schedule[qWeak].filter(n => n !== nameA);
-            schedule[qWeak].push(nameB);
-            schedule[qStrong] = schedule[qStrong].filter(n => n !== nameB);
-            schedule[qStrong].push(nameA);
-
-            // Update tracking
-            const copyA = copyByName[nameA];
-            const copyB = copyByName[nameB];
-            copyA.sittingQuarters = copyA.sittingQuarters.filter(q => q !== qWeak);
-            copyA.sittingQuarters.push(qStrong);
-            copyB.sittingQuarters = copyB.sittingQuarters.filter(q => q !== qStrong);
-            copyB.sittingQuarters.push(qWeak);
-        }
-    }
-
-    hasConsecutive(quarters) {
-        const sorted = [...quarters].sort((a, b) => a - b);
-        for (let i = 0; i < sorted.length - 1; i++) {
-            if (sorted[i + 1] - sorted[i] === 1) return true;
-        }
-        return false;
-    }
-
-    findNonConsecutiveSittingQuarter(currentSittingQuarters, schedule, availableCount) {
-        // Try to find a quarter where:
-        // 1. Player hasn't sat yet
-        // 2. Won't create consecutive sitting
-        // 3. Quarter isn't full
-        
-        const quartersToTry = [1, 3, 2, 4]; // Prefer alternating quarters
-        
-        for (let q of quartersToTry) {
-            // Check if quarter is not full
-            const maxSitting = availableCount - this.playersOnField;
-            if (schedule[q].length >= maxSitting) continue;
-            
-            // Check if player already sits this quarter
-            if (currentSittingQuarters.includes(q)) continue;
-            
-            // Check for consecutive sitting
-            let isConsecutive = false;
-            for (let sat of currentSittingQuarters) {
-                if (Math.abs(sat - q) === 1) {
-                    isConsecutive = true;
-                    break;
-                }
-            }
-            
-            if (!isConsecutive) {
-                return q;
-            }
-        }
-        
-        // If no perfect quarter found, still avoid consecutive sitting
-        for (let q = 1; q <= 4; q++) {
-            const maxSitting = availableCount - this.playersOnField;
-            if (schedule[q].length < maxSitting && !currentSittingQuarters.includes(q)) {
-                // Still check for consecutive sitting even in fallback
-                let isConsecutive = false;
-                for (let sat of currentSittingQuarters) {
-                    if (Math.abs(sat - q) === 1) {
-                        isConsecutive = true;
-                        break;
-                    }
-                }
-                if (!isConsecutive) {
-                    return q;
-                }
-            }
-        }
-        
-        return -1;
-    }
-
-    generateQuarterLineup(quarter, sittingSchedule, players) {
-        const quarterLineup = {
-            quarter: quarter,
-            positions: {}
-        };
-
-        // Determine who sits this quarter
-        const sittingPlayers = sittingSchedule[quarter] || [];
-        
-        // Get players who will play this quarter
-        const playingPlayers = players.filter(p => !sittingPlayers.includes(p.name));
-        
-        // Categorize positions as offensive or defensive
-        const defensivePositions = this.positions.filter(p => 
-            p.includes('Back') || p === 'Keeper'
-        );
-        const offensivePositions = this.positions.filter(p => 
-            !p.includes('Back') && p !== 'Keeper'
-        );
-
-        // Assign positions for this quarter
-        const positionsToFill = [...this.positions];
-        const assignedPlayers = new Map();
-        
-        // First, assign goalkeeper (special handling)
-        const keeperIndex = positionsToFill.indexOf('Keeper');
-        if (keeperIndex !== -1) {
-            const keeper = this.selectKeeper(playingPlayers, quarter);
-            if (keeper) {
-                quarterLineup.positions['Keeper'] = keeper.name;
-                keeper.quartersPlayed.push(quarter);
-                keeper.positionsPlayed.push({ quarter, position: 'Keeper' });
-                keeper.goalieQuarter = quarter;
-                // Track keeper as defensive role
-                keeper.defensiveQuarters = (keeper.defensiveQuarters || 0) + 1;
-                assignedPlayers.set('Keeper', keeper);
-                playingPlayers.splice(playingPlayers.indexOf(keeper), 1);
-                positionsToFill.splice(keeperIndex, 1);
-            }
-        }
-
-        // Create position-player assignments prioritizing unique positions
-        const assignments = this.assignPositionsOptimally(playingPlayers, positionsToFill, defensivePositions);
-        
-        // Apply the assignments
-        assignments.forEach(({ position, player }) => {
-            quarterLineup.positions[position] = player.name;
-            player.quartersPlayed.push(quarter);
-            player.positionsPlayed.push({ quarter, position });
-            
-            // Track role type
-            if (defensivePositions.includes(position)) {
-                player.defensiveQuarters = (player.defensiveQuarters || 0) + 1;
-            } else {
-                player.offensiveQuarters = (player.offensiveQuarters || 0) + 1;
-            }
-        });
-
-        // Mark sitting players
-        players.forEach(player => {
-            if (sittingPlayers.includes(player.name)) {
-                player.quartersSitting.push(quarter);
-            }
-        });
-
-        return quarterLineup;
-    }
-    
-    assignPositionsOptimally(players, positions, defensivePositions) {
-        const assignments = [];
-        const remainingPlayers = [...players];
-        const remainingPositions = [...positions];
-
-        // Get season stats for position variety bonus
-        const seasonStats = this.seasonStatsCache || this.getPlayerStats();
-
-        // Shuffle positions to vary assignment order across quarters
-        this.shuffleArray(remainingPositions);
-
-        // First pass: Assign positions prioritizing players who haven't played them
-        for (let i = remainingPositions.length - 1; i >= 0; i--) {
-            const position = remainingPositions[i];
-            const isDefensive = defensivePositions.includes(position);
-
-            // Sort remaining players by priority for this position
-            const scoredPlayers = remainingPlayers.map(player => {
-                const hasPlayedPosition = player.positionsPlayed.some(p => p.position === position);
-                const timesPlayedPosition = player.positionsPlayed.filter(p => p.position === position).length;
-                const defensive = player.defensiveQuarters || 0;
-                const offensive = player.offensiveQuarters || 0;
-
-                let score = 0;
-
-                // Heavily penalize if already played this position THIS GAME (-1000)
-                if (hasPlayedPosition) {
-                    score -= 1000 * timesPlayedPosition;
-                }
-
-                // Strongly prioritize role balance to prevent extreme D/O imbalances
-                // Calculate the imbalance this assignment would create
-                const currentImbalance = Math.abs(defensive - offensive);
-                let projectedImbalance;
-                if (isDefensive) {
-                    projectedImbalance = Math.abs((defensive + 1) - offensive);
-                    // Reward players who need more defense (have played more offense)
-                    score += (offensive - defensive) * 100;
-                } else {
-                    projectedImbalance = Math.abs(defensive - (offensive + 1));
-                    // Reward players who need more offense (have played more defense)
-                    score += (defensive - offensive) * 100;
-                }
-
-                // Extra penalty for making the imbalance worse
-                if (projectedImbalance > currentImbalance) {
-                    score -= 200 * (projectedImbalance - currentImbalance);
-                }
-
-                // Season position variety bonus (+50 to +200)
-                // Reward positions this player has played less across the season
-                const playerSeasonStats = seasonStats[player.name];
-                if (playerSeasonStats && playerSeasonStats.positions) {
-                    const timesPlayedPositionSeason = playerSeasonStats.positions[position] || 0;
-                    const totalPositionsPlayed = Object.values(playerSeasonStats.positions).reduce((a, b) => a + b, 0);
-                    if (totalPositionsPlayed > 0) {
-                        // Calculate what percentage of their positions this has been
-                        const positionPct = timesPlayedPositionSeason / totalPositionsPlayed;
-                        // Bonus for positions played less this season (0-200 points)
-                        score += (1 - positionPct) * 200;
-                    } else {
-                        // No season history, give neutral bonus
-                        score += 100;
-                    }
-                } else {
-                    // No season history for this player, give neutral bonus
-                    score += 100;
-                }
-
-                // Positional rating bonus (0-150 points)
-                // Players rated higher at a position's category get a bonus
-                const posRatings = player.positionalRatings || {};
-                const posRatingCategory = this.getPositionRatingCategory(position);
-                const posRating = posRatings[posRatingCategory] || 0;
-                if (posRating > 0) {
-                    score += posRating * 30; // 30-150 bonus based on 1-5 rating
-                }
-
-                // Add small random factor to vary assignments
-                score += Math.random() * 5;
-
-                return { player, score };
-            });
-            
-            // Sort by score (highest first)
-            scoredPlayers.sort((a, b) => b.score - a.score);
-            
-            if (scoredPlayers.length > 0) {
-                const chosen = scoredPlayers[0];
-                assignments.push({ 
-                    position, 
-                    player: chosen.player 
-                });
-                
-                const playerIndex = remainingPlayers.indexOf(chosen.player);
-                remainingPlayers.splice(playerIndex, 1);
-                remainingPositions.splice(i, 1);
-            }
-        }
-        
-        // Handle any remaining assignments (shouldn't happen)
-        while (remainingPositions.length > 0 && remainingPlayers.length > 0) {
-            assignments.push({ 
-                position: remainingPositions.shift(), 
-                player: remainingPlayers.shift() 
-            });
-        }
-        
-        return assignments;
-    }
-    
-    getPositionRatingCategory(position) {
-        if (position === 'Keeper') return 'keeper';
-        if (position.includes('Back')) return 'defense';
-        if (position.includes('Mid') || position === 'Midfield') return 'midfield';
-        // Strikers, Wings, Forwards, Attacking positions
-        return 'offense';
-    }
-
-    sortPlayersByRoleBalance(players) {
-        return players.sort((a, b) => {
-            const aDefensive = a.defensiveQuarters || 0;
-            const aOffensive = a.offensiveQuarters || 0;
-            const bDefensive = b.defensiveQuarters || 0;
-            const bOffensive = b.offensiveQuarters || 0;
-            
-            // Calculate imbalance (higher number means more imbalanced)
-            const aImbalance = Math.abs(aDefensive - aOffensive);
-            const bImbalance = Math.abs(bDefensive - bOffensive);
-            
-            // Prioritize players with more imbalance
-            return bImbalance - aImbalance;
-        });
-    }
-    
-    selectPlayerForBalancedRole(availablePlayers, position) {
-        const isDefensive = position.includes('Back') || position === 'Keeper';
-        
-        // First, filter out players who have already played this position
-        const playersWhoHaventPlayedPosition = availablePlayers.filter(player => {
-            const hasPlayedPosition = player.positionsPlayed.some(p => p.position === position);
-            return !hasPlayedPosition;
-        });
-        
-        // Use filtered list if we have options, otherwise use all available
-        const candidatePlayers = playersWhoHaventPlayedPosition.length > 0 
-            ? playersWhoHaventPlayedPosition 
-            : availablePlayers;
-        
-        // Find players who need this type of position most (offensive vs defensive balance)
-        const prioritizedPlayers = candidatePlayers.filter(player => {
-            const defensive = player.defensiveQuarters || 0;
-            const offensive = player.offensiveQuarters || 0;
-            
-            if (isDefensive) {
-                // Prioritize players who have played less defense
-                return defensive <= offensive;
-            } else {
-                // Prioritize players who have played less offense
-                return offensive <= defensive;
-            }
-        });
-        
-        // If we have prioritized players, choose from them, otherwise choose any
-        const pool = prioritizedPlayers.length > 0 ? prioritizedPlayers : candidatePlayers;
-        
-        // Return the first player from the pool (already sorted by need)
-        return pool[0];
-    }
-
-    selectKeeper(availablePlayers, quarter) {
-        // First filter out players who should not play keeper
-        const allowedKeepers = availablePlayers.filter(player => !player.noKeeper);
-
-        // If no players are allowed to be keeper, fall back to all available players
-        const poolToSelectFrom = allowedKeepers.length > 0 ? allowedKeepers : availablePlayers;
-
-        // Find players who haven't been keeper yet THIS GAME from the allowed pool
-        let potentialKeepers = poolToSelectFrom.filter(player => !player.goalieQuarter);
-
-        if (potentialKeepers.length > 0) {
-            // Use season stats to prioritize players who've been goalkeeper less across the season
-            const seasonStats = this.seasonStatsCache || this.getPlayerStats();
-
-            // Sort by season goalkeeper quarters (ascending - fewer GK = higher priority)
-            potentialKeepers.sort((a, b) => {
-                const gkA = seasonStats[a.name]?.goalkeeperQuarters || 0;
-                const gkB = seasonStats[b.name]?.goalkeeperQuarters || 0;
-                return gkA - gkB;
-            });
-
-            // Get minimum GK count from the sorted list
-            const minGK = seasonStats[potentialKeepers[0].name]?.goalkeeperQuarters || 0;
-
-            // Filter to players with lowest GK count this season
-            const lowestGKGroup = potentialKeepers.filter(p =>
-                (seasonStats[p.name]?.goalkeeperQuarters || 0) === minGK
-            );
-
-            // If any players have keeper ratings, prefer higher-rated keepers within the group
-            const hasKeeperRatings = lowestGKGroup.some(p => (p.positionalRatings || {}).keeper);
-            if (hasKeeperRatings) {
-                lowestGKGroup.sort((a, b) => {
-                    const rA = (a.positionalRatings || {}).keeper || 0;
-                    const rB = (b.positionalRatings || {}).keeper || 0;
-                    return rB - rA;
-                });
-                // Get top-rated group and pick randomly from them
-                const topRating = (lowestGKGroup[0].positionalRatings || {}).keeper || 0;
-                const topRatedKeepers = lowestGKGroup.filter(p =>
-                    ((p.positionalRatings || {}).keeper || 0) === topRating
-                );
-                return topRatedKeepers[Math.floor(Math.random() * topRatedKeepers.length)];
-            }
-
-            // Random selection within the lowest GK group for variety
-            return lowestGKGroup[Math.floor(Math.random() * lowestGKGroup.length)];
-        }
-
-        // If all allowed players have been keeper this game, return any available player from the pool
-        return poolToSelectFrom[0];
     }
 
     validateLineup() {
