@@ -87,7 +87,7 @@ function balanceSittingByRating(schedule, playersCopy, players, playersOnField) 
         return allNames.reduce((sum, name) => sitting.has(name) ? sum : sum + ratingOf[name], 0);
     };
 
-    const copyByName = {};
+    const copyByName = Object.create(null);
     playersCopy.forEach(p => { copyByName[p.name] = p; });
 
     for (let iter = 0; iter < 20; iter++) {
