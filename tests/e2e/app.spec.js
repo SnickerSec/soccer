@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 // Run tests serially to avoid conflicts
 test.describe.configure({ mode: 'serial' });

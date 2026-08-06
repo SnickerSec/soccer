@@ -33,11 +33,11 @@ app.use((req, res, next) => {
     // Content Security Policy
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://unpkg.com",
+        "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self' data:",
-        "connect-src 'self' https://unpkg.com",
+        "connect-src 'self'",
         "frame-ancestors 'none'",
         "form-action 'self' https://accounts.google.com",
         "base-uri 'self'"
@@ -51,6 +51,17 @@ app.use((req, res, next) => {
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
     next();
+});
+
+// Serve static files and the health check BEFORE the rate limiter and session
+// middleware. A cold page load is ~18 asset requests, so counting them against
+// the 100-per-15-min budget would lock out coaches sharing a club/school NAT.
+// This also skips a session-store DB lookup on every CSS/JS request.
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check endpoint for Railway
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
 });
 
 // Rate limiting middleware
@@ -109,9 +120,8 @@ const { csrfSynchronisedProtection, generateToken } = csrfSync({
     getTokenFromRequest: (req) => req.headers['x-csrf-token'],
     ignoredMethods: ['GET', 'HEAD', 'OPTIONS']
 });
-app.use(csrfSynchronisedProtection);
 
-// Endpoint to get a CSRF token (must be before protection middleware)
+// Endpoint to get a CSRF token (must be before the protection middleware)
 app.get('/api/csrf-token', (req, res) => {
     const token = generateToken(req);
     res.json({ token });
@@ -127,14 +137,6 @@ app.use(playerRoutes);
 app.use(gameRoutes);
 app.use(settingsRoutes);
 app.use(inviteRoutes);
-
-// Serve static files from the public directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Health check endpoint for Railway
-app.get('/health', (req, res) => {
-    res.status(200).send('OK');
-});
 
 // API endpoint to analyze PDF and detect form fields
 app.get('/api/analyze-form', async (req, res) => {

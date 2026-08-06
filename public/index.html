@@ -10,11 +10,14 @@
     <meta name="apple-mobile-web-app-title" content="Roster Pro">
     <title>AYSO Roster Pro</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="apple-touch-icon" href="favicon.svg">
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon-180.png">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
-    <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js" integrity="sha384-2p6U+1mmqF10USehFeRiyG2ESG9FwIqN+jxULn5w9jjQIihSn9Pt13dVCn/Hawjn" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
+    <!--
+      pdf-lib and fontkit (~1.2MB combined) are loaded on demand by
+      loadPdfLibraries() in app.js, only when generating an evaluation PDF.
+      They are served from /vendor/ so PDF export works offline.
+    -->
     <script src="constants.js"></script>
 </head>
 <body>
@@ -26,12 +29,22 @@
             <h1>AYSO Roster Pro</h1>
             <p class="subtitle">Smart lineup generator with fair rotation for youth soccer</p>
             <div class="header-controls">
+                <!-- App Controls -->
+                <div class="app-controls">
+                    <button id="undoBtn" class="btn-icon" title="Undo last change (Ctrl+Z)" aria-label="Undo last change" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-undo"></use></svg></button>
+                    <button id="redoBtn" class="btn-icon" title="Redo last change (Ctrl+Y)" aria-label="Redo last change" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-redo"></use></svg></button>
+                    <button id="themeToggle" class="btn-icon" title="Switch between dark and light theme" aria-label="Switch between dark and light theme">
+                        <span class="theme-icon-dark"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-theme-dark"></use></svg></span>
+                        <span class="theme-icon-light"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-theme-light"></use></svg></span>
+                    </button>
+                </div>
+
                 <!-- Team Selector -->
                 <div id="teamSelector" class="team-selector hidden">
                     <select id="currentTeam" aria-label="Select team">
                         <option value="">Select Team...</option>
                     </select>
-                    <button id="manageTeams" class="btn-icon" title="Manage teams" aria-label="Manage teams">&#9881;</button>
+                    <button id="manageTeams" class="btn-icon" title="Manage teams" aria-label="Manage teams"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-settings"></use></svg></button>
                 </div>
 
                 <!-- Auth Container -->
@@ -40,7 +53,7 @@
                     <div id="userMenu" class="user-menu hidden">
                         <img id="userAvatar" class="user-avatar" src="" alt="">
                         <span id="userName" class="user-name"></span>
-                        <button id="signOutBtn" class="btn-icon btn-signout" title="Sign out" aria-label="Sign out">&#10005;</button>
+                        <button id="signOutBtn" class="btn-icon btn-signout" title="Sign out" aria-label="Sign out"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg></button>
                     </div>
                 </div>
             </div>
@@ -81,10 +94,10 @@
                         <div class="player-list">
                             <h3 id="roster-heading">Current Players (<span id="playerCount">0</span>)</h3>
                             <div class="player-list-legend">
-                                <span class="legend-item" title="Check to select as team captain"><span class="legend-icon captain">&#9733;</span> Captain</span>
+                                <span class="legend-item" title="Check to select as team captain"><span class="legend-icon captain"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-star"></use></svg></span> Captain</span>
                                 <span class="legend-item" title="Check if player should not play goalkeeper"><span class="legend-icon no-keeper">GK</span> No Keeper</span>
                                 <span class="legend-item" title="Check if player needs to rest at least 1 quarter"><span class="legend-icon rest">R</span> Must Rest</span>
-                                <span class="legend-item" title="Player availability status"><span class="legend-icon status">&#9679;</span> Status</span>
+                                <span class="legend-item" title="Player availability status"><span class="legend-icon status"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-status"></use></svg></span> Status</span>
                             </div>
                             <ul id="playerList" role="list" aria-label="Player roster"></ul>
                         </div>
@@ -227,27 +240,27 @@
             <!-- Lineup Display Section -->
             <section id="lineupDisplay" class="lineup-section hidden">
                 <h2>Game Lineup</h2>
-                <div id="validationMessages" class="validation-messages"></div>
+                <div id="validationMessages" class="validation-messages" role="status" aria-live="polite" aria-atomic="true"></div>
                 <div id="lineupGrid" class="lineup-grid"></div>
 
                 <div class="action-buttons">
                     <button id="copyLineup" class="btn-copy" aria-label="Copy lineup to clipboard" title="Copy to clipboard">
-                        <span>&#128203;</span> Copy
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-copy"></use></svg> Copy
                     </button>
                     <button id="shareLineup" class="btn-share" aria-label="Share lineup via link" title="Share lineup">
-                        <span>&#128279;</span> Share
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-share"></use></svg> Share
                     </button>
                     <button id="exportCSV" class="btn-csv" aria-label="Export lineup to CSV" title="Export to CSV">
-                        <span>&#128200;</span> CSV
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-csv"></use></svg> CSV
                     </button>
                     <button id="exportLineup" class="btn-export" aria-label="Export the generated lineup to a text file" title="Export to text file">
-                        <span>&#128190;</span> Text
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-export"></use></svg> Text
                     </button>
                     <button id="printLineup" class="btn-print" aria-label="Print the current lineup" title="Print lineup">
-                        <span>&#128424;</span> Print
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-print"></use></svg> Print
                     </button>
                     <button id="saveGame" class="btn-save-game" aria-label="Save this game" title="Save game for tracking">
-                        <span>&#128190;</span> Save Game
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-save-game"></use></svg> Save Game
                     </button>
                 </div>
             </section>
@@ -272,7 +285,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="teamModalTitle">Manage Teams</h2>
-                <button class="btn-close" aria-label="Close" id="closeTeamModal">&#10005;</button>
+                <button class="btn-close" aria-label="Close" id="closeTeamModal"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg></button>
             </div>
 
             <!-- Team List View -->
@@ -341,7 +354,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Team Invitation</h2>
-                <button class="btn-close" aria-label="Close" id="closeInviteModal">&#10005;</button>
+                <button class="btn-close" aria-label="Close" id="closeInviteModal"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg></button>
             </div>
             <div class="modal-body">
                 <p id="inviteMessage">You've been invited to join a team.</p>
@@ -363,7 +376,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Save Game</h2>
-                <button class="btn-close" aria-label="Close" id="closeSaveGameModal">&#10005;</button>
+                <button class="btn-close" aria-label="Close" id="closeSaveGameModal"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg></button>
             </div>
             <div class="modal-body">
                 <div class="input-group">

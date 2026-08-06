@@ -1,5 +1,8 @@
 // Service Worker for AYSO Roster Pro - Offline Support
-const CACHE_NAME = 'ayso-roster-pro-v12';
+const CACHE_NAME = 'ayso-roster-pro-v15';
+
+// App shell: fetched on install so a first-time visitor who later goes offline
+// still gets a working app. Keep this in sync with the modules in public/modules/.
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
@@ -7,21 +10,37 @@ const ASSETS_TO_CACHE = [
     '/constants.js',
     '/styles.css',
     '/favicon.svg',
+    '/assets/icons.svg',
+    '/assets/icons/apple-touch-icon-180.png',
     '/lineup-worker.js',
     '/manifest.json',
-    '/modules/storage.js',
-    '/modules/utils.js',
-    '/modules/season-stats.js',
+    '/modules/index.js',
+    '/modules/api-client.js',
+    '/modules/auth.js',
+    '/modules/cloud-storage.js',
     '/modules/formations.js',
-    '/modules/index.js'
+    '/modules/season-stats.js',
+    '/modules/storage.js',
+    '/modules/sync.js',
+    '/modules/team-manager.js',
+    '/modules/utils.js'
 ];
 
-// Install event - cache assets
+// Large, rarely-changing files (PDF libraries, fonts, the evaluation template).
+// Cached on first use rather than up front — precaching ~1.5MB would make the
+// first visit slow for the many coaches who never open the evaluation form.
+// Served cache-first with no revalidation, since they only change on a deploy
+// (which bumps CACHE_NAME and drops the whole cache anyway).
+const IMMUTABLE_PATHS = ['/vendor/', '/assets/'];
+
+const isImmutable = (pathname) => IMMUTABLE_PATHS.some((prefix) => pathname.startsWith(prefix));
+
+// Install event - cache the app shell
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('Service Worker: Caching files');
+                console.log('Service Worker: Caching app shell');
                 return cache.addAll(ASSETS_TO_CACHE);
             })
             .then(() => self.skipWaiting())
@@ -44,12 +63,21 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Puts a successful response in the cache and returns the original.
+function cachePut(request, response) {
+    if (response && response.status === 200 && response.type === 'basic') {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    }
+    return response;
+}
+
+// Fetch event
 self.addEventListener('fetch', (event) => {
     // Skip non-GET requests
     if (event.request.method !== 'GET') return;
 
-    // Skip external requests (like unpkg CDN)
+    // Skip cross-origin requests
     if (!event.request.url.startsWith(self.location.origin)) {
         return;
     }
@@ -60,40 +88,35 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    event.respondWith(
-        caches.match(event.request)
-            .then((cachedResponse) => {
-                if (cachedResponse) {
-                    // Return cached version
-                    return cachedResponse;
-                }
-
-                // Not in cache, fetch from network
-                return fetch(event.request)
-                    .then((response) => {
-                        // Don't cache non-successful responses
-                        if (!response || response.status !== 200) {
-                            return response;
-                        }
-
-                        // Clone the response
-                        const responseToCache = response.clone();
-
-                        // Add to cache
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
-                                cache.put(event.request, responseToCache);
-                            });
-
-                        return response;
-                    })
-                    .catch(() => {
-                        // Network failed, return offline page if available
-                        if (event.request.mode === 'navigate') {
-                            return caches.match('/index.html');
-                        }
-                    });
+    // Cache-first for large immutable assets: no background re-download of a
+    // 1.2MB library every time the evaluation form is opened.
+    if (isImmutable(url.pathname)) {
+        event.respondWith(
+            caches.match(event.request).then((cached) => {
+                if (cached) return cached;
+                return fetch(event.request).then((response) => cachePut(event.request, response));
             })
+        );
+        return;
+    }
+
+    // Stale-while-revalidate for app code: serve the cached copy immediately,
+    // then refresh it in the background so the next load picks up a new deploy
+    // even if CACHE_NAME was not bumped.
+    event.respondWith(
+        caches.match(event.request).then((cached) => {
+            const network = fetch(event.request)
+                .then((response) => cachePut(event.request, response))
+                .catch(() => {
+                    // Offline: fall back to the cached shell for navigations
+                    if (!cached && event.request.mode === 'navigate') {
+                        return caches.match('/index.html');
+                    }
+                    return cached;
+                });
+
+            return cached || network;
+        })
     );
 });
 
