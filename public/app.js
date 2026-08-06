@@ -2776,7 +2776,8 @@ class SoccerLineupGenerator {
 
     runLineupWorker(data) {
         return new Promise((resolve, reject) => {
-            const worker = new Worker('/lineup-worker.js');
+            // Module worker: it imports the shared engine from modules/lineup-engine.js
+            const worker = new Worker('/lineup-worker.js', { type: 'module' });
             
             worker.onmessage = (e) => {
                 const { type, result, attempts, validation, error } = e.data;
