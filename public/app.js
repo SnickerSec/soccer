@@ -9,9 +9,6 @@ import {
 import {
     escapeHtml,
     shuffleArray,
-    shuffleWithinSimilarGroups,
-    deepClone,
-    formatDate,
     debounce
 } from './modules/utils.js';
 
@@ -62,6 +59,18 @@ import {
     clearInviteTokenFromUrl
 } from './modules/team-manager.js';
 import { deleteGame as deleteGameFromCloud } from './modules/cloud-storage.js';
+import { createFieldVisualization } from './modules/field-visualization.js';
+import {
+    buildRecommendationsHtml,
+    buildGameHistoryHtml,
+    buildPlayerStatsHtml,
+    buildSeasonStatsCsv
+} from './modules/season-render.js';
+import {
+    loadPdfLibraries,
+    generateEvaluationPdf,
+    describePdfError
+} from './modules/evaluation-pdf.js';
 
 class SoccerLineupGenerator {
     constructor() {
@@ -77,9 +86,6 @@ class SoccerLineupGenerator {
         // Undo/Redo stacks
         this.undoStack = [];
         this.redoStack = [];
-
-        // PDF template cache
-        this.pdfTemplateCache = null;
 
         // Theme
         this.currentTheme = 'dark';
@@ -995,98 +1001,22 @@ class SoccerLineupGenerator {
         const container = document.getElementById('lineupRecommendations');
         if (!container) return;
 
+        // A null result means there is nothing to base recommendations on yet
+        // (no saved games, or no available players) -- distinct from having
+        // history but finding nothing worth flagging.
         const recommendations = this.getLineupRecommendations();
-
         if (!recommendations) {
             container.innerHTML = '<p class="empty-state">Play some games to see lineup recommendations for the next game.</p>';
             return;
         }
 
-        const sections = [];
-
-        if (recommendations.shouldSit.length > 0) {
-            sections.push(`
-                <div class="rec-section">
-                    <h4>🪑 Should Sit More</h4>
-                    <p class="rec-desc">These players have sat the least this season</p>
-                    <ul>${recommendations.shouldSit.map(p =>
-                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - avg ${p.avgSitting} sits/game</li>`
-                    ).join('')}</ul>
-                </div>
-            `);
-        }
-
-        if (recommendations.shouldKeep.length > 0) {
-            sections.push(`
-                <div class="rec-section">
-                    <h4>🧤 Goalkeeper Priority</h4>
-                    <p class="rec-desc">These players have played goalkeeper the least</p>
-                    <ul>${recommendations.shouldKeep.map(p =>
-                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.gkCount} GK games</li>`
-                    ).join('')}</ul>
-                </div>
-            `);
-        }
-
-        if (recommendations.shouldCaptain.length > 0) {
-            sections.push(`
-                <div class="rec-section">
-                    <h4>⭐ Captain Priority</h4>
-                    <p class="rec-desc">These players have been captain the least</p>
-                    <ul>${recommendations.shouldCaptain.map(p =>
-                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.captainCount} captain games</li>`
-                    ).join('')}</ul>
-                </div>
-            `);
-        }
-
-        if (recommendations.needsOffense.length > 0) {
-            sections.push(`
-                <div class="rec-section">
-                    <h4>⚽ Needs More Offense</h4>
-                    <p class="rec-desc">These players have played mostly defense</p>
-                    <ul>${recommendations.needsOffense.map(p =>
-                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.offense} off / ${p.defense} def quarters</li>`
-                    ).join('')}</ul>
-                </div>
-            `);
-        }
-
-        if (recommendations.needsDefense.length > 0) {
-            sections.push(`
-                <div class="rec-section">
-                    <h4>🛡️ Needs More Defense</h4>
-                    <p class="rec-desc">These players have played mostly offense</p>
-                    <ul>${recommendations.needsDefense.map(p =>
-                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.offense} off / ${p.defense} def quarters</li>`
-                    ).join('')}</ul>
-                </div>
-            `);
-        }
-
-        if (recommendations.positionVariety.length > 0) {
-            sections.push(`
-                <div class="rec-section">
-                    <h4>🔄 Needs Position Variety</h4>
-                    <p class="rec-desc">These players have played the fewest unique positions</p>
-                    <ul>${recommendations.positionVariety.map(p =>
-                        `<li><strong>${this.escapeHtmlAttribute(p.name)}</strong> - ${p.positionCount} positions (${this.escapeHtmlAttribute(p.topPositions || 'none')})</li>`
-                    ).join('')}</ul>
-                </div>
-            `);
-        }
-
-        if (sections.length === 0) {
+        const html = buildRecommendationsHtml(recommendations);
+        if (html === null) {
             container.innerHTML = '<p class="empty-state">All players are well-balanced! No specific recommendations.</p>';
-        } else {
-            const recsHtml = `
-                <div class="recommendations-grid">
-                    ${sections.join('')}
-                </div>
-                <p class="rec-note">These recommendations are automatically applied when you generate a lineup.</p>
-            `;
-            container.innerHTML = recsHtml; // nosemgrep: javascript.browser.security.insecure-document-method.insecure-document-method
+            return;
         }
+
+        container.innerHTML = html; // nosemgrep: javascript.browser.security.insecure-document-method.insecure-document-method
     }
 
     // Render season stats tab
@@ -1098,7 +1028,6 @@ class SoccerLineupGenerator {
 
         if (!totalGamesEl || !gameHistoryEl || !playerStatsEl) return;
 
-        // Update summary stats
         totalGamesEl.textContent = this.savedGames.length;
 
         const allPlayers = new Set();
@@ -1107,116 +1036,23 @@ class SoccerLineupGenerator {
         });
         totalPlayersEl.textContent = allPlayers.size;
 
-        // Render game history
         if (this.savedGames.length === 0) {
             gameHistoryEl.innerHTML = '<p class="empty-state">No games saved yet. Generate a lineup and click "Save Game" to start tracking.</p>';
-        } else {
-            const sortedGames = [...this.savedGames].sort((a, b) => new Date(b.date) - new Date(a.date));
-            const gameHistoryHtml = sortedGames.map(game => {
-                const date = new Date(game.date);
-                const formattedDate = date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                });
-                const playerCount = game.players.filter(p => p.status === 'available').length;
-                const safeId = this.escapeHtmlAttribute(String(game.id));
-                const safeName = this.escapeHtmlAttribute(game.name);
-                const safeFormation = this.escapeHtmlAttribute(game.settings.formation);
-                const safeDivision = this.escapeHtmlAttribute(game.settings.ageDivision);
-                const notesHtml = game.notes
-                    ? `<span class="game-notes">${this.escapeHtmlAttribute(game.notes)}</span>`
-                    : '';
-                return `
-                    <div class="game-history-item" data-game-id="${safeId}">
-                        <div class="game-info">
-                            <span class="game-name">${safeName}</span>
-                            <span class="game-date">${formattedDate}</span>
-                            <span class="game-meta">${playerCount} players | ${safeFormation} | ${safeDivision}</span>
-                            ${notesHtml}
-                        </div>
-                        <div class="game-actions">
-                            <button class="btn-view-game" data-action="view-game" data-game-id="${safeId}" aria-label="View ${safeName}">View</button>
-                            <button class="btn-notes-game" data-action="notes-game" data-game-id="${safeId}" aria-label="Edit notes for ${safeName}">Notes</button>
-                            <button class="btn-delete-game" data-action="delete-game" data-game-id="${safeId}" aria-label="Delete ${safeName}">Delete</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            gameHistoryEl.innerHTML = gameHistoryHtml; // nosemgrep: javascript.browser.security.insecure-document-method.insecure-document-method
-        }
-
-        // Render player stats
-        if (this.savedGames.length === 0) {
             playerStatsEl.innerHTML = '<p class="empty-state">Save some games to see player statistics across the season.</p>';
-        } else {
-            const stats = this.getPlayerStats();
-            const playerNames = Object.keys(stats).filter(name => stats[name].gamesPlayed > 0);
-
-            if (playerNames.length === 0) {
-                playerStatsEl.innerHTML = '<p class="empty-state">No player statistics available.</p>';
-                return;
-            }
-
-            // Sort by games played (descending), then by name
-            playerNames.sort((a, b) => {
-                const diff = stats[b].gamesPlayed - stats[a].gamesPlayed;
-                return diff !== 0 ? diff : a.localeCompare(b);
-            });
-
-            const maxQuarters = Math.max(...playerNames.map(n => stats[n].totalQuarters)) || 1;
-
-            const playerStatsHtml = `
-                <table class="player-stats-table">
-                    <thead>
-                        <tr>
-                            <th>Player</th>
-                            <th class="sortable" data-sort="attendance" title="Games Attended / Games on Roster">Attend</th>
-                            <th class="sortable" data-sort="quarters">Quarters</th>
-                            <th class="sortable" data-sort="sitting">Sitting %</th>
-                            <th class="sortable" data-sort="gk">GK</th>
-                            <th class="sortable" data-sort="captain">Capt</th>
-                            <th>Top Positions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${playerNames.map(name => {
-                            const s = stats[name];
-                            const totalPossibleQuarters = s.gamesPlayed * 4;
-                            const sittingPct = totalPossibleQuarters > 0
-                                ? Math.round((s.totalSitting / totalPossibleQuarters) * 100)
-                                : 0;
-                            const barWidth = Math.round((s.totalQuarters / maxQuarters) * 50);
-                            const attended = s.gamesAttended || s.gamesPlayed;
-                            const onRoster = s.gamesOnRoster || s.gamesPlayed;
-                            const attendanceDisplay = onRoster > 0 ? `${attended}/${onRoster}` : '-';
-
-                            // Get top 3 positions
-                            const positions = Object.entries(s.positions)
-                                .sort((a, b) => b[1] - a[1])
-                                .slice(0, 3)
-                                .map(([pos, count]) => `${this.escapeHtmlAttribute(pos)} (${count})`)
-                                .join(', ') || '-';
-
-                            return `
-                                <tr>
-                                    <td>${this.escapeHtmlAttribute(name)}</td>
-                                    <td title="${s.gamesAbsent || 0} absent, ${s.gamesInjured || 0} injured">${attendanceDisplay}</td>
-                                    <td>${s.totalQuarters}<span class="stat-bar" style="width: ${barWidth}px;"></span></td>
-                                    <td>${sittingPct}%</td>
-                                    <td>${s.goalkeeperQuarters}</td>
-                                    <td>${s.captainGames || 0}</td>
-                                    <td>${positions}</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            `;
-            playerStatsEl.innerHTML = playerStatsHtml; // nosemgrep: javascript.browser.security.insecure-document-method.insecure-document-method
+            this.renderRecommendations();
+            return;
         }
 
-        // Also render lineup recommendations
+        // nosemgrep: javascript.browser.security.insecure-document-method.insecure-document-method
+        gameHistoryEl.innerHTML = buildGameHistoryHtml(this.savedGames);
+
+        const statsHtml = buildPlayerStatsHtml(this.getPlayerStats());
+        if (statsHtml === null) {
+            playerStatsEl.innerHTML = '<p class="empty-state">No player statistics available.</p>';
+        } else {
+            playerStatsEl.innerHTML = statsHtml; // nosemgrep: javascript.browser.security.insecure-document-method.insecure-document-method
+        }
+
         this.renderRecommendations();
     }
 
@@ -1293,52 +1129,12 @@ class SoccerLineupGenerator {
             return;
         }
 
-        const stats = this.getPlayerStats();
-        const playerNames = Object.keys(stats).filter(name => stats[name].gamesPlayed > 0);
-
-        if (playerNames.length === 0) {
+        const csvContent = buildSeasonStatsCsv(this.getPlayerStats());
+        if (csvContent === null) {
             this.showNotification('No player statistics available', 'error');
             return;
         }
 
-        // Sort by games played descending
-        playerNames.sort((a, b) => stats[b].gamesPlayed - stats[a].gamesPlayed);
-
-        // Build CSV content
-        const headers = ['Player', 'Games Attended', 'Absent', 'Injured', 'Attendance %', 'Quarters Played', 'Quarters Sitting', 'Sitting %', 'GK Games', 'Captain Games', 'Top Positions'];
-        const rows = playerNames.map(name => {
-            const s = stats[name];
-            const totalPossible = s.gamesPlayed * 4;
-            const sittingPct = totalPossible > 0 ? Math.round((s.totalSitting / totalPossible) * 100) : 0;
-            const attendancePct = s.gamesOnRoster > 0 ? Math.round((s.gamesAttended / s.gamesOnRoster) * 100) : 0;
-            const topPositions = Object.entries(s.positions)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3)
-                .map(([pos, count]) => `${pos}(${count})`)
-                .join('; ');
-
-            return [
-                name,
-                s.gamesAttended || s.gamesPlayed,
-                s.gamesAbsent || 0,
-                s.gamesInjured || 0,
-                `${attendancePct}%`,
-                s.totalQuarters,
-                s.totalSitting,
-                `${sittingPct}%`,
-                s.goalkeeperQuarters,
-                s.captainGames || 0,
-                topPositions
-            ];
-        });
-
-        // Convert to CSV string
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-        ].join('\n');
-
-        // Create and download file
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
@@ -1410,18 +1206,6 @@ class SoccerLineupGenerator {
 
     shuffleArray(array) {
         return shuffleArray(array);
-    }
-
-    deepClone(obj) {
-        return deepClone(obj);
-    }
-
-    formatDate(date, options) {
-        return formatDate(date, options);
-    }
-
-    escapeHtml(str) {
-        return escapeHtml(str);
     }
 
     /**
@@ -2307,19 +2091,6 @@ class SoccerLineupGenerator {
     }
 
     // Escape HTML attribute to prevent XSS
-    escapeHtmlAttribute(str) {
-        return str.replace(/[&<>"']/g, (char) => {
-            const entities = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;'
-            };
-            return entities[char];
-        });
-    }
-
     switchTab(tabName) {
         // Save last used tab to localStorage
         localStorage.setItem('lastUsedTab', tabName);
@@ -3261,7 +3032,7 @@ class SoccerLineupGenerator {
             quarterDiv.appendChild(h3);
 
             // Add soccer field visualization (returns DOM element)
-            quarterDiv.appendChild(this.createFieldVisualization(quarter));
+            quarterDiv.appendChild(createFieldVisualization(quarter, this.positions, this.players));
 
             // Create positions table
             const table = document.createElement('table');
@@ -3728,156 +3499,6 @@ class SoccerLineupGenerator {
         }
     }
 
-    createFieldVisualization(quarter) {
-        const positions = quarter.positions;
-        const svgNS = 'http://www.w3.org/2000/svg';
-
-        // Position coordinates for all formations (percentage-based)
-        const positionCoords = {
-            'Keeper': { x: 50, y: 90 },
-            'Left Back': { x: 25, y: 70 },
-            'Right Back': { x: 75, y: 70 },
-            'Left Wing': { x: 15, y: 40 },
-            'Right Wing': { x: 85, y: 40 },
-            'Center Mid': { x: 50, y: 45 },
-            'Striker': { x: 50, y: 20 },
-            'Center Back': { x: 50, y: 72 },
-            'Left Mid': { x: 30, y: 45 },
-            'Right Mid': { x: 70, y: 45 },
-            'Left Striker': { x: 35, y: 20 },
-            'Right Striker': { x: 65, y: 20 },
-            'Midfield': { x: 50, y: 50 },
-            'Left Forward': { x: 35, y: 25 },
-            'Right Forward': { x: 65, y: 25 },
-            'Left Center Back': { x: 35, y: 75 },
-            'Right Center Back': { x: 65, y: 75 },
-            'Left Wing Back': { x: 15, y: 55 },
-            'Right Wing Back': { x: 85, y: 55 },
-            'Left Center Mid': { x: 35, y: 50 },
-            'Right Center Mid': { x: 65, y: 50 },
-            'Left Defensive Mid': { x: 40, y: 60 },
-            'Right Defensive Mid': { x: 60, y: 60 },
-            'Attacking Mid': { x: 50, y: 35 }
-        };
-
-        // Create container
-        const container = document.createElement('div');
-        container.className = 'field-container';
-        container.setAttribute('role', 'img');
-        container.setAttribute('aria-label', `Soccer field visualization showing player positions for Quarter ${quarter.quarter}`);
-
-        // Create SVG element
-        const svg = document.createElementNS(svgNS, 'svg');
-        svg.setAttribute('viewBox', '0 0 400 600');
-        svg.setAttribute('class', 'soccer-field');
-
-        // Helper to create SVG elements
-        const createSvgElement = (tag, attrs) => {
-            const el = document.createElementNS(svgNS, tag);
-            Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
-            return el;
-        };
-
-        // Field background
-        svg.appendChild(createSvgElement('rect', { x: 0, y: 0, width: 400, height: 600, fill: '#4a9b4a' }));
-        // Field lines
-        svg.appendChild(createSvgElement('rect', { x: 20, y: 20, width: 360, height: 560, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
-        // Center line
-        svg.appendChild(createSvgElement('line', { x1: 20, y1: 300, x2: 380, y2: 300, stroke: 'white', 'stroke-width': 3 }));
-        // Center circle
-        svg.appendChild(createSvgElement('circle', { cx: 200, cy: 300, r: 60, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
-        svg.appendChild(createSvgElement('circle', { cx: 200, cy: 300, r: 5, fill: 'white' }));
-        // Penalty areas
-        svg.appendChild(createSvgElement('rect', { x: 100, y: 20, width: 200, height: 100, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
-        svg.appendChild(createSvgElement('rect', { x: 100, y: 480, width: 200, height: 100, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
-        // Goal areas
-        svg.appendChild(createSvgElement('rect', { x: 140, y: 20, width: 120, height: 40, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
-        svg.appendChild(createSvgElement('rect', { x: 140, y: 540, width: 120, height: 40, fill: 'none', stroke: 'white', 'stroke-width': 3 }));
-        // Goals
-        svg.appendChild(createSvgElement('rect', { x: 170, y: 10, width: 60, height: 10, fill: 'white' }));
-        svg.appendChild(createSvgElement('rect', { x: 170, y: 580, width: 60, height: 10, fill: 'white' }));
-        // Penalty spots
-        svg.appendChild(createSvgElement('circle', { cx: 200, cy: 80, r: 3, fill: 'white' }));
-        svg.appendChild(createSvgElement('circle', { cx: 200, cy: 520, r: 3, fill: 'white' }));
-
-        // Add player positions
-        this.positions.forEach(position => {
-            const player = positions[position];
-            if (player && positionCoords[position]) {
-                const coord = positionCoords[position];
-                const x = coord.x * 4;
-                const y = coord.y * 6;
-                const isDefensive = position.includes('Back') || position === 'Keeper';
-                const isKeeper = position === 'Keeper';
-                const playerInfo = this.players.find(p => p.name === player);
-                const displayText = playerInfo && playerInfo.number ? playerInfo.number : this.getPlayerInitials(player);
-
-                const g = document.createElementNS(svgNS, 'g');
-                g.setAttribute('class', 'player-marker');
-
-                const circle = createSvgElement('circle', {
-                    cx: x, cy: y, r: 18,
-                    fill: isKeeper ? '#ffcc00' : isDefensive ? '#3498db' : '#e74c3c',
-                    stroke: 'white', 'stroke-width': 2
-                });
-                g.appendChild(circle);
-
-                const text = createSvgElement('text', {
-                    x: x, y: y,
-                    'text-anchor': 'middle',
-                    'dominant-baseline': 'middle',
-                    fill: 'white',
-                    'font-size': playerInfo && playerInfo.number ? '12' : '10',
-                    'font-weight': 'bold'
-                });
-                text.textContent = String(displayText);
-                g.appendChild(text);
-
-                svg.appendChild(g);
-            }
-        });
-
-        container.appendChild(svg);
-
-        // Create legend
-        const legend = document.createElement('div');
-        legend.className = 'field-legend';
-        const legendItems = [
-            { className: 'keeper', label: 'Keeper' },
-            { className: 'defensive', label: 'Defense' },
-            { className: 'offensive', label: 'Offense' }
-        ];
-        legendItems.forEach(item => {
-            const span = document.createElement('span');
-            span.className = 'legend-item';
-            const colorSpan = document.createElement('span');
-            colorSpan.className = `legend-color ${item.className}`;
-            span.appendChild(colorSpan);
-            span.appendChild(document.createTextNode(item.label));
-            legend.appendChild(span);
-        });
-        container.appendChild(legend);
-
-        return container;
-    }
-    
-    getPlayerInitials(name) {
-        const parts = name.split(' ');
-        if (parts.length >= 2) {
-            return parts[0][0] + parts[parts.length - 1][0];
-        }
-        return name.substring(0, 2).toUpperCase();
-    }
-
-    // Shuffle utilities - delegate to module
-    shuffleArray(array) {
-        return shuffleArray(array);
-    }
-
-    shuffleWithinSimilarGroups(array, keyFn) {
-        return shuffleWithinSimilarGroups(array, keyFn);
-    }
-
     loadData() {
         // Load players
         const savedPlayers = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS);
@@ -3998,161 +3619,6 @@ class SoccerLineupGenerator {
         }, 3000);
     }
     
-    async fetchFormCoordinates() {
-        // Fetch automatically detected field coordinates from the server
-        try {
-            const response = await fetch('/api/analyze-form');
-            const data = await response.json();
-            if (data.success) {
-                console.log('Auto-detected form coordinates:', data.fieldCoordinates);
-                return data;
-            }
-            return null;
-        } catch (error) {
-            console.error('Error fetching form coordinates:', error);
-            return null;
-        }
-    }
-
-    drawCoordinateGrid(page, width, height) {
-        /**
-         * COORDINATE GRID HELPER - For finding exact PDF positions
-         *
-         * How to use this tool:
-         * 1. Uncomment the call to this function in generatePlayerEvaluationPDF()
-         * 2. Generate a PDF - it will have a grid overlay with coordinate labels
-         * 3. Open the PDF and see where lines fall on the grid
-         * 4. Use the coordinates to adjust text placement
-         *
-         * PDF Coordinate System:
-         * - Origin (0,0) is at BOTTOM-LEFT corner
-         * - X increases from left to right →
-         * - Y increases from bottom to top ↑
-         * - US Letter page: 612 points wide × 792 points tall
-         * - 1 inch = 72 points
-         *
-         * Example calculations:
-         * - Top of page (US Letter): height = 792
-         * - 1 inch from top: y = 792 - 72 = 720
-         * - 2 inches from top: y = 792 - 144 = 648
-         * - 1 inch from left: x = 72
-         * - Center horizontally: x = 612 / 2 = 306
-         *
-         * Using height variable:
-         * - We use `height - value` because we measure from top in design
-         * - Example: height - 150 means 150 points down from top of page
-         *
-         * ADVANCED: Programmatic Form Field Detection
-         * ============================================
-         * For automatic coordinate detection, you could:
-         * 1. Parse PDF to extract all Path objects (vector graphics)
-         * 2. Filter for horizontal lines: |y1 - y2| < epsilon
-         * 3. Filter by length: min 50-100 points for form fields
-         * 4. Find nearby text labels (e.g., "Coach:", "Division:")
-         * 5. Calculate field position: label_x_right → line_x_left, line_y
-         * 6. This approach requires advanced PDF parsing (PyMuPDF, PDFBox)
-         *
-         * Our simpler approach: Use this grid to manually measure positions
-         */
-        const { rgb } = window.PDFLib;
-
-        // Draw vertical lines every 50 points
-        for (let x = 0; x <= width; x += 50) {
-            page.drawLine({
-                start: { x, y: 0 },
-                end: { x, y: height },
-                thickness: x % 100 === 0 ? 0.5 : 0.2,
-                color: rgb(0.7, 0.7, 0.7),
-                opacity: 0.5
-            });
-
-            // Label every 100 points
-            if (x % 100 === 0) {
-                page.drawText(`${x}`, {
-                    x: x + 2,
-                    y: height - 20,
-                    size: 8,
-                    color: rgb(1, 0, 0)
-                });
-            }
-        }
-
-        // Draw horizontal lines every 50 points
-        for (let y = 0; y <= height; y += 50) {
-            page.drawLine({
-                start: { x: 0, y },
-                end: { x: width, y },
-                thickness: y % 100 === 0 ? 0.5 : 0.2,
-                color: rgb(0.7, 0.7, 0.7),
-                opacity: 0.5
-            });
-
-            // Label every 100 points
-            if (y % 100 === 0) {
-                page.drawText(`${y}`, {
-                    x: 5,
-                    y: y + 2,
-                    size: 8,
-                    color: rgb(1, 0, 0)
-                });
-            }
-        }
-
-        console.log('Coordinate grid drawn on PDF (50pt spacing, labeled every 100pt)');
-    }
-
-    /**
-     * Loads pdf-lib and fontkit on demand.
-     *
-     * Together they are ~1.2MB, and only the evaluation form needs them, so they
-     * are kept out of the initial page load. They are served from our own origin
-     * (see scripts/copy-vendor.js) so that PDF export keeps working offline once
-     * the service worker has cached them.
-     *
-     * Concurrent calls share one in-flight promise; a failure clears it so a
-     * later attempt can retry.
-     */
-    loadPdfLibraries() {
-        if (window.PDFLib && window.fontkit) {
-            return Promise.resolve();
-        }
-
-        if (!this.pdfLibrariesPromise) {
-            const loadScript = (src) => new Promise((resolve, reject) => {
-                const existing = document.querySelector(`script[src="${src}"]`);
-                if (existing) {
-                    existing.addEventListener('load', resolve);
-                    existing.addEventListener('error', reject);
-                    return;
-                }
-                const script = document.createElement('script');
-                script.src = src;
-                script.onload = resolve;
-                script.onerror = () => reject(new Error(`Failed to load ${src}`));
-                document.head.appendChild(script);
-            });
-
-            this.showLoading('Loading PDF library...');
-            this.pdfLibrariesPromise = Promise.all([
-                loadScript('/vendor/pdf-lib.min.js'),
-                loadScript('/vendor/fontkit.umd.min.js')
-            ])
-                .then(() => {
-                    if (!window.PDFLib || !window.fontkit) {
-                        throw new Error('PDF libraries loaded but did not register globals');
-                    }
-                })
-                .catch((error) => {
-                    // Allow a retry on the next attempt
-                    this.pdfLibrariesPromise = null;
-                    throw error;
-                })
-                .finally(() => this.hideLoading());
-        }
-
-        return this.pdfLibrariesPromise;
-    }
-
     async generatePlayerEvaluationPDF() {
         if (this.players.length === 0) {
             this.showNotification('Please add players first before generating the evaluation form.', 'error');
@@ -4169,9 +3635,11 @@ class SoccerLineupGenerator {
             return;
         }
 
-        // Load the PDF libraries on demand (~1.2MB, so not loaded up front)
         try {
-            await this.loadPdfLibraries();
+            await loadPdfLibraries({
+                onLoadStart: () => this.showLoading('Loading PDF library...'),
+                onLoadEnd: () => this.hideLoading()
+            });
         } catch (error) {
             console.error('Failed to load PDF libraries:', error);
             this.showNotification('Could not load the PDF library. Check your connection and try again.', 'error');
@@ -4179,240 +3647,17 @@ class SoccerLineupGenerator {
         }
 
         try {
-            // Load the PDF template (use cache if available)
-            const templateUrl = '/assets/Player Evaluation Form 2025.pdf';
-            let existingPdfBytes;
-
-            if (this.pdfTemplateCache) {
-                existingPdfBytes = this.pdfTemplateCache;
-            } else {
-                const response = await fetch(templateUrl);
-                if (!response.ok) {
-                    throw new Error(`Failed to load PDF template: ${response.status} ${response.statusText}`);
-                }
-                existingPdfBytes = await response.arrayBuffer();
-                // Cache the template for future use
-                this.pdfTemplateCache = existingPdfBytes;
-            }
-
-            // Load pdf-lib
-            const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
-            const pdfDoc = await PDFDocument.load(existingPdfBytes);
-
-            // Register fontkit to enable custom fonts
-            pdfDoc.registerFontkit(window.fontkit);
-
-            const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-            const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-            const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-
-            // Load custom handwriting font for signature
-            const autographyFontUrl = '/assets/Autography-DOLnW.otf';
-            const autographyFontBytes = await fetch(autographyFontUrl).then(res => res.arrayBuffer());
-            const autographyFont = await pdfDoc.embedFont(autographyFontBytes);
-
-            // Sort players alphabetically by last name
-            const sortedPlayers = [...this.players].sort((a, b) => {
-                const lastNameA = a.name.split(' ').pop().toLowerCase();
-                const lastNameB = b.name.split(' ').pop().toLowerCase();
-                return lastNameA.localeCompare(lastNameB);
+            await generateEvaluationPdf({
+                players: this.players,
+                coachName,
+                assistantCoach,
+                division,
+                gender
             });
-
-            // Get the first page
-            const pages = pdfDoc.getPages();
-            const firstPage = pages[0];
-            const { width, height } = firstPage.getSize();
-
-            // LOG: Display page dimensions for debugging
-            console.log('PDF Page Dimensions:');
-            console.log(`  Width: ${width} points`);
-            console.log(`  Height: ${height} points`);
-            console.log('  Note: Origin (0,0) is at bottom-left corner');
-            console.log('  Common page sizes:');
-            console.log('    - US Letter: 612 × 792 points');
-            console.log('    - A4: 595 × 842 points');
-
-            // DEBUG MODE: Uncomment to draw coordinate grid for alignment
-            // this.drawCoordinateGrid(firstPage, width, height);
-
-            // Fill in header information (exact coordinates from user measurement)
-            // Note: PDF coordinates are from bottom-left. Y coordinates moved up by 1 point.
-            // Text is centered on the X coordinate.
-            const fontSize = 11;
-
-            const coachWidth = helveticaFont.widthOfTextAtSize(coachName, fontSize);
-            firstPage.drawText(coachName, {
-                x: 266 - (coachWidth / 2),
-                y: 714,
-                size: fontSize,
-                font: helveticaFont,
-                color: rgb(0, 0, 0)
-            });
-
-            const divisionWidth = helveticaFont.widthOfTextAtSize(division, fontSize);
-            firstPage.drawText(division, {
-                x: 443 - (divisionWidth / 2),
-                y: 714,
-                size: fontSize,
-                font: helveticaFont,
-                color: rgb(0, 0, 0)
-            });
-
-            // Abbreviate gender to just B or G
-            const genderAbbrev = gender === 'Boys' ? 'B' : gender === 'Girls' ? 'G' : gender.charAt(0);
-            const genderWidth = helveticaFont.widthOfTextAtSize(genderAbbrev, fontSize);
-            firstPage.drawText(genderAbbrev, {
-                x: 531 - (genderWidth / 2),
-                y: 714,
-                size: fontSize,
-                font: helveticaFont,
-                color: rgb(0, 0, 0)
-            });
-
-            const assistantWidth = helveticaFont.widthOfTextAtSize(assistantCoach, fontSize);
-            firstPage.drawText(assistantCoach, {
-                x: 314 - (assistantWidth / 2),
-                y: 686,
-                size: fontSize,
-                font: helveticaFont,
-                color: rgb(0, 0, 0)
-            });
-
-            // Add coach signature at coordinate 241, 80 (using custom handwriting font)
-            const coachSignatureWidth = autographyFont.widthOfTextAtSize(coachName, fontSize);
-            firstPage.drawText(coachName, {
-                x: 241 - (coachSignatureWidth / 2),
-                y: 81,  // 80 + 1 to match other Y adjustment
-                size: fontSize,
-                font: autographyFont,
-                color: rgb(0, 0, 0)
-            });
-
-            // Add today's date at coordinate 448, 80
-            const today = new Date();
-            const dateStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
-            const dateWidth = helveticaFont.widthOfTextAtSize(dateStr, fontSize);
-            firstPage.drawText(dateStr, {
-                x: 448 - (dateWidth / 2),
-                y: 81,  // 80 + 1 to match other Y adjustment
-                size: fontSize,
-                font: helveticaFont,
-                color: rgb(0, 0, 0)
-            });
-
-            // Player list coordinates (exact measurements from user)
-            // Y coordinates moved up by 1 point, text centered on X coordinates
-            const playerNameX = 164;
-            const ratingX = 326;
-            const commentsX = 460;
-            const firstPlayerY = 390;  // 389 + 1
-            const lineHeight = 28.8;  // Each line is 28.8 points below the previous
-            const playersPerPage = 10;
-            const playerFontSize = 10;
-            const commentFontSize = 9;
-
-            // Fill in player names, ratings, and comments
-            for (let i = 0; i < sortedPlayers.length && i < 20; i++) {
-                const pageIndex = Math.floor(i / playersPerPage);
-
-                // Determine which page to use
-                let currentPage;
-                if (pageIndex === 0) {
-                    currentPage = firstPage;
-                } else if (pageIndex === 1 && pages.length > 1) {
-                    currentPage = pages[1];
-                } else {
-                    // Template only has 2 pages with ~20 player slots
-                    break;
-                }
-
-                // Get the player
-                const player = sortedPlayers[i];
-                const playerName = player.number ? `${player.name} #${player.number}` : player.name;
-
-                // Calculate Y position based on which page and position on that page
-                const positionOnPage = i % playersPerPage;
-                let yPosition;
-
-                if (pageIndex === 0) {
-                    yPosition = firstPlayerY - (positionOnPage * lineHeight);
-                } else {
-                    // Second page - need to determine starting Y for page 2
-                    // Assuming similar spacing, will adjust if needed
-                    yPosition = firstPlayerY - (positionOnPage * lineHeight);
-                }
-
-                // Draw player name (left column) - centered on X coordinate
-                const playerNameWidth = helveticaFont.widthOfTextAtSize(playerName, playerFontSize);
-                currentPage.drawText(playerName, {
-                    x: playerNameX - (playerNameWidth / 2),
-                    y: yPosition,
-                    size: playerFontSize,
-                    font: helveticaFont,
-                    color: rgb(0, 0, 0)
-                });
-
-                // Draw rating if available (center column) - centered on X coordinate
-                if (player.rating) {
-                    const ratingText = player.rating.toString();
-                    const ratingWidth = helveticaFont.widthOfTextAtSize(ratingText, playerFontSize);
-                    currentPage.drawText(ratingText, {
-                        x: ratingX - (ratingWidth / 2),
-                        y: yPosition,
-                        size: playerFontSize,
-                        font: helveticaFont,
-                        color: rgb(0, 0, 0)
-                    });
-                }
-
-                // Draw comment if available (right column - truncate to fit) - centered on X coordinate
-                if (player.comment) {
-                    const maxCommentLength = 50;
-                    const comment = player.comment.length > maxCommentLength
-                        ? player.comment.substring(0, maxCommentLength - 3) + '...'
-                        : player.comment;
-
-                    const commentWidth = helveticaFont.widthOfTextAtSize(comment, commentFontSize);
-                    currentPage.drawText(comment, {
-                        x: commentsX - (commentWidth / 2),
-                        y: yPosition,
-                        size: commentFontSize,
-                        font: helveticaFont,
-                        color: rgb(0, 0, 0)
-                    });
-                }
-            }
-
-            // Save the PDF
-            const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
-
-            // Download the file
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Player_Evaluation_${division}_${gender}_${new Date().getFullYear()}.pdf`;
-            a.click();
-
-            URL.revokeObjectURL(url);
-
             this.showNotification('Player Evaluation Form generated successfully!', 'success');
         } catch (error) {
             console.error('Error generating PDF:', error);
-
-            // Provide specific error messages based on error type
-            let errorMessage = 'Error generating PDF: ';
-            if (error.message.includes('Failed to load PDF template')) {
-                errorMessage += 'Could not load the template file. Please check your internet connection.';
-            } else if (error.message.includes('font')) {
-                errorMessage += 'Font loading error. Please refresh the page and try again.';
-            } else if (error.name === 'TypeError') {
-                errorMessage += 'Invalid data format. Please check player information.';
-            } else {
-                errorMessage += error.message || 'Unknown error occurred.';
-            }
-
-            this.showNotification(errorMessage, 'error');
+            this.showNotification(`Error generating PDF: ${describePdfError(error)}`, 'error');
         }
     }
 
