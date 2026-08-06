@@ -7,9 +7,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Development
 - **Run the application locally**: `npm start` (runs on http://localhost:3000)
 - **Install dependencies**: `npm install`
-- **Run unit tests**: `npm test`
-- **Run e2e tests**: `npm run test:e2e`
+- **Run unit tests**: `npm test` (Jest; includes the server route tests under `tests/server/`)
+- **Run e2e tests**: `npm run test:e2e` (Playwright; starts the server itself)
 - **Run all tests**: `npm run test:all`
+- **Rebuild generated assets**: `npm run build:assets` (icon sprite + PWA icons)
+
+`npm run test:e2e` downloads the Chromium build Playwright needs on first run,
+via the `pretest:e2e` hook — roughly 300MB once, then a ~0.5s no-op. Keep
+Playwright reasonably current: older versions resolve distro-pinned browser
+builds and fail on newer Linux releases with "does not support chromium on
+<distro>".
 
 ## Architecture
 

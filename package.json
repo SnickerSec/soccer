@@ -13,6 +13,7 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "pretest:e2e": "playwright install chromium",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:all": "npm run test && npm run test:e2e"
@@ -36,7 +37,7 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.121",
     "@jest/globals": "^29.7.0",
-    "@playwright/test": "^1.57.0",
+    "@playwright/test": "^1.62.1",
     "@resvg/resvg-js": "^2.6.2",
     "jest": "^29.7.0",
     "supertest": "^7.2.2"
