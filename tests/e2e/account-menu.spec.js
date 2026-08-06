@@ -57,6 +57,20 @@ test.describe('Account menu', () => {
         await expect(page.locator('#accountTrigger')).toHaveAttribute('aria-expanded', 'true');
     });
 
+    test('the trigger is just the avatar; the name lives in the panel', async ({ page }) => {
+        // The name was duplicated on the trigger, where it only cost width
+        const triggerText = await page.locator('#accountTrigger').innerText();
+        expect(triggerText.trim()).toBe('');
+
+        const width = await page.evaluate(() =>
+            document.getElementById('accountTrigger').getBoundingClientRect().width
+        );
+        expect(width).toBeLessThan(70);
+
+        await page.click('#accountTrigger');
+        await expect(page.locator('#accountName')).toHaveText('Coach Taylor');
+    });
+
     test('shows who is signed in', async ({ page }) => {
         await page.click('#accountTrigger');
 

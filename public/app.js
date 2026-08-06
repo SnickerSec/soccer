@@ -285,7 +285,6 @@ class SoccerLineupGenerator {
         const signInBtn = document.getElementById('signInBtn');
         const userMenu = document.getElementById('userMenu');
         const userAvatar = document.getElementById('userAvatar');
-        const userName = document.getElementById('userName');
         const syncStatus = document.getElementById('syncStatus');
 
         if (user) {
@@ -296,9 +295,6 @@ class SoccerLineupGenerator {
                 if (userAvatar && user.avatarUrl) {
                     userAvatar.src = user.avatarUrl;
                     userAvatar.alt = user.displayName;
-                }
-                if (userName) {
-                    userName.textContent = user.displayName;
                 }
             }
             const accountName = document.getElementById('accountName');
