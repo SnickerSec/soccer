@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# A newer push to the same branch makes the in-flight run redundant
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `npm ci` installs from the lockfile and runs postinstall, which copies
+      # the vendored pdf-lib and fontkit into public/vendor/ -- the e2e PDF
+      # tests need those and they are deliberately not committed.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit and server tests
+        run: npm test
+
+      # Keyed on the Playwright version, since browser builds are tied to it.
+      # On a hit, the pretest:e2e hook becomes a no-op.
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # playwright.config.js starts the app itself via its webServer block.
+      # No database is needed: the unit tests mock the pool, and the app serves
+      # its offline-first UI without one.
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      # Traces are recorded on first retry, so this is what makes a flaky or
+      # failing run diagnosable after the fact.
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
