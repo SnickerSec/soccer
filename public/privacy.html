@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="How AYSO Roster Pro handles your team's data, on your device and in optional cloud sync.">
+    <meta name="theme-color" content="#0f3460">
+    <title>Privacy &amp; Safety - AYSO Roster Pro</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon-180.png">
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        // Match the app's theme before first paint, so this page does not flash
+        try {
+            const saved = localStorage.getItem('ayso_theme');
+            if (saved) document.documentElement.setAttribute('data-theme', saved);
+        } catch (e) { /* storage unavailable; the dark default stands */ }
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <div class="container">
+        <header class="site-header">
+            <div class="site-header-inner">
+                <!-- The brand links home here; the page's own h1 lives in the
+                     content below, so there is exactly one per page. -->
+                <a class="brand" href="/">
+                    <img class="brand-mark" src="favicon.svg" alt="" width="32" height="32">
+                    <div class="brand-text">
+                        <span class="brand-name">AYSO Roster Pro</span>
+                        <span class="subtitle">Fair rotation for youth soccer</span>
+                    </div>
+                </a>
+
+                <div class="header-controls">
+                    <a href="/" class="btn-secondary doc-back">&larr; Back to the app</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-content" id="main-content">
+            <section class="doc-section">
+                <h1 class="doc-title">Privacy &amp; Safety</h1>
+                <p class="doc-lead">
+                    This app works two ways, and they handle data differently. By default everything
+                    stays on your device. If you choose to sign in, your roster is stored on our
+                    server so co-coaches can share it. This page explains both.
+                </p>
+
+                <div class="doc-callout doc-callout-info">
+                    <strong>The short version:</strong> Don't sign in, and nothing about your team
+                    leaves your device. Sign in, and your roster, saved games and Google account
+                    details are stored on our server and shared with coaches you invite.
+                </div>
+            </section>
+
+            <section class="doc-section">
+                <h2>Using the app without signing in</h2>
+                <p>This is the default. No account, no server storage.</p>
+                <ul class="doc-list">
+                    <li><strong>Your data is kept in your browser's local storage</strong> — the roster,
+                        saved games, and your settings.</li>
+                    <li><strong>Nothing about your team is sent to our server.</strong> The only network
+                        requests are the ones that load the app itself.</li>
+                    <li><strong>It works offline.</strong> Once loaded, the app runs with no connection.</li>
+                    <li><strong>No analytics, no advertising, no third-party trackers.</strong> The app
+                        loads no third-party scripts at all.</li>
+                </ul>
+                <div class="doc-callout doc-callout-warning">
+                    <strong>Correcting an earlier version of this page:</strong> local data is
+                    <em>not</em> erased when you close the tab. It stays in your browser until you
+                    clear it, so a shared or family computer will still have your roster on it next
+                    time. Use <strong>Clear All</strong> in the app to remove it.
+                </div>
+            </section>
+
+            <section class="doc-section">
+                <h2>If you sign in for cloud sync</h2>
+                <p>
+                    Signing in with Google turns on syncing, so more than one coach can work from the
+                    same roster. That means data is stored on our server.
+                </p>
+
+                <h3>What is stored on the server</h3>
+                <table class="doc-table">
+                    <thead>
+                        <tr><th>Data</th><th>What it includes</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Your account</td>
+                            <td>The email address, display name and profile picture URL from your Google account</td>
+                        </tr>
+                        <tr>
+                            <td>Your roster</td>
+                            <td>Each player's name, jersey number, captain / must-rest / no-keeper flags,
+                                availability status and preferred positions</td>
+                        </tr>
+                        <tr>
+                            <td>Saved games</td>
+                            <td>Game name, date, your notes, the lineup, the settings used, and a snapshot
+                                of the roster at the time</td>
+                        </tr>
+                        <tr>
+                            <td>Teams and access</td>
+                            <td>Team names, age divisions, who is a member, their role, and pending invitations</td>
+                        </tr>
+                        <tr>
+                            <td>Your session</td>
+                            <td>A sign-in cookie, so you stay signed in between visits</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Who can see it</h3>
+                <ul class="doc-list">
+                    <li><strong>You</strong>, and anyone you invite to your team.</li>
+                    <li><strong>Coaches</strong> you invite can view and edit the roster and games.</li>
+                    <li><strong>Viewers</strong> you invite can only look.</li>
+                    <li>Invitation links expire — seven days by default, thirty at most.</li>
+                    <li>Team members only ever reach teams they belong to; every request is checked
+                        against your membership and role.</li>
+                </ul>
+
+                <h3>Third parties involved</h3>
+                <ul class="doc-list">
+                    <li><strong>Google</strong> — only to sign you in. We receive your email, name and
+                        profile picture URL; we never see your password.</li>
+                    <li><strong>Our hosting provider</strong>, which runs the server and its database.</li>
+                </ul>
+                <p class="doc-note">
+                    There are no advertising networks, analytics services or tracking pixels, signed in
+                    or not.
+                </p>
+            </section>
+
+            <section class="doc-section">
+                <h2>Children's information</h2>
+                <p>
+                    This app exists to organise youth soccer teams, so it necessarily holds children's
+                    names. We keep that to a minimum: a name, a jersey number, and playing preferences.
+                    There are no photos, no birthdates, no addresses, no contact details, and no way for
+                    players or families to log in or message anyone.
+                </p>
+                <ul class="doc-list">
+                    <li><strong>Use first name and last initial</strong> where you can — enough to run a
+                        lineup, less to expose.</li>
+                    <li><strong>Don't put anything else in the name field</strong>, such as a phone number
+                        or a medical note.</li>
+                    <li><strong>Remember that signing in stores those names on our server</strong>, not just
+                        your device. If you would rather they didn't leave your device, don't sign in —
+                        the app is fully functional without it.</li>
+                    <li><strong>Check with your AYSO region</strong> if you're unsure what their policy
+                        allows you to store or share.</li>
+                </ul>
+            </section>
+
+            <section class="doc-section">
+                <h2>Removing your data</h2>
+                <ul class="doc-list">
+                    <li><strong>On your device:</strong> use <strong>Clear All</strong> on the roster tab,
+                        and <strong>Clear All History</strong> on the season tracker.</li>
+                    <li><strong>On the server:</strong> deleting a team removes its roster, its saved games
+                        and its membership records along with it.</li>
+                    <li><strong>Exported files</strong> — text, CSV and PDF — are saved to your own device
+                        and are yours to manage.</li>
+                </ul>
+            </section>
+
+            <section class="doc-section">
+                <h2>How the app is protected</h2>
+                <ul class="doc-list">
+                    <li>The browser is instructed to load scripts only from this site, so no third-party
+                        code can run on the page.</li>
+                    <li>State-changing requests carry a CSRF token, so another site cannot act on your behalf.</li>
+                    <li>The sign-in cookie cannot be read by JavaScript, and is sent over HTTPS in production.</li>
+                    <li>API requests are rate limited.</li>
+                    <li>Every team request is authorised against your membership and role before it runs.</li>
+                    <li>Dependencies are monitored for known vulnerabilities, and the test suite runs on
+                        every change.</li>
+                </ul>
+            </section>
+
+            <section class="doc-section">
+                <h2>Questions</h2>
+                <p>
+                    This tool is provided free for the AYSO community. For questions about what your region
+                    permits, speak to your AYSO region's board. For questions about the app itself, the
+                    source code is public and can be inspected.
+                </p>
+                <p class="doc-note">Last reviewed: August 2026</p>
+            </section>
+        </div>
+
+        <footer>
+            <p><a href="/">Back to AYSO Roster Pro</a></p>
+        </footer>
+    </div>
+</body>
+</html>

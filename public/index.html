@@ -25,42 +25,58 @@
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
     <div class="container">
-        <header>
-            <h1>AYSO Roster Pro</h1>
-            <p class="subtitle">Smart lineup generator with fair rotation for youth soccer</p>
-            <div class="header-controls">
-                <!-- App Controls -->
-                <div class="app-controls">
-                    <button id="undoBtn" class="btn-icon" title="Undo last change (Ctrl+Z)" aria-label="Undo last change" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-undo"></use></svg></button>
-                    <button id="redoBtn" class="btn-icon" title="Redo last change (Ctrl+Y)" aria-label="Redo last change" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-redo"></use></svg></button>
-                    <button id="themeToggle" class="btn-icon" title="Switch between dark and light theme" aria-label="Switch between dark and light theme">
-                        <span class="theme-icon-dark"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-theme-dark"></use></svg></span>
-                        <span class="theme-icon-light"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-theme-light"></use></svg></span>
-                    </button>
+        <header class="site-header">
+            <div class="site-header-inner">
+                <div class="brand">
+                    <img class="brand-mark" src="favicon.svg" alt="" width="32" height="32">
+                    <div class="brand-text">
+                        <h1>AYSO Roster Pro</h1>
+                        <p class="subtitle">Fair rotation for youth soccer</p>
+                    </div>
                 </div>
 
-                <!-- Cloud sync status. Shown once signed in by updateAuthUI();
-                     state and label are set by updateSyncStatusUI(). -->
-                <div id="syncStatus" class="sync-status hidden" role="status" aria-live="polite">
-                    <span class="sync-icon" aria-hidden="true"></span>
-                    <span class="sync-text"></span>
-                </div>
+                <nav class="site-nav" aria-label="Sections">
+                    <div class="tab-navigation" role="tablist" aria-label="Player management tabs">
+                        <button class="tab-button active" data-tab="roster" role="tab" aria-selected="true" aria-controls="roster-tab" id="roster-tab-btn">Roster</button>
+                        <button class="tab-button" data-tab="season" role="tab" aria-selected="false" aria-controls="season-tab" id="season-tab-btn">Season Tracker</button>
+                        <button class="tab-button" data-tab="evaluation" role="tab" aria-selected="false" aria-controls="evaluation-tab" id="evaluation-tab-btn">Player Evaluation</button>
+                    </div>
+                </nav>
 
-                <!-- Team Selector -->
-                <div id="teamSelector" class="team-selector hidden">
-                    <select id="currentTeam" aria-label="Select team">
-                        <option value="">Select Team...</option>
-                    </select>
-                    <button id="manageTeams" class="btn-icon" title="Manage teams" aria-label="Manage teams"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-settings"></use></svg></button>
-                </div>
+                <div class="header-controls">
+                    <!-- Cloud sync status. Shown once signed in by updateAuthUI();
+                         state and label are set by updateSyncStatusUI(). -->
+                    <div id="syncStatus" class="sync-status hidden" role="status" aria-live="polite">
+                        <span class="sync-icon" aria-hidden="true"></span>
+                        <span class="sync-text"></span>
+                    </div>
 
-                <!-- Auth Container -->
-                <div id="authContainer" class="auth-container">
-                    <button id="signInBtn" class="btn-auth hidden" aria-label="Sign in to sync data">Sign In</button>
-                    <div id="userMenu" class="user-menu hidden">
-                        <img id="userAvatar" class="user-avatar" src="" alt="">
-                        <span id="userName" class="user-name"></span>
-                        <button id="signOutBtn" class="btn-icon btn-signout" title="Sign out" aria-label="Sign out"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg></button>
+                    <!-- Team Selector -->
+                    <div id="teamSelector" class="team-selector hidden">
+                        <select id="currentTeam" aria-label="Select team">
+                            <option value="">Select Team...</option>
+                        </select>
+                        <button id="manageTeams" class="btn-icon" title="Manage teams" aria-label="Manage teams"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-settings"></use></svg></button>
+                    </div>
+
+                    <!-- App Controls -->
+                    <div class="app-controls">
+                        <button id="undoBtn" class="btn-icon" title="Undo last change (Ctrl+Z)" aria-label="Undo last change" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-undo"></use></svg></button>
+                        <button id="redoBtn" class="btn-icon" title="Redo last change (Ctrl+Y)" aria-label="Redo last change" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-redo"></use></svg></button>
+                        <button id="themeToggle" class="btn-icon" title="Switch between dark and light theme" aria-label="Switch between dark and light theme">
+                            <span class="theme-icon-dark"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-theme-dark"></use></svg></span>
+                            <span class="theme-icon-light"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-theme-light"></use></svg></span>
+                        </button>
+                    </div>
+
+                    <!-- Auth Container -->
+                    <div id="authContainer" class="auth-container">
+                        <button id="signInBtn" class="btn-auth hidden" aria-label="Sign in to sync data">Sign In</button>
+                        <div id="userMenu" class="user-menu hidden">
+                            <img id="userAvatar" class="user-avatar" src="" alt="">
+                            <span id="userName" class="user-name"></span>
+                            <button id="signOutBtn" class="btn-icon btn-signout" title="Sign out" aria-label="Sign out"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg></button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -69,13 +85,6 @@
         <div class="main-content" id="main-content">
             <!-- Player Management & Evaluation Section with Tabs -->
             <section class="player-section" aria-labelledby="roster-heading">
-                <!-- Tab Navigation -->
-                <div class="tab-navigation" role="tablist" aria-label="Player management tabs">
-                    <button class="tab-button active" data-tab="roster" role="tab" aria-selected="true" aria-controls="roster-tab" id="roster-tab-btn">Roster Management</button>
-                    <button class="tab-button" data-tab="season" role="tab" aria-selected="false" aria-controls="season-tab" id="season-tab-btn">Season Tracker</button>
-                    <button class="tab-button" data-tab="evaluation" role="tab" aria-selected="false" aria-controls="evaluation-tab" id="evaluation-tab-btn">Player Evaluation</button>
-                </div>
-
                 <!-- Tab Content -->
                 <div class="tab-content">
                     <!-- Roster Management Tab -->
@@ -282,7 +291,7 @@
             <p style="margin-top: 5px; font-size: 0.9rem;">All players must play at least 50% of every game | Balanced teams | Positive coaching</p>
             <p style="margin-top: 10px; font-size: 0.85rem; opacity: 0.8;">
                 Privacy First: Works offline, data stays local | Optional cloud sync to share with co-coaches |
-                <a href="docs/PRIVACY_AND_SAFETY.md" style="color: white; text-decoration: underline;">Learn More</a>
+                <a href="/privacy.html">Privacy &amp; Safety</a>
             </p>
         </footer>
     </div>

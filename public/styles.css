@@ -3690,3 +3690,323 @@ footer a {
 .modal .modal-header h2 {
     font-size: 1.0625rem;
 }
+
+/* ============================================
+   DOCUMENT PAGES (privacy.html)
+   ============================================ */
+
+.doc-back {
+    display: inline-block;
+    text-decoration: none;
+}
+
+.doc-section {
+    margin-bottom: 20px;
+}
+
+.doc-section h2 {
+    font-size: 1.0625rem;
+}
+
+.doc-section h3 {
+    font-size: 0.9375rem;
+    margin: 20px 0 10px;
+}
+
+.doc-section p {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    margin-bottom: 12px;
+    max-width: 68ch;
+}
+
+.doc-lead {
+    font-size: 1rem !important;
+    color: hsl(var(--foreground)) !important;
+}
+
+.doc-list {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    margin: 0 0 12px 20px;
+    max-width: 68ch;
+}
+
+.doc-list li {
+    margin-bottom: 8px;
+}
+
+.doc-list strong,
+.doc-section p strong {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+}
+
+.doc-note {
+    font-size: 0.8125rem !important;
+    color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Callouts carry the same left-edge treatment as the in-app info panels */
+.doc-callout {
+    border: 1px solid hsl(var(--border));
+    border-left: 3px solid hsl(var(--primary));
+    border-radius: var(--radius-md);
+    background: hsl(var(--muted) / 0.5);
+    color: hsl(var(--muted-foreground));
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    padding: 14px 16px;
+    margin: 16px 0;
+    max-width: 68ch;
+}
+
+.doc-callout strong {
+    color: hsl(var(--foreground));
+}
+
+.doc-callout-warning {
+    border-left-color: hsl(var(--warning));
+    background: hsl(var(--warning) / 0.08);
+}
+
+.doc-table {
+    width: 100%;
+    max-width: 68ch;
+    margin: 12px 0 16px;
+    font-size: 0.875rem;
+}
+
+.doc-table th {
+    color: hsl(var(--muted-foreground));
+    font-weight: 500;
+    font-size: 0.8125rem;
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.doc-table td {
+    color: hsl(var(--muted-foreground));
+    padding: 10px 12px;
+    border-bottom: 1px solid hsl(var(--border) / 0.6);
+    vertical-align: top;
+    line-height: 1.55;
+}
+
+.doc-table td:first-child {
+    color: hsl(var(--foreground));
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.doc-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* ============================================
+   SITE HEADER
+
+   The conventional three-zone masthead: brand on the left, section nav in the
+   middle, account and app controls on the right. The nav holds the tablist, so
+   switching sections is a navigation act rather than something buried inside
+   the first panel.
+   ============================================ */
+
+.site-header {
+    background: hsl(var(--card));
+    border-bottom: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 0 24px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.site-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    min-height: 60px;
+}
+
+/* --- Brand --------------------------------------------------------------- */
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.brand-mark {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.brand-text h1 {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.brand-text .subtitle {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.75rem;
+    line-height: 1.3;
+    margin: 0;
+}
+
+/* --- Section nav --------------------------------------------------------- */
+
+/* Takes the middle, so the controls stay pinned right */
+.site-nav {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+}
+
+.site-header .tab-navigation {
+    margin-bottom: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.site-header .tab-navigation::-webkit-scrollbar {
+    display: none;
+}
+
+.site-header .tab-button {
+    white-space: nowrap;
+}
+
+/* --- Controls ------------------------------------------------------------ */
+
+.site-header .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 0;
+    flex-shrink: 0;
+    /* Pinned right even on pages with no nav in the middle to push it there */
+    margin-left: auto;
+}
+
+/* The panel below no longer opens with a tab strip */
+.player-section .tab-content {
+    margin-top: 0;
+}
+
+/* --- Narrower viewports -------------------------------------------------- */
+
+/* Below this the three zones cannot share a row: nav drops to its own line */
+@media (max-width: 1024px) {
+    .site-header-inner {
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 0;
+    }
+
+    .brand {
+        flex: 1;
+    }
+
+    .site-nav {
+        order: 3;
+        flex-basis: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 640px) {
+    .site-header {
+        padding: 0 16px;
+        position: static;
+    }
+
+    .brand-text .subtitle {
+        display: none;
+    }
+
+    /* Keep the name on one line; letting it wrap turned it into a three-line
+       column once the controls claimed their space */
+    .brand-text h1 {
+        font-size: 0.9375rem;
+        white-space: nowrap;
+    }
+
+    .brand {
+        flex: 0 1 auto;
+        min-width: 0;
+        gap: 8px;
+    }
+
+    .brand-mark {
+        width: 26px;
+        height: 26px;
+    }
+
+    .site-header .header-controls {
+        gap: 6px;
+    }
+
+    /* The strip scrolls sideways rather than wrapping; fade the right edge so
+       it reads as scrollable */
+    .site-nav {
+        position: relative;
+    }
+
+    .site-nav::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 24px;
+        pointer-events: none;
+        background: linear-gradient(to right, transparent, hsl(var(--card)));
+    }
+}
+
+/* Brand as a link, on pages other than the app itself */
+a.brand {
+    text-decoration: none;
+    color: inherit;
+}
+
+a.brand:hover .brand-name {
+    color: hsl(var(--primary));
+}
+
+.brand-name {
+    display: block;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+.brand-text .subtitle {
+    display: block;
+}
+
+.doc-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 14px;
+}
+
+.site-header .doc-back {
+    text-decoration: none;
+    white-space: nowrap;
+}
