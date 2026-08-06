@@ -141,7 +141,10 @@ function buildPositionRow(quarter, position, players, onSwap) {
  */
 function buildSittingRow(quarter, player, isFirst, onSwap) {
     const row = document.createElement('tr');
-    row.className = 'sitting-row';
+    // draggable-row carries the grab cursor and the dragging/drag-over
+    // feedback. Bench rows are draggable, so without it they moved with no
+    // visual response at all.
+    row.className = 'sitting-row draggable-row';
 
     makeSwappable(
         row,

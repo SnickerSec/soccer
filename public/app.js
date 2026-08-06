@@ -97,6 +97,9 @@ class SoccerLineupGenerator {
         // Saved games for multi-game tracking
         this.savedGames = [];
 
+        // Game whose notes the notes dialog is editing
+        this.pendingNotesGameId = null;
+
         // Season stats cache for performance during lineup generation
         this.seasonStatsCache = null;
 
@@ -964,12 +967,43 @@ class SoccerLineupGenerator {
         const game = this.savedGames.find(g => String(g.id) === String(gameId));
         if (!game) return;
 
-        const notes = prompt('Enter notes for this game:', game.notes || '');
-        if (notes !== null) {
-            this.updateGameNotes(gameId, notes);
-        }
+        const modal = document.getElementById('notesModal');
+        const input = document.getElementById('gameNotesInput');
+        const nameLabel = document.getElementById('notesGameName');
+        if (!modal || !input) return;
+
+        // Held until the dialog is confirmed, so the row can be re-rendered
+        // underneath without losing which game is being edited
+        this.pendingNotesGameId = gameId;
+
+        input.value = game.notes || '';
+        if (nameLabel) nameLabel.textContent = game.name;
+
+        modal.showModal();
+        input.focus();
     }
 
+    handleConfirmGameNotes() {
+        const modal = document.getElementById('notesModal');
+        const input = document.getElementById('gameNotesInput');
+
+        if (this.pendingNotesGameId !== null) {
+            this.updateGameNotes(this.pendingNotesGameId, input?.value.trim() ?? '');
+            this.pendingNotesGameId = null;
+        }
+
+        modal?.close();
+    }
+
+    /**
+     * Restores a saved game: its roster, lineup, and the settings it was built
+     * with.
+     *
+     * The settings matter as much as the lineup. displayLineup() renders rows
+     * from this.positions, which comes from the formation -- so opening a 9v9
+     * game while the app sits on 7v7 would draw it against the wrong position
+     * list and quietly drop players.
+     */
     loadSavedGame(gameId) {
         const game = this.savedGames.find(g => String(g.id) === String(gameId));
         if (!game) {
@@ -978,16 +1012,55 @@ class SoccerLineupGenerator {
         }
 
         this.saveStateForUndo();
+
         this.players = JSON.parse(JSON.stringify(game.players));
         this.lineup = JSON.parse(JSON.stringify(game.lineup));
         this.captains = this.players.filter(p => p.isCaptain).map(p => p.name);
-        this.ageDivision = game.settings.ageDivision;
-        this.playersOnField = game.settings.playersOnField;
-        this.formation = game.settings.formation;
+
+        this.applyGameSettings(game.settings);
 
         this.updatePlayerList();
         this.displayLineup(this.validateLineup());
+
+        document.getElementById('lineupDisplay')?.scrollIntoView({ behavior: 'smooth' });
         this.showNotification(`Loaded "${game.name}"`, 'success');
+    }
+
+    /**
+     * Restores the age division, field size and formation a game was saved
+     * with, keeping the controls in step.
+     *
+     * Order matters: each dropdown's options are rebuilt from the previous
+     * choice, and the rebuild helpers reset the value to a default, so the
+     * saved value is reapplied after each one.
+     */
+    applyGameSettings(settings) {
+        const ageDivisionSelect = document.getElementById('ageDivision');
+        const fieldSelect = document.getElementById('fieldPlayers');
+        const formationSelect = document.getElementById('formation');
+
+        this.ageDivision = settings.ageDivision;
+        if (ageDivisionSelect) ageDivisionSelect.value = this.ageDivision;
+
+        this.updateFieldOptions();
+        this.playersOnField = settings.playersOnField;
+        if (fieldSelect) fieldSelect.value = this.playersOnField;
+
+        this.updateFormationOptions();
+        this.formation = settings.formation;
+        if (formationSelect) {
+            formationSelect.value = this.formation;
+            // A formation saved by an older version may no longer be offered;
+            // fall back to whatever the dropdown settled on rather than
+            // rendering against a formation with no positions.
+            if (formationSelect.value !== this.formation) {
+                this.formation = formationSelect.value;
+            }
+        }
+
+        this.updatePositions();
+        this.updateAgeRules();
+        this.updateFormationDescription();
     }
 
     getPlayerStats() {
@@ -1085,35 +1158,6 @@ class SoccerLineupGenerator {
     }
 
     // View a saved game's lineup
-    viewGameDetails(gameId) {
-        const game = this.savedGames.find(g => String(g.id) === String(gameId));
-        if (!game) {
-            this.showNotification('Game not found', 'error');
-            return;
-        }
-
-        // Load the game data temporarily to display the lineup
-        const originalPlayers = JSON.parse(JSON.stringify(this.players));
-        const originalLineup = JSON.parse(JSON.stringify(this.lineup));
-
-        this.players = JSON.parse(JSON.stringify(game.players));
-        this.lineup = JSON.parse(JSON.stringify(game.lineup));
-
-        // Display the lineup
-        this.displayLineup([]);
-
-        // Scroll to lineup section
-        const lineupSection = document.getElementById('lineupDisplay');
-        if (lineupSection) {
-            lineupSection.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        this.showNotification(`Viewing lineup from "${game.name}"`, 'info');
-
-        // Restore original data after a delay (user can see the lineup)
-        // Note: We don't restore automatically - user can generate a new lineup or save this one
-    }
-
     // Clear all season history
     clearSeasonHistory() {
         if (!confirm('Are you sure you want to delete ALL saved games? This cannot be undone.')) {
@@ -1388,7 +1432,7 @@ class SoccerLineupGenerator {
                 const gameId = button.dataset.gameId;
 
                 if (action === 'view-game') {
-                    this.viewGameDetails(gameId);
+                    this.loadSavedGame(gameId);
                 } else if (action === 'delete-game') {
                     this.deleteGame(gameId);
                 } else if (action === 'notes-game') {
@@ -1599,6 +1643,27 @@ class SoccerLineupGenerator {
             closeSaveGameModal.addEventListener('click', () => {
                 document.getElementById('saveGameModal')?.close();
             });
+        }
+
+        const closeNotesModal = document.getElementById('closeNotesModal');
+        if (closeNotesModal) {
+            closeNotesModal.addEventListener('click', () => {
+                this.pendingNotesGameId = null;
+                document.getElementById('notesModal')?.close();
+            });
+        }
+
+        const cancelGameNotes = document.getElementById('cancelGameNotes');
+        if (cancelGameNotes) {
+            cancelGameNotes.addEventListener('click', () => {
+                this.pendingNotesGameId = null;
+                document.getElementById('notesModal')?.close();
+            });
+        }
+
+        const confirmGameNotes = document.getElementById('confirmGameNotes');
+        if (confirmGameNotes) {
+            confirmGameNotes.addEventListener('click', () => this.handleConfirmGameNotes());
         }
 
         const cancelSaveGame = document.getElementById('cancelSaveGame');
@@ -2211,45 +2276,6 @@ class SoccerLineupGenerator {
             this.players[index].comment = comment.trim();
             this.savePlayers();
         }
-    }
-
-    toggleCaptain(playerName) {
-        const player = this.players.find(p => p.name === playerName);
-        if (!player) return;
-
-        const checkbox = event.target;
-        const isChecked = checkbox.checked;
-
-        if (isChecked) {
-            // Adding captain
-            if (this.captains.length >= 2) {
-                // Remove the first captain and add the new one
-                const removedCaptain = this.captains.shift();
-                const removedPlayer = this.players.find(p => p.name === removedCaptain);
-                if (removedPlayer) {
-                    removedPlayer.isCaptain = false;
-                }
-                // Update the UI for the removed captain
-                this.updatePlayerList();
-                this.showNotification(`Captain limit reached. Replaced ${removedCaptain} with ${playerName}`, 'info');
-            } else {
-                this.showNotification(`${playerName} is now a captain`, 'success');
-            }
-            this.captains.push(playerName);
-            player.isCaptain = true;
-        } else {
-            // Removing captain
-            const index = this.captains.indexOf(playerName);
-            if (index > -1) {
-                this.captains.splice(index, 1);
-            }
-            player.isCaptain = false;
-            this.showNotification(`${playerName} is no longer a captain`, 'info');
-        }
-
-        // Refresh the player list to update checkboxes and icons
-        this.updatePlayerList();
-        this.savePlayers();
     }
 
     toggleRestPreference(playerName) {

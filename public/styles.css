@@ -836,7 +836,8 @@ small {
 }
 
 .input-group input,
-.input-group select {
+.input-group select,
+.input-group textarea {
     padding: 10px;
     border: 2px solid #3a3a4a;
     border-radius: 5px;
@@ -847,9 +848,16 @@ small {
 }
 
 .input-group input:focus,
-.input-group select:focus {
+.input-group select:focus,
+.input-group textarea:focus {
     outline: none;
     border-color: #5dade2;
+}
+
+.input-group textarea {
+    font-family: inherit;
+    resize: vertical;
+    width: 100%;
 }
 
 .helper-text {

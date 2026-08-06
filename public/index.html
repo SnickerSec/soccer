@@ -378,6 +378,28 @@
         </div>
     </dialog>
 
+    <!-- Game Notes Modal -->
+    <dialog id="notesModal" class="modal notes-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Game Notes</h2>
+                <button class="btn-close" aria-label="Close" id="closeNotesModal">
+                    <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="gameNotesInput">Notes for <span id="notesGameName"></span>:</label>
+                    <textarea id="gameNotesInput" rows="4" maxlength="500" placeholder="e.g., Won 3-1, strong second half"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button id="cancelGameNotes" class="btn-secondary">Cancel</button>
+                    <button id="confirmGameNotes" class="btn-primary">Save Notes</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
     <!-- Save Game Modal -->
     <dialog id="saveGameModal" class="modal save-game-modal">
         <div class="modal-content">

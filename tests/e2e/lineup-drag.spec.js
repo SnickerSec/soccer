@@ -21,7 +21,7 @@ test.describe('Lineup drag and drop', () => {
         return page.evaluate(index => {
             const card = document.querySelectorAll('.quarter-lineup')[index];
             const result = { positions: {}, resting: [] };
-            card.querySelectorAll('tr.draggable-row').forEach(row => {
+            card.querySelectorAll('tr.draggable-row:not(.sitting-row)').forEach(row => {
                 result.positions[row.dataset.position] = row.dataset.player;
             });
             card.querySelectorAll('tr.sitting-row').forEach(row => {
@@ -37,7 +37,7 @@ test.describe('Lineup drag and drop', () => {
         const rows = await page.evaluate(() => {
             const card = document.querySelector('.quarter-lineup');
             return {
-                positions: [...card.querySelectorAll('tr.draggable-row')].map(r => ({
+                positions: [...card.querySelectorAll('tr.draggable-row:not(.sitting-row)')].map(r => ({
                     draggable: r.draggable,
                     quarter: r.dataset.quarter,
                     position: r.dataset.position,
