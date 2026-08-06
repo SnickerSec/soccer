@@ -3234,10 +3234,10 @@ class SoccerLineupGenerator {
         const printBtnClone = printBtn.cloneNode(true);
         printBtnClone.addEventListener('click', () => this.printLineup());
         const saveGameBtnClone = saveGameBtn.cloneNode(true);
-        saveGameBtnClone.addEventListener('click', () => {
-            const name = prompt('Enter a name for this game (e.g., "vs Tigers 12/10"):');
-            if (name !== null) this.saveCurrentGame(name);
-        });
+        // This clone is the button coaches actually see -- the original is
+        // hidden below. It opens the same modal as the original so the game
+        // date is captured; a bare prompt() silently dated every game today.
+        saveGameBtnClone.addEventListener('click', () => this.showSaveGameModal());
 
         // Helper to create dropdown menu
         const createDropdown = (label, iconId, items) => {

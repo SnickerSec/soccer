@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import pool from '../db.js';
-import { requireAuth, requireTeamAccess } from '../middleware.js';
+import { requireAuth, requireTeamAccess, getTeamRole, roleSatisfies } from '../middleware.js';
 
 const router = Router();
 
@@ -143,14 +143,16 @@ router.put('/api/games/:id', requireAuth, async (req, res) => {
         }
 
         const teamId = gameResult.rows[0].team_id;
-        const accessResult = await pool.query(
-            `SELECT role FROM team_members
-             WHERE team_id = $1 AND user_id = $2 AND joined_at IS NOT NULL`,
-            [teamId, req.user.id]
-        );
+        // Membership alone is not enough: a viewer is read-only, so writes
+        // require at least coach.
+        const role = await getTeamRole(teamId, req.user.id);
 
-        if (accessResult.rows.length === 0) {
+        if (role === null) {
             return res.status(403).json({ success: false, error: 'No access' });
+        }
+
+        if (!roleSatisfies(role, 'coach')) {
+            return res.status(403).json({ success: false, error: 'Insufficient permissions' });
         }
 
         const updates = req.body;
@@ -196,14 +198,16 @@ router.delete('/api/games/:id', requireAuth, async (req, res) => {
         }
 
         const teamId = gameResult.rows[0].team_id;
-        const accessResult = await pool.query(
-            `SELECT role FROM team_members
-             WHERE team_id = $1 AND user_id = $2 AND joined_at IS NOT NULL`,
-            [teamId, req.user.id]
-        );
+        // Membership alone is not enough: a viewer is read-only, so writes
+        // require at least coach.
+        const role = await getTeamRole(teamId, req.user.id);
 
-        if (accessResult.rows.length === 0) {
+        if (role === null) {
             return res.status(403).json({ success: false, error: 'No access' });
+        }
+
+        if (!roleSatisfies(role, 'coach')) {
+            return res.status(403).json({ success: false, error: 'Insufficient permissions' });
         }
 
         await pool.query('DELETE FROM games WHERE id = $1', [req.params.id]);

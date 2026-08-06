@@ -15,6 +15,38 @@ export function requireAuth(req, res, next) {
 }
 
 /**
+ * Team roles, lowest to highest. A role satisfies any requirement at or below
+ * its own level.
+ */
+export const ROLE_HIERARCHY = { viewer: 0, coach: 1, owner: 2 };
+
+/**
+ * Whether `userRole` satisfies `minRole`.
+ *
+ * Unknown roles rank below every requirement, so an unexpected value in the
+ * database denies rather than grants.
+ */
+export function roleSatisfies(userRole, minRole) {
+    return (ROLE_HIERARCHY[userRole] ?? -1) >= (ROLE_HIERARCHY[minRole] ?? 0);
+}
+
+/**
+ * Looks up the caller's role on a team, for routes that resolve the team from a
+ * resource id and so cannot use requireTeamAccess.
+ *
+ * Returns null when the caller is not a joined member.
+ */
+export async function getTeamRole(teamId, userId) {
+    const result = await pool.query(
+        `SELECT role FROM team_members
+         WHERE team_id = $1 AND user_id = $2 AND joined_at IS NOT NULL`,
+        [teamId, userId]
+    );
+
+    return result.rows.length > 0 ? result.rows[0].role : null;
+}
+
+/**
  * Require team access with minimum role
  * Reads teamId from req.params.teamId or req.params.id
  */
@@ -30,20 +62,13 @@ export function requireTeamAccess(minRole = 'viewer') {
         }
 
         try {
-            const result = await pool.query(
-                `SELECT role FROM team_members
-                 WHERE team_id = $1 AND user_id = $2 AND joined_at IS NOT NULL`,
-                [teamId, req.user.id]
-            );
+            const userRole = await getTeamRole(teamId, req.user.id);
 
-            if (result.rows.length === 0) {
+            if (userRole === null) {
                 return res.status(403).json({ success: false, error: 'No access to this team' });
             }
 
-            const userRole = result.rows[0].role;
-            const roleHierarchy = { viewer: 0, coach: 1, owner: 2 };
-
-            if ((roleHierarchy[userRole] ?? -1) < (roleHierarchy[minRole] ?? 0)) {
+            if (!roleSatisfies(userRole, minRole)) {
                 return res.status(403).json({ success: false, error: 'Insufficient permissions' });
             }
 
