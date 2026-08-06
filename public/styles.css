@@ -4010,3 +4010,203 @@ a.brand:hover .brand-name {
     text-decoration: none;
     white-space: nowrap;
 }
+
+/* ============================================
+   ACCOUNT MENU
+
+   Identity, team switching and team management hang off the avatar, following
+   the shadcn dropdown-menu shape: a trigger, a floating panel, grouped items
+   with separators.
+   ============================================ */
+
+.account-menu {
+    position: relative;
+}
+
+.account-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    color: hsl(var(--foreground));
+    cursor: pointer;
+    padding: 4px 8px 4px 4px;
+    max-width: 220px;
+}
+
+.account-trigger:hover,
+.account-trigger[aria-expanded="true"] {
+    background: hsl(var(--accent));
+    border-color: hsl(var(--border));
+}
+
+.account-trigger .user-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.account-trigger .user-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-chevron {
+    width: 14px;
+    height: 14px;
+    color: hsl(var(--muted-foreground));
+    flex-shrink: 0;
+}
+
+/* --- Panel --------------------------------------------------------------- */
+
+.account-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 60;
+    min-width: 260px;
+    max-width: 320px;
+    padding: 5px;
+    background: hsl(var(--popover));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+}
+
+.account-panel[hidden] {
+    display: none;
+}
+
+.account-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+}
+
+.account-identity-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+}
+
+.account-identity-email {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.account-separator {
+    height: 1px;
+    background: hsl(var(--border));
+    margin: 5px -5px;
+}
+
+.account-section-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    padding: 6px 10px 4px;
+}
+
+/* --- Items --------------------------------------------------------------- */
+
+.account-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: hsl(var(--foreground));
+    cursor: pointer;
+    font-size: 0.875rem;
+    padding: 8px 10px;
+    text-align: left;
+}
+
+.account-item:hover,
+.account-item:focus-visible {
+    background: hsl(var(--accent));
+}
+
+.account-item .icon {
+    width: 15px;
+    height: 15px;
+    color: hsl(var(--muted-foreground));
+    flex-shrink: 0;
+}
+
+.account-item-danger:hover .icon,
+.account-item-danger:hover {
+    color: hsl(var(--destructive));
+}
+
+/* Teams scroll rather than pushing Manage and Sign out off screen */
+.account-team-list {
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.account-team-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    flex-shrink: 0;
+}
+
+.account-team-check .icon {
+    width: 15px;
+    height: 15px;
+    color: hsl(var(--primary));
+}
+
+.account-team-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-team.is-current .account-team-name {
+    font-weight: 600;
+}
+
+.account-team-role {
+    font-size: 0.6875rem;
+    color: hsl(var(--muted-foreground));
+    text-transform: capitalize;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
+    flex-shrink: 0;
+}
+
+.account-empty {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.8125rem;
+    padding: 8px 10px;
+}
+
+@media (max-width: 640px) {
+    /* The name is in the panel; the avatar alone triggers it */
+    .account-trigger .user-name {
+        display: none;
+    }
+
+    .account-panel {
+        min-width: 240px;
+    }
+}

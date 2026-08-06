@@ -51,14 +51,6 @@
                         <span class="sync-text"></span>
                     </div>
 
-                    <!-- Team Selector -->
-                    <div id="teamSelector" class="team-selector hidden">
-                        <select id="currentTeam" aria-label="Select team">
-                            <option value="">Select Team...</option>
-                        </select>
-                        <button id="manageTeams" class="btn-icon" title="Manage teams" aria-label="Manage teams"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-settings"></use></svg></button>
-                    </div>
-
                     <!-- App Controls -->
                     <div class="app-controls">
                         <button id="undoBtn" class="btn-icon" title="Undo last change (Ctrl+Z)" aria-label="Undo last change" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-undo"></use></svg></button>
@@ -69,13 +61,40 @@
                         </button>
                     </div>
 
-                    <!-- Auth Container -->
+                    <!-- Account menu: identity, team switching and team
+                         management all hang off the avatar. -->
                     <div id="authContainer" class="auth-container">
                         <button id="signInBtn" class="btn-auth hidden" aria-label="Sign in to sync data">Sign In</button>
-                        <div id="userMenu" class="user-menu hidden">
-                            <img id="userAvatar" class="user-avatar" src="" alt="">
-                            <span id="userName" class="user-name"></span>
-                            <button id="signOutBtn" class="btn-icon btn-signout" title="Sign out" aria-label="Sign out"><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg></button>
+
+                        <div id="userMenu" class="account-menu hidden">
+                            <button id="accountTrigger" class="account-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="accountPanel" aria-label="Account and teams">
+                                <img id="userAvatar" class="user-avatar" src="" alt="">
+                                <span id="userName" class="user-name"></span>
+                                <svg class="icon account-chevron" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-chevron-down"></use></svg>
+                            </button>
+
+                            <div id="accountPanel" class="account-panel" role="menu" aria-labelledby="accountTrigger" hidden>
+                                <div class="account-identity">
+                                    <span id="accountName" class="account-identity-name"></span>
+                                    <span id="accountEmail" class="account-identity-email"></span>
+                                </div>
+
+                                <div class="account-separator" role="separator"></div>
+
+                                <div class="account-section-label" id="accountTeamsLabel">Teams</div>
+                                <div id="accountTeamList" class="account-team-list" role="group" aria-labelledby="accountTeamsLabel"></div>
+
+                                <div class="account-separator" role="separator"></div>
+
+                                <button id="manageTeams" class="account-item" role="menuitem" type="button">
+                                    <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-settings"></use></svg>
+                                    Manage teams
+                                </button>
+                                <button id="signOutBtn" class="account-item account-item-danger" role="menuitem" type="button">
+                                    <svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-close"></use></svg>
+                                    Sign out
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

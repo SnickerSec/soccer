@@ -64,6 +64,7 @@ import {
     buildLineupGrid
 } from './modules/lineup-render.js';
 import { buildActionBar } from './modules/lineup-actions.js';
+import { iconMarkup } from './modules/icons.js';
 import {
     buildRecommendationsHtml,
     buildGameHistoryHtml,
@@ -286,7 +287,6 @@ class SoccerLineupGenerator {
         const userAvatar = document.getElementById('userAvatar');
         const userName = document.getElementById('userName');
         const syncStatus = document.getElementById('syncStatus');
-        const teamSelector = document.getElementById('teamSelector');
 
         if (user) {
             // User is signed in
@@ -301,8 +301,12 @@ class SoccerLineupGenerator {
                     userName.textContent = user.displayName;
                 }
             }
+            const accountName = document.getElementById('accountName');
+            const accountEmail = document.getElementById('accountEmail');
+            if (accountName) accountName.textContent = user.displayName || '';
+            if (accountEmail) accountEmail.textContent = user.email || '';
+
             if (syncStatus) syncStatus.classList.remove('hidden');
-            if (teamSelector) teamSelector.classList.remove('hidden');
         } else {
             // User is signed out
             if (signInBtn && isSupabaseConfigured()) {
@@ -310,7 +314,7 @@ class SoccerLineupGenerator {
             }
             if (userMenu) userMenu.classList.add('hidden');
             if (syncStatus) syncStatus.classList.add('hidden');
-            if (teamSelector) teamSelector.classList.add('hidden');
+            this.closeAccountMenu();
         }
     }
 
@@ -349,29 +353,77 @@ class SoccerLineupGenerator {
         }
     }
 
+    /**
+     * Renders the team list inside the account menu.
+     *
+     * Each team is a menuitemradio: the current one is checked, so the menu
+     * both shows which team is active and switches between them.
+     */
     updateTeamSelector() {
-        const select = document.getElementById('currentTeam');
-        if (!select) return;
+        const list = document.getElementById('accountTeamList');
+        if (!list) return;
 
-        select.innerHTML = '';
+        list.textContent = '';
 
         if (this.teams.length === 0) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'No teams';
-            select.appendChild(option);
+            const empty = document.createElement('p');
+            empty.className = 'account-empty';
+            empty.textContent = 'No teams yet';
+            list.appendChild(empty);
             return;
         }
 
         this.teams.forEach(team => {
-            const option = document.createElement('option');
-            option.value = team.id;
-            option.textContent = `${team.name} (${team.role})`;
-            if (team.id === this.currentTeamId) {
-                option.selected = true;
-            }
-            select.appendChild(option);
+            const isCurrent = team.id === this.currentTeamId;
+
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = `account-item account-team${isCurrent ? ' is-current' : ''}`;
+            item.setAttribute('role', 'menuitemradio');
+            item.setAttribute('aria-checked', String(isCurrent));
+            item.dataset.teamId = team.id;
+
+            const check = document.createElement('span');
+            check.className = 'account-team-check';
+            check.setAttribute('aria-hidden', 'true');
+            check.innerHTML = isCurrent ? iconMarkup('icon-sync-synced') : '';
+
+            const name = document.createElement('span');
+            name.className = 'account-team-name';
+            name.textContent = team.name;
+
+            const role = document.createElement('span');
+            role.className = 'account-team-role';
+            role.textContent = team.role;
+
+            item.append(check, name, role);
+            item.addEventListener('click', () => {
+                this.closeAccountMenu();
+                if (!isCurrent) this.switchTeam(team.id);
+            });
+
+            list.appendChild(item);
         });
+    }
+
+    /** Opens or closes the account menu. */
+    toggleAccountMenu(force) {
+        const trigger = document.getElementById('accountTrigger');
+        const panel = document.getElementById('accountPanel');
+        if (!trigger || !panel) return;
+
+        const open = force ?? panel.hasAttribute('hidden');
+        panel.toggleAttribute('hidden', !open);
+        trigger.setAttribute('aria-expanded', String(open));
+
+        if (open) {
+            // Focus the first item so the menu is usable from the keyboard
+            panel.querySelector('.account-item')?.focus();
+        }
+    }
+
+    closeAccountMenu() {
+        this.toggleAccountMenu(false);
     }
 
     async switchTeam(teamId) {
@@ -1525,25 +1577,42 @@ class SoccerLineupGenerator {
         const signOutBtn = document.getElementById('signOutBtn');
         if (signOutBtn) {
             signOutBtn.addEventListener('click', async () => {
+                this.closeAccountMenu();
                 await signOut();
                 this.showNotification('Signed out', 'info');
             });
         }
 
         // Team selector
-        const teamSelect = document.getElementById('currentTeam');
-        if (teamSelect) {
-            teamSelect.addEventListener('change', (e) => {
-                if (e.target.value) {
-                    this.switchTeam(e.target.value);
-                }
+        const accountTrigger = document.getElementById('accountTrigger');
+        if (accountTrigger) {
+            accountTrigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleAccountMenu();
             });
         }
 
-        // Manage teams button
+        // Clicking away or pressing Escape closes the menu, as a menu should
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#userMenu')) this.closeAccountMenu();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const panel = document.getElementById('accountPanel');
+                if (panel && !panel.hasAttribute('hidden')) {
+                    this.closeAccountMenu();
+                    document.getElementById('accountTrigger')?.focus();
+                }
+            }
+        });
+
         const manageTeamsBtn = document.getElementById('manageTeams');
         if (manageTeamsBtn) {
-            manageTeamsBtn.addEventListener('click', () => this.showTeamModal());
+            manageTeamsBtn.addEventListener('click', () => {
+                this.closeAccountMenu();
+                this.showTeamModal();
+            });
         }
 
         // Team modal events
