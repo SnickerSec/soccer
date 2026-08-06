@@ -90,6 +90,12 @@ function balanceSittingByRating(schedule, playersCopy, players, playersOnField) 
                 const copyB = copyByName[nameB];
                 if (!copyA || !copyB) continue;
 
+                // A player already resting in the quarter they would move to
+                // would end up listed there twice, which shrinks that quarter's
+                // real rest group and pushes an unintended player off the field.
+                if (copyA.sittingQuarters.includes(strongest.q)) continue;
+                if (copyB.sittingQuarters.includes(weakest.q)) continue;
+
                 const newSittingA = copyA.sittingQuarters.filter(q => q !== weakest.q).concat(strongest.q);
                 const newSittingB = copyB.sittingQuarters.filter(q => q !== strongest.q).concat(weakest.q);
 

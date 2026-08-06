@@ -37,12 +37,16 @@ function makePlayer(name, options = {}) {
 }
 
 function makeRoster(size, options = {}) {
-    return Array.from({ length: size }, (_, i) => makePlayer(`Player ${i + 1}`, options));
+    return Array.from({ length: size }, (_, i) => makePlayer(`Player ${i + 1}`, {
+        ...options,
+        // Spread of ability, which is what turns on balanceSittingByRating
+        overallRating: options.rated ? 1 + (i % 5) : options.overallRating ?? null
+    }));
 }
 
 /** Runs the real generator for a roster size and formation. */
-function generate(rosterSize, { playersOnField = 7, formation = '2-3-1', players, seasonStats = {} } = {}) {
-    const roster = players ?? makeRoster(rosterSize);
+function generate(rosterSize, { playersOnField = 7, formation = '2-3-1', players, seasonStats = {}, rated = false } = {}) {
+    const roster = players ?? makeRoster(rosterSize, { rated });
     return generateLineup({
         players: roster,
         positions: getPositionsForFormation(playersOnField, formation),
@@ -331,11 +335,11 @@ describe('resting is recorded from who actually played', () => {
      * validateLineup, which then reported a clean sheet over a real violation.
      */
     test.each([
-        [11, 7, '2-2-2'],
-        [12, 7, '2-3-1'],
-        [13, 7, '2-3-1'],
-        [16, 9, '3-3-2']
-    ])('%i players at %iv%i keep the books straight', (size, playersOnField, formation) => {
+        { size: 11, playersOnField: 7, formation: '2-2-2' },
+        { size: 12, playersOnField: 7, formation: '2-3-1' },
+        { size: 13, playersOnField: 7, formation: '2-3-1' },
+        { size: 16, playersOnField: 9, formation: '3-3-2' }
+    ])('$size players, $formation, keep the books straight', ({ size, playersOnField, formation }) => {
         for (let run = 0; run < 25; run++) {
             const result = generate(size, { playersOnField, formation });
 
@@ -385,5 +389,65 @@ describe('limits inherent to the format', () => {
         expect(result.lineup).toHaveLength(QUARTERS);
         expect(result.validation.length).toBeGreaterThan(0);
         result.lineup.forEach(q => expect(Object.keys(q.positions)).toHaveLength(7));
+    });
+});
+
+describe('strength balancing (players with ratings)', () => {
+    /**
+     * Ratings switch on balanceSittingByRating, which swaps who rests between
+     * the strongest and weakest quarters to even the sides out. Nothing
+     * exercised that path before, and it was moving a player into a quarter
+     * they were already resting in -- listing them twice, which shrank that
+     * quarter's real rest group and pushed someone else off the field
+     * unintentionally.
+     */
+    test.each([
+        { size: 10, playersOnField: 7, formation: '2-3-1' },
+        { size: 11, playersOnField: 7, formation: '2-2-2' },
+        { size: 12, playersOnField: 7, formation: '2-3-1' },
+        { size: 16, playersOnField: 9, formation: '3-3-2' }
+    ])('$size players rest exactly once per quarter they sit', ({ size, playersOnField }) => {
+        const sittingPerQuarter = size - playersOnField;
+
+        for (let run = 0; run < 40; run++) {
+            const schedule = determineSittingSchedule(
+                makeRoster(size, { rated: true }), playersOnField, QUARTERS, {}
+            );
+
+            for (let quarter = 1; quarter <= QUARTERS; quarter++) {
+                const resting = schedule[quarter];
+                expect(new Set(resting).size).toBe(resting.length);
+                expect(resting).toHaveLength(sittingPerQuarter);
+            }
+        }
+    });
+
+    test.each([
+        { size: 10, playersOnField: 7, formation: '2-3-1' },
+        { size: 11, playersOnField: 7, formation: '2-2-2' },
+        { size: 12, playersOnField: 7, formation: '2-3-1' },
+        { size: 16, playersOnField: 9, formation: '3-3-2' }
+    ])('$size players, $formation, still satisfy the rotation rules', ({ size, playersOnField, formation }) => {
+        for (let run = 0; run < 15; run++) {
+            const result = generate(size, { playersOnField, formation, rated: true });
+
+            expect(result.validation).toEqual([]);
+
+            for (const [name, entry] of tally(result, playersOnField)) {
+                expect(`${name} sat ${entry.sat.length}`).toBe(`${name} sat ${Math.min(entry.sat.length, 2)}`);
+                expect(`${name}: ${hasConsecutive(entry.sat)}`).toBe(`${name}: false`);
+                expect(`${name} in goal ${entry.keeper}`).toBe(`${name} in goal ${Math.min(entry.keeper, 1)}`);
+            }
+        }
+    });
+
+    test('a roster of equally rated players is left alone', () => {
+        const flat = makeRoster(11).map(p => ({ ...p, overallRating: 3 }));
+        const schedule = determineSittingSchedule(flat, 7, QUARTERS, {});
+
+        for (let quarter = 1; quarter <= QUARTERS; quarter++) {
+            expect(schedule[quarter]).toHaveLength(4);
+            expect(new Set(schedule[quarter]).size).toBe(4);
+        }
     });
 });
