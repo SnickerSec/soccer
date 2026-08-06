@@ -2514,6 +2514,10 @@ button:active {
 
 .sync-icon {
     font-size: 1rem;
+    /* Must not be a plain inline box: transform, and so the spin animation
+       above, does not apply to non-replaced inline elements. */
+    display: inline-flex;
+    align-items: center;
 }
 
 .sync-text {
@@ -2861,7 +2865,18 @@ button:active {
 /* Responsive adjustments for cloud UI */
 @media (max-width: 768px) {
     .sync-status .sync-text {
-        display: none;
+        /* Hidden visually to keep the header compact, but kept in the
+           accessibility tree -- display:none would stop the live region
+           announcing sync failures on phones, which is where coaches use this. */
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
 
     .user-name {

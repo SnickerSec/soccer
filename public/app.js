@@ -3711,5 +3711,8 @@ class SoccerLineupGenerator {
     }
 }
 
-// Initialize the application
+// Initialize the application. Exposed on window so the running app can be
+// inspected from the console and driven from end-to-end tests -- states like
+// cloud sync are otherwise only reachable with real credentials.
 const lineupGenerator = new SoccerLineupGenerator();
+window.lineupGenerator = lineupGenerator;
