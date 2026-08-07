@@ -2574,6 +2574,19 @@ button:active {
     font-size: 0.8rem;
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
+    transition: opacity 400ms ease;
+}
+
+/* "Synced" is a transient confirmation: updateSyncStatusUI() fades it out a few
+   seconds after it lands, then collapses it so it leaves no gap in the header.
+   Any later status change clears both classes and brings it back. */
+.sync-status.faded {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sync-status.faded-out {
+    display: none;
 }
 
 .sync-status.syncing {

@@ -33,6 +33,10 @@ const CONSTANTS = {
     NOTIFICATION_DURATION_MS: 3000,
     NOTIFICATION_FADE_MS: 300,
     WELCOME_MESSAGE_DELAY_MS: 500,
+    // How long "Synced" lingers before it fades, and how long the fade itself
+    // takes (must match the .sync-status transition in styles.css).
+    SYNC_STATUS_FADE_DELAY_MS: 3000,
+    SYNC_STATUS_FADE_MS: 400,
 
     // Undo/Redo
     MAX_UNDO_STACK_SIZE: 20,

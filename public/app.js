@@ -302,7 +302,7 @@ class SoccerLineupGenerator {
             if (accountName) accountName.textContent = user.displayName || '';
             if (accountEmail) accountEmail.textContent = user.email || '';
 
-            if (syncStatus) syncStatus.classList.remove('hidden');
+            if (syncStatus) syncStatus.classList.remove('hidden', 'faded', 'faded-out');
         } else {
             // User is signed out
             if (signInBtn && isSupabaseConfigured()) {
@@ -310,6 +310,7 @@ class SoccerLineupGenerator {
             }
             if (userMenu) userMenu.classList.add('hidden');
             if (syncStatus) syncStatus.classList.add('hidden');
+            this.clearSyncStatusFade();
             this.closeAccountMenu();
         }
     }
@@ -320,6 +321,11 @@ class SoccerLineupGenerator {
 
         const icon = syncStatus.querySelector('.sync-icon');
         const text = syncStatus.querySelector('.sync-text');
+
+        // A new status cancels any pending fade and makes the indicator visible
+        // again, so a "Synced" that faded out earlier reappears on the next sync.
+        this.clearSyncStatusFade();
+        syncStatus.classList.remove('faded', 'faded-out');
 
         // Remove all status classes
         syncStatus.classList.remove('syncing', 'synced', 'error', 'offline');
@@ -334,6 +340,7 @@ class SoccerLineupGenerator {
                 syncStatus.classList.add('synced');
                 if (icon) icon.innerHTML = '<svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-sync-synced"></use></svg>';
                 if (text) text.textContent = 'Synced';
+                this.scheduleSyncStatusFade(syncStatus);
                 break;
             case SYNC_STATUS.ERROR:
                 syncStatus.classList.add('error');
@@ -347,6 +354,27 @@ class SoccerLineupGenerator {
                 if (text) text.textContent = 'Offline';
                 break;
         }
+    }
+
+    /**
+     * Fades the sync indicator out once everything is settled. Only the
+     * "Synced" state does this — syncing, error and offline all describe
+     * something in progress or wrong, so they stay put.
+     */
+    scheduleSyncStatusFade(syncStatus) {
+        this.syncStatusFadeTimer = setTimeout(() => {
+            syncStatus.classList.add('faded');
+            // Collapse it only after the opacity transition has finished, so it
+            // does not disappear mid-fade.
+            this.syncStatusCollapseTimer = setTimeout(() => {
+                syncStatus.classList.add('faded-out');
+            }, CONSTANTS.SYNC_STATUS_FADE_MS);
+        }, CONSTANTS.SYNC_STATUS_FADE_DELAY_MS);
+    }
+
+    clearSyncStatusFade() {
+        clearTimeout(this.syncStatusFadeTimer);
+        clearTimeout(this.syncStatusCollapseTimer);
     }
 
     /**

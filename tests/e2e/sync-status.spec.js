@@ -86,6 +86,37 @@ test.describe('Sync status indicator', () => {
         await expect(page.locator('#syncStatus .sync-text')).toHaveText('Offline');
     });
 
+    test('"Synced" fades away on its own, and comes back on the next sync', async ({ page }) => {
+        await page.goto('/');
+
+        await page.evaluate(() => {
+            document.getElementById('syncStatus').classList.remove('hidden');
+            window.lineupGenerator.updateSyncStatusUI('synced');
+        });
+
+        const indicator = page.locator('#syncStatus');
+        await expect(indicator).toBeVisible();
+        await expect(indicator).toBeHidden({ timeout: 10000 });
+
+        await page.evaluate(() => window.lineupGenerator.updateSyncStatusUI('syncing'));
+        await expect(indicator).toBeVisible();
+    });
+
+    for (const status of ['syncing', 'error', 'offline']) {
+        test(`the ${status} state stays on screen rather than fading`, async ({ page }) => {
+            await page.goto('/');
+
+            await page.evaluate(s => {
+                document.getElementById('syncStatus').classList.remove('hidden');
+                window.lineupGenerator.updateSyncStatusUI(s);
+            }, status);
+
+            // Comfortably past the fade delay the synced state uses
+            await page.waitForTimeout(5000);
+            await expect(page.locator('#syncStatus')).toBeVisible();
+        });
+    }
+
     test('the spinning icon is not an inline box, so the animation applies', async ({ page }) => {
         await page.goto('/');
 
