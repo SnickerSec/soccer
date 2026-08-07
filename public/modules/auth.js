@@ -4,6 +4,7 @@
  */
 
 import { api, clearUserCache, getUser } from './api-client.js';
+import { clearTeamScopedData } from './storage.js';
 
 // Auth state
 let currentUser = null;
@@ -22,6 +23,9 @@ export function signInWithGoogle() {
 export async function signOut() {
     currentUser = null;
     clearUserCache();
+    // The cached roster and season history belong to the account being signed
+    // out of; leaving them would show them to whoever loads the page next.
+    clearTeamScopedData();
 
     try {
         await api.post('/api/auth/logout');

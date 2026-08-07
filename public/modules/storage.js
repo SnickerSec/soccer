@@ -33,6 +33,23 @@ export function safeRemoveFromStorage(key) {
     }
 }
 
+// Keys holding a signed-in user's roster/season data, as opposed to device
+// preferences like theme. Cleared on sign-out and when the last team is
+// deleted, so the next user (or the same user with no teams) doesn't inherit
+// the previous account's players and game history.
+const TEAM_SCOPED_KEYS = [
+    'ayso_players',
+    'ayso_lineup_history',
+    'ayso_settings',
+    'ayso_sync_queue',
+    'ayso_migration_status',
+    'ayso_current_team'
+];
+
+export function clearTeamScopedData() {
+    TEAM_SCOPED_KEYS.forEach(safeRemoveFromStorage);
+}
+
 export function safeParseJSON(jsonString, fallback = null) {
     if (!jsonString) return fallback;
     try {

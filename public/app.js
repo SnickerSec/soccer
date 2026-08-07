@@ -3,7 +3,8 @@ import {
     safeGetFromStorage,
     safeSetToStorage,
     safeRemoveFromStorage,
-    safeParseJSON
+    safeParseJSON,
+    clearTeamScopedData
 } from './modules/storage.js';
 
 import {
@@ -682,11 +683,18 @@ class SoccerLineupGenerator {
 
         const result = await deleteTeam(teamId);
         if (result.success) {
+            const wasCurrent = teamId === this.currentTeamId;
             await this.loadTeams();
-            if (this.teams.length > 0) {
-                await this.switchTeam(this.teams[0].id);
-            } else {
-                this.currentTeamId = null;
+            if (wasCurrent) {
+                if (this.teams.length > 0) {
+                    // switchTeam re-syncs and re-renders from the new team
+                    await this.switchTeam(this.teams[0].id);
+                } else {
+                    // No team left to sync from, so the cached roster and
+                    // season history have nothing behind them any more.
+                    this.currentTeamId = null;
+                    this.clearLocalTeamData();
+                }
             }
             this.showTeamView('list');
             this.renderTeamList();
@@ -918,13 +926,24 @@ class SoccerLineupGenerator {
     // Multi-game tracking
     loadSavedGames() {
         const saved = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY);
-        if (saved) {
-            try {
-                this.savedGames = JSON.parse(saved);
-            } catch (e) {
-                this.savedGames = [];
-            }
+        try {
+            this.savedGames = saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            this.savedGames = [];
         }
+    }
+
+    // Drop the locally cached roster and season history, e.g. once the last
+    // team is gone. Device preferences (theme) are left alone.
+    clearLocalTeamData() {
+        clearTeamScopedData();
+        this.players = [];
+        this.captains = [];
+        this.savedGames = [];
+        this.lineup = [];
+        this.seasonStatsCache = null;
+        this.updatePlayerList();
+        this.renderSeasonStats();
     }
 
     saveCurrentGame(gameName, notes = '', gameDate = null) {
