@@ -70,16 +70,23 @@ const limiter = rateLimit({
     max: 100, // Limit each IP to 100 requests per windowMs
     standardHeaders: true,
     legacyHeaders: false,
-    message: 'Too many requests from this IP, please try again later.'
+    message: 'Too many requests from this IP, please try again later.',
+    // /api has its own budget below. Counting those requests here too meant a
+    // coach hit whichever ceiling was lower first, and the two limits could
+    // not be reasoned about independently.
+    skip: (req) => req.path.startsWith('/api/')
 });
 
 // Apply rate limiting to all routes
 app.use(limiter);
 
-// Stricter rate limiting for API endpoints
+// Rate limiting for API endpoints. A normal session is chatty: page load costs
+// a CSRF token, an auth check, settings, teams, players and games, and every
+// roster or lineup edit pushes again. 50 per 15 minutes locked coaches out
+// mid-game, so this is sized for real use while still stopping a scraper.
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 50, // Limit API calls to 50 per 15 minutes
+    max: 600,
     standardHeaders: true,
     legacyHeaders: false,
     message: 'Too many API requests, please try again later.'

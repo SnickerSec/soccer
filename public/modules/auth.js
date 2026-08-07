@@ -3,7 +3,7 @@
  * Handles Google OAuth sign-in/sign-out via direct server-side flow
  */
 
-import { api, clearUserCache } from './api-client.js';
+import { api, clearUserCache, getUser } from './api-client.js';
 
 // Auth state
 let currentUser = null;
@@ -41,20 +41,18 @@ export async function getCurrentUser() {
         return currentUser;
     }
 
-    try {
-        const result = await api.get('/api/auth/me');
-        if (result.success && result.data) {
-            currentUser = {
-                id: result.data.id,
-                email: result.data.email,
-                displayName: result.data.displayName || result.data.email?.split('@')[0],
-                avatarUrl: result.data.avatarUrl,
-                createdAt: result.data.createdAt
-            };
-            return currentUser;
-        }
-    } catch (e) {
-        // Backend session not available
+    // Goes through the api-client cache rather than hitting /api/auth/me
+    // again: both modules ask on startup, which doubled the auth requests.
+    const user = await getUser();
+    if (user) {
+        currentUser = {
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName || user.email?.split('@')[0],
+            avatarUrl: user.avatarUrl,
+            createdAt: user.createdAt
+        };
+        return currentUser;
     }
 
     return null;

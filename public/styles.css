@@ -1075,33 +1075,35 @@ small {
 }
 
 /* Season Tracker Tab */
+/* Two numbers do not need a full-width banner. They read as compact chips
+   sitting on the page rather than a centred panel with empty sides. */
 .season-summary {
     display: flex;
-    gap: 30px;
-    margin-bottom: 30px;
-    padding: 20px;
-    background: var(--bg-elevated);
-    border-radius: var(--radius-md);
-    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
 }
 
 .summary-stat {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 15px 30px;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
 }
 
 .summary-stat .stat-value {
-    font-size: 2.5rem;
+    font-size: 1.5rem;
     font-weight: 700;
+    line-height: 1.1;
     color: var(--accent-blue);
 }
 
 .summary-stat .stat-label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text-muted);
-    margin-top: 5px;
 }
 
 .season-section {
@@ -2387,15 +2389,11 @@ button:active {
         padding: 8px 10px;
     }
 
-    /* Season summary on mobile */
-    .season-summary {
-        flex-direction: column;
-        gap: 10px;
-    }
-
+    /* Season summary on mobile: the chips wrap on their own, so stacking them
+       full-width just gives the space back. */
     .summary-stat {
-        width: 100%;
-        text-align: center;
+        flex: 1 1 auto;
+        justify-content: center;
     }
 
     /* Season actions on mobile */
@@ -2564,29 +2562,18 @@ button:active {
    CLOUD SYNC STYLES
    ============================================ */
 
-/* Sync Status Indicator */
+/* Sync Status Indicator. Lives inside the account dropdown, so it reads as a
+   row of that menu rather than a badge floating in the header. */
 .sync-status {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
+    gap: 8px;
+    margin: 4px 8px 0;
+    padding: 6px 10px;
     border-radius: var(--radius-sm);
     font-size: 0.8rem;
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
-    transition: opacity 400ms ease;
-}
-
-/* "Synced" is a transient confirmation: updateSyncStatusUI() fades it out a few
-   seconds after it lands, then collapses it so it leaves no gap in the header.
-   Any later status change clears both classes and brings it back. */
-.sync-status.faded {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.sync-status.faded-out {
-    display: none;
 }
 
 .sync-status.syncing {
@@ -2962,21 +2949,9 @@ button:active {
 
 /* Responsive adjustments for cloud UI */
 @media (max-width: 768px) {
-    .sync-status .sync-text {
-        /* Hidden visually to keep the header compact, but kept in the
-           accessibility tree -- display:none would stop the live region
-           announcing sync failures on phones, which is where coaches use this. */
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-    }
-
+    /* The sync label used to be visually hidden here to keep the header
+       compact. It lives in the account dropdown now, which has room for it on
+       any screen. */
     .team-selector select {
         max-width: 100px;
     }

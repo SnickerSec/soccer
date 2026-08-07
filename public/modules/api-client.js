@@ -3,7 +3,11 @@
  * Thin fetch() wrapper replacing the Supabase client
  */
 
-let cachedUser = null;
+// undefined means "not looked up yet"; null means "looked up, signed out".
+// Caching the signed-out answer matters: without it every isAuthenticated()
+// call re-hit /api/auth/me and burned through the API rate limit.
+let cachedUser;
+let pendingUserRequest = null;
 let csrfToken = null;
 
 const STATE_CHANGING_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH'];
@@ -46,6 +50,19 @@ async function request(method, url, body = null) {
     }
 
     const response = await fetch(url, options);
+
+    // Rate-limit and proxy errors come back as plain text, so response.json()
+    // would throw a parse error that says nothing about what happened.
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        return {
+            success: false,
+            status: response.status,
+            error: text || `Request failed with status ${response.status}`
+        };
+    }
+
     return response.json();
 }
 
@@ -78,23 +95,34 @@ export async function getSession() {
  * Get current user from server
  */
 export async function getUser() {
-    if (cachedUser !== undefined && cachedUser !== null) {
+    if (cachedUser !== undefined) {
         return cachedUser;
     }
 
-    try {
-        const result = await api.get('/api/auth/me');
-        if (result.success && result.data) {
-            cachedUser = result.data;
-            await ensureCsrfToken();
-            return cachedUser;
-        }
-    } catch (e) {
-        // Offline or server error
-    }
+    // Callers on startup overlap; share one request rather than firing several.
+    if (pendingUserRequest) return pendingUserRequest;
 
-    cachedUser = null;
-    return null;
+    pendingUserRequest = (async () => {
+        try {
+            const result = await api.get('/api/auth/me');
+            if (result.success && result.data) {
+                cachedUser = result.data;
+                await ensureCsrfToken();
+                return cachedUser;
+            }
+            cachedUser = null;
+        } catch (e) {
+            // Offline or server error. Leave the lookup uncached so a later
+            // call can retry once the connection is back.
+        }
+        return cachedUser ?? null;
+    })();
+
+    try {
+        return await pendingUserRequest;
+    } finally {
+        pendingUserRequest = null;
+    }
 }
 
 /**
@@ -109,5 +137,8 @@ export async function isAuthenticated() {
  * Clear cached user (called on sign-out)
  */
 export function clearUserCache() {
-    cachedUser = null;
+    // undefined, not null: the next call should ask the server again rather
+    // than assume the user is signed out.
+    cachedUser = undefined;
+    pendingUserRequest = null;
 }

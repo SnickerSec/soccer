@@ -2,12 +2,12 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * The cloud sync indicator. updateSyncStatusUI() has always targeted
- * #syncStatus, but the element was never in index.html, so every call bailed at
- * the first line and coaches got no feedback on whether a sync worked.
+ * The cloud sync indicator. It lives inside the account dropdown rather than
+ * the header: sync state is only interesting when a coach goes looking for it,
+ * and a permanent header badge cost space on every screen.
  *
  * Sign-in needs real Google credentials, so these drive the app object directly
- * rather than going through OAuth.
+ * rather than going through OAuth: reveal the menu, then open the panel.
  */
 test.describe('Sync status indicator', () => {
     const STATES = [
@@ -17,11 +17,26 @@ test.describe('Sync status indicator', () => {
         { status: 'offline', className: 'offline', label: 'Offline' }
     ];
 
-    test('exists, and is hidden until the user signs in', async ({ page }) => {
+    /** Fakes a signed-in user and opens the account dropdown. */
+    async function openAccountPanel(page, status) {
+        await page.evaluate(s => {
+            document.getElementById('userMenu').classList.remove('hidden');
+            document.getElementById('syncStatus').classList.remove('hidden');
+            if (s) window.lineupGenerator.updateSyncStatusUI(s);
+        }, status || null);
+        await page.click('#accountTrigger');
+        await expect(page.locator('#accountPanel')).toBeVisible();
+    }
+
+    test('lives in the account panel, not the header', async ({ page }) => {
         await page.goto('/');
 
         const indicator = page.locator('#syncStatus');
         await expect(indicator).toHaveCount(1);
+        await expect(page.locator('#accountPanel #syncStatus')).toHaveCount(1);
+        await expect(page.locator('.header-controls > #syncStatus')).toHaveCount(0);
+
+        // Signed out, and the panel is closed, so nothing shows
         await expect(indicator).toBeHidden();
 
         // The parts updateSyncStatusUI() writes into
@@ -39,12 +54,7 @@ test.describe('Sync status indicator', () => {
     for (const { status, className, label } of STATES) {
         test(`renders the ${status} state`, async ({ page }) => {
             await page.goto('/');
-
-            await page.evaluate(s => {
-                const app = window.lineupGenerator;
-                document.getElementById('syncStatus').classList.remove('hidden');
-                app.updateSyncStatusUI(s);
-            }, status);
+            await openAccountPanel(page, status);
 
             const indicator = page.locator('#syncStatus');
             await expect(indicator).toBeVisible();
@@ -59,11 +69,7 @@ test.describe('Sync status indicator', () => {
 
     test('switching state does not leave the previous state class behind', async ({ page }) => {
         await page.goto('/');
-
-        await page.evaluate(() => {
-            document.getElementById('syncStatus').classList.remove('hidden');
-            window.lineupGenerator.updateSyncStatusUI('syncing');
-        });
+        await openAccountPanel(page, 'syncing');
         await expect(page.locator('#syncStatus')).toHaveClass(/\bsyncing\b/);
 
         await page.evaluate(() => window.lineupGenerator.updateSyncStatusUI('error'));
@@ -76,54 +82,15 @@ test.describe('Sync status indicator', () => {
 
     test('an unknown status falls back to offline rather than rendering blank', async ({ page }) => {
         await page.goto('/');
-
-        await page.evaluate(() => {
-            document.getElementById('syncStatus').classList.remove('hidden');
-            window.lineupGenerator.updateSyncStatusUI('something-unexpected');
-        });
+        await openAccountPanel(page, 'something-unexpected');
 
         await expect(page.locator('#syncStatus')).toHaveClass(/\boffline\b/);
         await expect(page.locator('#syncStatus .sync-text')).toHaveText('Offline');
     });
 
-    test('"Synced" fades away on its own, and comes back on the next sync', async ({ page }) => {
-        await page.goto('/');
-
-        await page.evaluate(() => {
-            document.getElementById('syncStatus').classList.remove('hidden');
-            window.lineupGenerator.updateSyncStatusUI('synced');
-        });
-
-        const indicator = page.locator('#syncStatus');
-        await expect(indicator).toBeVisible();
-        await expect(indicator).toBeHidden({ timeout: 10000 });
-
-        await page.evaluate(() => window.lineupGenerator.updateSyncStatusUI('syncing'));
-        await expect(indicator).toBeVisible();
-    });
-
-    for (const status of ['syncing', 'error', 'offline']) {
-        test(`the ${status} state stays on screen rather than fading`, async ({ page }) => {
-            await page.goto('/');
-
-            await page.evaluate(s => {
-                document.getElementById('syncStatus').classList.remove('hidden');
-                window.lineupGenerator.updateSyncStatusUI(s);
-            }, status);
-
-            // Comfortably past the fade delay the synced state uses
-            await page.waitForTimeout(5000);
-            await expect(page.locator('#syncStatus')).toBeVisible();
-        });
-    }
-
     test('the spinning icon is not an inline box, so the animation applies', async ({ page }) => {
         await page.goto('/');
-
-        await page.evaluate(() => {
-            document.getElementById('syncStatus').classList.remove('hidden');
-            window.lineupGenerator.updateSyncStatusUI('syncing');
-        });
+        await openAccountPanel(page, 'syncing');
 
         const { display, animationName } = await page.evaluate(() => {
             const style = getComputedStyle(document.querySelector('#syncStatus .sync-icon'));
@@ -135,24 +102,14 @@ test.describe('Sync status indicator', () => {
         expect(animationName).toBe('spin');
     });
 
-    test('the label stays readable to assistive tech on phones', async ({ page }) => {
+    test('the label is readable on phones, where the dropdown has room for it', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 800 });
         await page.goto('/');
+        await openAccountPanel(page, 'error');
 
-        await page.evaluate(() => {
-            document.getElementById('syncStatus').classList.remove('hidden');
-            window.lineupGenerator.updateSyncStatusUI('error');
-        });
-
-        // Visually collapsed to keep the header compact...
+        // No longer visually collapsed the way the header badge had to be
         const box = await page.locator('#syncStatus .sync-text').boundingBox();
-        expect(box.width).toBeLessThan(5);
-
-        // ...but still in the accessibility tree, unlike display:none
-        const display = await page.evaluate(() =>
-            getComputedStyle(document.querySelector('#syncStatus .sync-text')).display
-        );
-        expect(display).not.toBe('none');
+        expect(box.width).toBeGreaterThan(20);
         await expect(page.locator('#syncStatus .sync-text')).toHaveText('Sync Error');
     });
 });

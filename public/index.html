@@ -44,13 +44,6 @@
                 </nav>
 
                 <div class="header-controls">
-                    <!-- Cloud sync status. Shown once signed in by updateAuthUI();
-                         state and label are set by updateSyncStatusUI(). -->
-                    <div id="syncStatus" class="sync-status hidden" role="status" aria-live="polite">
-                        <span class="sync-icon" aria-hidden="true"></span>
-                        <span class="sync-text"></span>
-                    </div>
-
                     <!-- App Controls -->
                     <div class="app-controls">
                         <button id="undoBtn" class="btn-icon" title="Undo last change (Ctrl+Z)" aria-label="Undo last change" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-undo"></use></svg></button>
@@ -76,6 +69,14 @@
                                 <div class="account-identity">
                                     <span id="accountName" class="account-identity-name"></span>
                                     <span id="accountEmail" class="account-identity-email"></span>
+                                </div>
+
+                                <!-- Cloud sync status. Shown once signed in by
+                                     updateAuthUI(); state and label are set by
+                                     updateSyncStatusUI(). -->
+                                <div id="syncStatus" class="sync-status hidden" role="status" aria-live="polite">
+                                    <span class="sync-icon" aria-hidden="true"></span>
+                                    <span class="sync-text"></span>
                                 </div>
 
                                 <div class="account-separator" role="separator"></div>
