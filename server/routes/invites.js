@@ -48,12 +48,19 @@ router.post('/api/invites/:token/accept', requireAuth, async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // Find and validate invite
+        // Find and validate invite.
+        //
+        // FOR UPDATE holds the row for the rest of the transaction. An invite
+        // link is single-use — joined_at IS NULL is what spends it — so two
+        // people opening the same link at once would otherwise both see it
+        // unclaimed and both run the UPDATE below. The second overwrites
+        // user_id, leaving the first with a success response and no membership.
         const inviteResult = await client.query(
             `SELECT id, team_id FROM team_members
              WHERE invite_token = $1
                AND invite_expires_at > NOW()
-               AND joined_at IS NULL`,
+               AND joined_at IS NULL
+             FOR UPDATE`,
             [req.params.token]
         );
 
@@ -89,7 +96,14 @@ router.post('/api/invites/:token/accept', requireAuth, async (req, res) => {
         await client.query('COMMIT');
         res.json({ success: true, data: { teamId } });
     } catch (error) {
-        await client.query('ROLLBACK');
+        // A failed BEGIN would make ROLLBACK throw as well, and that would
+        // escape the handler and leave the request hanging. Same guard as the
+        // roster replace in players.js.
+        try {
+            await client.query('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('Rollback failed after accept invite error:', rollbackError);
+        }
         console.error('Accept invite error:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
     } finally {

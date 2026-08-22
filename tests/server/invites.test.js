@@ -172,6 +172,41 @@ describe('POST /api/invites/:token/accept', () => {
         expect(client.released.count).toBe(1);
     });
 
+    test('still answers when the rollback itself fails', async () => {
+        // A dropped connection makes BEGIN and ROLLBACK fail alike. Without the
+        // guard the rollback error escapes the handler and the request hangs.
+        const client = stubClient([
+            new Error('connection terminated'),   // BEGIN
+            new Error('connection terminated'),   // ROLLBACK
+        ]);
+
+        const res = await request(buildApp(inviteRoutes, ALICE)).post('/api/invites/tok/accept');
+
+        expect(res.status).toBe(500);
+        expect(client.released.count).toBe(1);
+    });
+
+    test('locks the invite row it is about to spend', async () => {
+        const seen = [];
+        connect.mockResolvedValue({
+            query: async (sql) => {
+                seen.push(String(sql));
+                if (String(sql).includes('SELECT id, team_id')) {
+                    return rows({ id: 'member-1', team_id: 'team-1' });
+                }
+                return rows();
+            },
+            release: () => {}
+        });
+
+        await request(buildApp(inviteRoutes, ALICE)).post('/api/invites/tok/accept');
+
+        // Whether the lock actually serialises two accepts is not something a
+        // mocked client can show; that is tests/integration/invites.test.js.
+        const find = seen.find(sql => sql.includes('SELECT id, team_id'));
+        expect(find).toMatch(/FOR UPDATE/);
+    });
+
     test('binds the accepting user from the session, not the request body', async () => {
         const bound = [];
         connect.mockResolvedValue({
