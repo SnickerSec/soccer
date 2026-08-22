@@ -1,7 +1,7 @@
 /**
  * Three-way merge for a roster, used when a save is rejected as stale.
  *
- * Two coaches can hold the same team (db/schema.sql grants 'coach' and above
+ * Two coaches can hold the same team (team_members.role grants 'coach' and above
  * write access), and a roster write replaces the whole list. Without a merge,
  * the second save silently discards the first's work — which is what the
  * server's 409 now prevents and this decides what to do about.

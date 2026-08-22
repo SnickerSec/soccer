@@ -12,12 +12,12 @@
  * one is skipped, so `npm test` still works with no database installed.
  *
  *   createdb soccer_test
- *   TEST_DATABASE_URL=postgres://localhost/soccer_test npm test
+ *   TEST_DATABASE_URL=postgres://localhost/soccer_test npm run test:db
  */
 
-import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { runner as migrate } from 'node-pg-migrate';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.join(__dirname, '..', '..', '..');
@@ -62,18 +62,33 @@ export const teamRoutes = hasDb ? (await import('../../../server/routes/teams.js
 export const inviteRoutes = hasDb ? (await import('../../../server/routes/invites.js')).default : null;
 
 /**
- * Applies db/schema.sql — the same file db/init.js runs in production.
+ * Brings the test database up to date by running the migrations — the same
+ * ones Railway's preDeployCommand runs against production.
  *
- * The schema is written to be safe to re-run, so this doubles as a check that
- * it stays that way: every suite applies it to a database a previous suite has
- * already set up.
+ * Running the real migrations rather than a schema dump is the point: a
+ * migration that works on the author's machine but not on a database built by
+ * its predecessors would otherwise reach production unexercised. Every suite
+ * calls this against a database a previous suite has already migrated, so
+ * re-running is covered too.
  */
 export async function applySchema() {
-    const schema = readFileSync(path.join(projectRoot, 'db', 'schema.sql'), 'utf-8');
-    await pool.query(schema);
+    await migrate({
+        dbClient: pool,
+        dir: path.join(projectRoot, 'migrations'),
+        direction: 'up',
+        migrationsTable: 'pgmigrations',
+        // The suites are noisy enough; failures still throw
+        log: () => {}
+    });
 }
 
-/** Empties every table so each test starts from a known state. */
+/**
+ * Empties every table so each test starts from a known state.
+ *
+ * Named explicitly rather than truncating everything: pgmigrations is the
+ * ledger of which migrations have run, and clearing it would make the next
+ * applySchema() replay them against a database that already has the schema.
+ */
 export async function truncateAll() {
     await pool.query(`
         TRUNCATE players, games, team_members, teams, user_settings, profiles

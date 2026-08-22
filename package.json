@@ -7,6 +7,9 @@
   "scripts": {
     "start": "node server.js",
     "postinstall": "node scripts/copy-vendor.js",
+    "migrate": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
+    "migrate:create": "node-pg-migrate create --migration-file-language sql --migration-filename-format utc",
     "build:icons": "node scripts/build-icons.js",
     "build:pwa-icons": "node scripts/build-pwa-icons.js",
     "build:assets": "npm run build:icons && npm run build:pwa-icons",
@@ -29,6 +32,7 @@
     "express": "^4.22.1",
     "express-rate-limit": "^8.3.1",
     "express-session": "^1.19.0",
+    "node-pg-migrate": "^9.0.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pdf-lib": "^1.17.1",

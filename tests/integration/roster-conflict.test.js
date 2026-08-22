@@ -1,8 +1,8 @@
 /**
  * Roster concurrency against a real PostgreSQL server.
  *
- * A team can have several coaches (db/schema.sql grants 'coach' and above write
- * access) and a roster write replaces the whole list, so without a version
+ * A team can have several coaches (team_members.role grants 'coach' and above
+ * write access) and a roster write replaces the whole list, so without a version
  * check the second save silently discards the first. The version is a column
  * and the check is a SELECT ... FOR UPDATE, neither of which a mocked pool can
  * prove anything about: the mock will happily agree that a row was locked.

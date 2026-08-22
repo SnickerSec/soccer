@@ -12,11 +12,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Run e2e tests**: `npm run test:e2e` (Playwright; starts the server itself)
 - **Run all tests**: `npm run test:all`
 - **Rebuild generated assets**: `npm run build:assets` (icon sprite + PWA icons)
+- **Apply pending migrations**: `npm run migrate` (needs `DATABASE_URL`)
+- **Start a new migration**: `npm run migrate:create -- <name>`
+
+### Database migrations
+
+`migrations/` holds SQL migrations run by node-pg-migrate, which records what
+it has applied in a `pgmigrations` table. Railway runs `npm run migrate` as its
+`preDeployCommand`, so a schema change ships with the code that needs it rather
+than waiting for someone to remember.
+
+`npm run migrate:create -- add_something` writes a timestamped stub with `-- Up
+Migration` and `-- Down Migration` sections. Write the change, not the whole
+schema — each migration runs exactly once, so guards like `IF NOT EXISTS` are
+only needed in the baseline.
+
+The baseline, `20260822000000_baseline.sql`, is the schema as it stood when
+migrations were introduced. Every statement in it is guarded, because it had to
+be a no-op against a production database that already had all of it. It is
+deliberately not reversible: reverting would drop every table.
+
+The integration suite runs the same migrations rather than a schema dump, so a
+migration that only works on a fresh database fails in CI rather than on deploy.
 
 The tests under `tests/server/` mock the connection pool, which proves the
 routes build the right SQL but not that PostgreSQL accepts it. The suite under
 `tests/integration/` executes the statements for real, and is what catches a
-column `db/schema.sql` never gained, a constraint violation surfacing as a 500,
+column the migrations never added, a constraint violation surfacing as a 500,
 or a transaction that half-applies. It is opt-in:
 
 ```
@@ -73,6 +95,7 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
 │   ├── server/             # Route tests with a mocked pool
 │   ├── integration/        # Route and schema tests against a real PostgreSQL
 │   └── e2e/                # Playwright browser tests
+├── migrations/         # SQL migrations (node-pg-migrate), applied on deploy
 ├── docs/               # Documentation (security, privacy)
 ├── test-data/          # Sample player roster files
 ├── package.json        # Dependencies and scripts

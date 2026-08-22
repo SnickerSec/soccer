@@ -18,7 +18,7 @@ jobs:
 
     # The integration suite runs the real routes against this, so the SQL is
     # executed rather than asserted against a mock. It is the only thing that
-    # would have caught db/schema.sql drifting behind the columns the routes
+    # would have caught the schema drifting behind the columns the routes
     # write.
     services:
       postgres:

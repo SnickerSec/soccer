@@ -1,3 +1,13 @@
+-- Baseline: the schema as it stood when migrations were introduced.
+--
+-- Every statement is guarded (IF NOT EXISTS / OR REPLACE / DROP ... IF EXISTS),
+-- because this has to be a no-op against the production database, which already
+-- has all of it. On an empty database it builds the lot.
+--
+-- Later migrations are ordinary: write the change, not the whole schema.
+
+-- Up Migration
+
 -- AYSO Roster Pro - PostgreSQL Schema (Railway)
 -- Adapted from Supabase schema: no RLS, no auth.users references
 
@@ -109,9 +119,10 @@ CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
 -- ============================================
 --
 -- CREATE TABLE IF NOT EXISTS skips a table that already exists, columns and
--- all, so a database created before a column was added never gains it. Adding
--- each later column here too keeps db/init.js safe to re-run against an
--- existing database as well as a fresh one.
+-- all, so a database created before a column was added never gains it. These
+-- repeat the later columns so the baseline lands on an existing database as
+-- well as a fresh one. Migrations after this one need no such guard: each runs
+-- exactly once.
 
 -- Player ratings: overall_rating is a 1-5 skill level, positional_ratings holds
 -- per-position (keeper/defense/midfield/offense) 1-5 scores.
@@ -195,3 +206,14 @@ DROP TRIGGER IF EXISTS on_team_created ON teams;
 CREATE TRIGGER on_team_created
     AFTER INSERT ON teams
     FOR EACH ROW EXECUTE FUNCTION handle_new_team();
+
+-- Down Migration
+
+-- Reverting the baseline would mean dropping every table in the database,
+-- including the production one this migration was written to no-op against.
+-- Refusing is the only safe answer; tear down a scratch database by dropping
+-- the database itself.
+DO $$
+BEGIN
+    RAISE EXCEPTION 'The baseline migration is not reversible. Drop the database instead.';
+END $$;

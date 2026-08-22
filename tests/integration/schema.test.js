@@ -1,22 +1,35 @@
 /**
- * db/schema.sql against a real PostgreSQL server.
+ * The migrations against a real PostgreSQL server.
  *
  * This file exists because of a specific failure: the schema never gained the
  * player ratings columns the players route writes, so initializing a fresh
  * database produced an app that 500'd on every roster save. Nothing caught it,
  * because every other test mocks the pool and a mock accepts any column name.
+ *
+ * The guard is the same either way — build the database the way a deployment
+ * does, then check it has the columns the routes name.
  */
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 
+import { readdirSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
+import os from 'os';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { runner as migrate } from 'node-pg-migrate';
+
 import { hasDb, pool, applySchema } from './helpers/db.js';
+
+const migrationsDir = path.join(
+    path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'migrations'
+);
 
 const describeDb = hasDb ? describe : describe.skip;
 
 /** The columns each route reads or writes by name. */
 const REQUIRED_COLUMNS = {
     profiles: ['id', 'google_id', 'email', 'display_name', 'avatar_url'],
-    teams: ['id', 'name', 'age_division', 'created_by', 'created_at'],
+    teams: ['id', 'name', 'age_division', 'created_by', 'created_at', 'roster_version'],
     team_members: ['id', 'team_id', 'user_id', 'role', 'invited_by', 'joined_at',
         'invite_token', 'invite_expires_at'],
     players: ['id', 'team_id', 'name', 'number', 'is_captain', 'must_rest', 'no_keeper',
@@ -36,7 +49,7 @@ async function columnsOf(table) {
     return rows.map(r => r.column_name);
 }
 
-describeDb('db/schema.sql', () => {
+describeDb('migrations', () => {
     beforeAll(async () => {
         await applySchema();
     });
@@ -53,32 +66,64 @@ describeDb('db/schema.sql', () => {
         }
     );
 
-    test('is safe to apply twice', async () => {
-        // db/init.js is the only way schema changes reach a deployment, so it
-        // has to be re-runnable — CREATE TABLE IF NOT EXISTS alone is not
-        // enough, since it skips an existing table columns and all.
+    test('running again is a no-op', async () => {
+        // Every deploy runs `npm run migrate`, so the common case by far is a
+        // database that is already up to date.
         await expect(applySchema()).resolves.not.toThrow();
     });
 
-    test('adds a column to a database that predates it', async () => {
-        // Exactly the drift that shipped: a database created before the ratings
-        // feature would never gain those columns, however often init.js ran.
-        await pool.query(`
-            ALTER TABLE players
-                DROP CONSTRAINT IF EXISTS players_overall_rating_range,
-                DROP COLUMN IF EXISTS overall_rating,
-                DROP COLUMN IF EXISTS positional_ratings
-        `);
-        expect(await columnsOf('players')).not.toContain('overall_rating');
+    test('every migration on disk has actually been applied', async () => {
+        const onDisk = readdirSync(migrationsDir)
+            .filter(file => file.endsWith('.sql'))
+            .map(file => file.replace(/\.sql$/, ''))
+            .sort();
 
-        await applySchema();
+        const { rows } = await pool.query('SELECT name FROM pgmigrations ORDER BY name');
+        const applied = rows.map(r => r.name).sort();
 
-        const columns = await columnsOf('players');
-        expect(columns).toContain('overall_rating');
-        expect(columns).toContain('positional_ratings');
+        // A migration that is committed but never runs is the drift this whole
+        // file exists to catch, in its new form: the schema the routes were
+        // written against and the schema they get would silently diverge.
+        expect(applied).toEqual(onDisk);
     });
 
-    test('re-adding a column does not duplicate its constraint', async () => {
+    test('a migration added later lands on an existing database', async () => {
+        // The point of the whole arrangement: a schema change committed today
+        // reaches a database built months ago, without anyone running SQL by
+        // hand. Run from a scratch directory and ledger so the real ones are
+        // untouched.
+        const dir = mkdtempSync(path.join(os.tmpdir(), 'migration-test-'));
+        try {
+            writeFileSync(path.join(dir, '20260901000000_add_probe.sql'), [
+                '-- Up Migration',
+                'ALTER TABLE teams ADD COLUMN probe_column TEXT;',
+                '-- Down Migration',
+                'ALTER TABLE teams DROP COLUMN probe_column;'
+            ].join('\n'));
+
+            expect(await columnsOf('teams')).not.toContain('probe_column');
+
+            await migrate({
+                dbClient: pool, dir, direction: 'up',
+                migrationsTable: 'pgmigrations_probe', log: () => {}
+            });
+
+            expect(await columnsOf('teams')).toContain('probe_column');
+
+            // And back out again, so the suite leaves the schema as it found it
+            await migrate({
+                dbClient: pool, dir, direction: 'down', count: 1,
+                migrationsTable: 'pgmigrations_probe', log: () => {}
+            });
+
+            expect(await columnsOf('teams')).not.toContain('probe_column');
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+            await pool.query('DROP TABLE IF EXISTS pgmigrations_probe');
+        }
+    });
+
+    test('the ratings constraint exists exactly once', async () => {
         const { rows } = await pool.query(
             `SELECT count(*)::int AS c FROM pg_constraint WHERE conname = 'players_overall_rating_range'`
         );
