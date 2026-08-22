@@ -1,5 +1,5 @@
 // Service Worker for AYSO Roster Pro - Offline Support
-const CACHE_NAME = 'ayso-roster-pro-v27';
+const CACHE_NAME = 'ayso-roster-pro-v28';
 
 // App shell: fetched on install so a first-time visitor who later goes offline
 // still gets a working app. Keep this in sync with the modules in public/modules/.
@@ -29,6 +29,7 @@ const ASSETS_TO_CACHE = [
     '/modules/lineup-render.js',
     '/modules/notifications.js',
     '/modules/roster-merge.js',
+    '/modules/share-link.js',
     '/modules/season-render.js',
     '/modules/season-stats.js',
     '/modules/storage.js',

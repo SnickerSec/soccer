@@ -71,6 +71,7 @@ import {
     updateLoadingProgress,
     hideLoading
 } from './modules/notifications.js';
+import { decodeShareData, buildShareUrl } from './modules/share-link.js';
 import {
     buildRecommendationsHtml,
     buildGameHistoryHtml,
@@ -788,8 +789,8 @@ class SoccerLineupGenerator {
 
         if (sharedData) {
             try {
-                const decoded = JSON.parse(atob(sharedData));
-                if (decoded.players && decoded.lineup) {
+                const decoded = decodeShareData(sharedData);
+                if (decoded?.players && decoded.lineup) {
                     this.saveStateForUndo();
                     this.players = decoded.players;
                     this.lineup = decoded.lineup;
@@ -831,9 +832,7 @@ class SoccerLineupGenerator {
             }
         };
 
-        const encoded = btoa(JSON.stringify(shareData));
-        const url = `${window.location.origin}${window.location.pathname}?lineup=${encoded}`;
-        return url;
+        return buildShareUrl(shareData, window.location);
     }
 
     // Share lineup
