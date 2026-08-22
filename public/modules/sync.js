@@ -6,8 +6,8 @@
 import { isSupabaseConfigured, isAuthenticated } from './api-client.js';
 import { getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
 import {
-    getTeams, createTeam, getPlayers, bulkUpsertPlayers,
-    getGames, saveGame, bulkImportGames, deleteAllPlayers
+    getTeams, createTeam, getPlayers, replaceRoster,
+    getGames, saveGame, bulkImportGames
 } from './cloud-storage.js';
 import { safeGetFromStorage, safeSetToStorage, safeParseJSON } from './storage.js';
 
@@ -193,9 +193,9 @@ export async function pushPlayers(players) {
     updateStatus(SYNC_STATUS.SYNCING);
 
     try {
-        // Delete existing and insert new (full sync for simplicity)
-        await deleteAllPlayers(currentTeamId);
-        const result = await bulkUpsertPlayers(currentTeamId, players);
+        // One atomic replace. Doing this as a delete followed by an upload left
+        // the roster empty if the second request never landed.
+        const result = await replaceRoster(currentTeamId, players);
 
         if (!result.success) {
             updateStatus(SYNC_STATUS.ERROR);
@@ -294,7 +294,7 @@ export async function processQueue() {
     for (const item of queue) {
         try {
             if (item.entityType === 'players' && item.action === 'bulk_update') {
-                const result = await bulkUpsertPlayers(currentTeamId, item.data);
+                const result = await replaceRoster(currentTeamId, item.data);
                 if (result.success) {
                     processed++;
                 } else {
@@ -359,7 +359,7 @@ async function migrateLocalDataToCloud() {
 
         // Migrate players
         if (localPlayers.length > 0) {
-            await bulkUpsertPlayers(currentTeamId, localPlayers);
+            await replaceRoster(currentTeamId, localPlayers);
         }
 
         // Migrate games

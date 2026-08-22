@@ -72,26 +72,14 @@ export async function getPlayers(teamId) {
 }
 
 /**
- * Add or update a player (single upsert via bulk endpoint)
+ * Replace a team's roster with exactly this list, atomically.
+ *
+ * Prefer this over deleting and then re-uploading: the server does both in one
+ * transaction, so an interrupted sync cannot leave the team with no players.
  */
-export async function upsertPlayer(teamId, player) {
+export async function replaceRoster(teamId, players) {
     try {
-        const result = await api.post(`/api/teams/${teamId}/players`, { players: [player] });
-        if (result.success && result.data?.length > 0) {
-            return { success: true, data: result.data[0] };
-        }
-        return result;
-    } catch (error) {
-        return { success: false, error: error.message };
-    }
-}
-
-/**
- * Bulk upsert players
- */
-export async function bulkUpsertPlayers(teamId, players) {
-    try {
-        return await api.post(`/api/teams/${teamId}/players`, { players });
+        return await api.put(`/api/teams/${teamId}/players`, { players });
     } catch (error) {
         return { success: false, error: error.message };
     }
@@ -103,17 +91,6 @@ export async function bulkUpsertPlayers(teamId, players) {
 export async function deletePlayer(playerId) {
     try {
         return await api.delete(`/api/players/${playerId}`);
-    } catch (error) {
-        return { success: false, error: error.message };
-    }
-}
-
-/**
- * Delete all players for a team
- */
-export async function deleteAllPlayers(teamId) {
-    try {
-        return await api.delete(`/api/teams/${teamId}/players`);
     } catch (error) {
         return { success: false, error: error.message };
     }

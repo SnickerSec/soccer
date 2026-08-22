@@ -303,6 +303,24 @@ describe('POST /api/teams/:teamId/players validation', () => {
         expect(query).toHaveBeenCalledTimes(1);
     });
 
+    test('rejects a jersey number outside the 0-99 the column enforces', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: [{ name: 'Ana', number: 999 }] });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/0 to 99/);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    test('accepts a player with no jersey number', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: [{ name: 'Ana' }, { name: 'Bo', number: '' }] });
+
+        expect(res.status).toBe(200);
+    });
+
     test('rejects a rating outside the 1-5 scale the column enforces', async () => {
         memberOfTeamAs('coach');
 
@@ -560,5 +578,126 @@ describe('PUT /api/games/:id validation', () => {
 
         expect(res.status).toBe(400);
         expect(query).toHaveBeenCalledTimes(2);
+    });
+});
+
+/**
+ * PUT /api/teams/:teamId/players — the atomic roster replace.
+ *
+ * This exists because the client used to delete the roster and then upload the
+ * new one as two requests: anything failing in between left the team with no
+ * players. Both statements now share one transaction, so what matters here is
+ * that it commits on success, rolls back on failure, and always releases the
+ * connection.
+ */
+describe('PUT /api/teams/:teamId/players', () => {
+    const put = (body) => request(buildApp(playerRoutes, ALICE))
+        .put('/api/teams/team-1/players').send(body);
+
+    /**
+     * A client answering with `responses` in order, recording its statements.
+     * Every statement consumes one response, BEGIN and COMMIT included.
+     */
+    function stubClient(responses = []) {
+        const statements = [];
+        const released = { count: 0 };
+        let i = 0;
+
+        connect.mockResolvedValue({
+            query: async (sql, params) => {
+                statements.push({ verb: String(sql).trim().split(/\s+/)[0].toUpperCase(), params });
+                const next = responses[i++];
+                if (next instanceof Error) throw next;
+                return next ?? rows();
+            },
+            release: () => { released.count++; }
+        });
+
+        return { statements, released };
+    }
+
+    test('a viewer cannot replace the roster', async () => {
+        memberOfTeamAs('viewer');
+
+        const res = await put({ players: [] });
+
+        expect(res.status).toBe(403);
+        expect(connect).not.toHaveBeenCalled();
+    });
+
+    test('validates before opening a transaction', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await put({ players: [{ number: 3 }] });
+
+        expect(res.status).toBe(400);
+        expect(connect).not.toHaveBeenCalled();
+    });
+
+    test('deletes the departed and upserts the rest, then commits', async () => {
+        memberOfTeamAs('coach');
+        //           BEGIN     DELETE    INSERT
+        const client = stubClient([rows(), rows(), rows({ id: 'p1', name: 'Ana' })]);
+
+        const res = await put({ players: [{ name: 'Ana' }] });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data).toEqual([expect.objectContaining({ id: 'p1', name: 'Ana' })]);
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'DELETE', 'INSERT', 'COMMIT']);
+        // The DELETE keeps exactly the names that were sent
+        expect(client.statements[1].params).toEqual(['team-1', ['Ana']]);
+        expect(client.released.count).toBe(1);
+    });
+
+    test('an empty roster clears the team without an INSERT', async () => {
+        memberOfTeamAs('coach');
+        const client = stubClient();
+
+        const res = await put({ players: [] });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data).toEqual([]);
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'DELETE', 'COMMIT']);
+        // An empty keep-list deletes every player on the team
+        expect(client.statements[1].params).toEqual(['team-1', []]);
+    });
+
+    test('rolls back and releases when the upsert fails', async () => {
+        memberOfTeamAs('coach');
+        //           BEGIN     DELETE    INSERT
+        const client = stubClient([rows(), rows(), new Error('constraint violation')]);
+
+        const res = await put({ players: [{ name: 'Ana' }] });
+
+        expect(res.status).toBe(500);
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'DELETE', 'INSERT', 'ROLLBACK']);
+        expect(client.released.count).toBe(1);
+    });
+
+    test('still answers when the rollback itself fails', async () => {
+        memberOfTeamAs('coach');
+        // Everything the client is asked to do throws, rollback included
+        const client = stubClient([
+            new Error('connection lost'),
+            new Error('connection lost'),
+            new Error('connection lost')
+        ]);
+
+        const res = await put({ players: [{ name: 'Ana' }] });
+
+        // Without the guard around ROLLBACK this request would hang
+        expect(res.status).toBe(500);
+        expect(client.released.count).toBe(1);
+    });
+
+    test('collapses duplicate names the same way the upsert does', async () => {
+        memberOfTeamAs('coach');
+        const client = stubClient([rows(), rows(), rows()]);
+
+        await put({ players: [{ name: 'Ana', number: 1 }, { name: 'Ana', number: 9 }] });
+
+        expect(client.statements[1].params).toEqual(['team-1', ['Ana']]);
+        // One row in the INSERT, carrying the later number
+        expect(client.statements[2].params[2]).toBe(9);
     });
 });
