@@ -92,9 +92,16 @@ const apiLimiter = rateLimit({
 
 app.use(express.json({ limit: '100kb' }));
 
-// Warn if using default session secret
+// A missing SESSION_SECRET in production is a silent compromise: the fallback
+// below is committed to a public repo, so anyone can forge a session cookie and
+// sign in as any coach. Refusing to boot turns that into a loud deploy failure
+// instead of a working-looking site. Development still gets the default.
 if (!process.env.SESSION_SECRET) {
-    console.warn('\x1b[33m⚠  WARNING: SESSION_SECRET is not set. Using insecure default. Set SESSION_SECRET env var in production.\x1b[0m');
+    if (process.env.NODE_ENV === 'production') {
+        console.error('\x1b[31m✖  SESSION_SECRET is not set. Refusing to start in production: the development fallback is public, so session cookies would be forgeable.\x1b[0m');
+        process.exit(1);
+    }
+    console.warn('\x1b[33m⚠  WARNING: SESSION_SECRET is not set. Using the insecure development default.\x1b[0m');
 }
 
 // Session middleware (PostgreSQL-backed via connect-pg-simple)
