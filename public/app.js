@@ -28,13 +28,11 @@ import {
 } from './modules/formations.js';
 
 // Cloud sync imports
-import { isSupabaseConfigured } from './modules/api-client.js';
 import {
     initAuth,
     signInWithGoogle,
     signOut,
-    getCurrentUser,
-    isCloudAvailable
+    getCurrentUser
 } from './modules/auth.js';
 import {
     initSync,
@@ -144,13 +142,6 @@ class SoccerLineupGenerator {
     // ============================================
 
     async initCloud() {
-        // Check if cloud sync is configured
-        if (!isSupabaseConfigured()) {
-            console.log('Cloud sync not configured');
-            this.updateAuthUI(null);
-            return;
-        }
-
         // Show sign in button
         const signInBtn = document.getElementById('signInBtn');
         if (signInBtn) {
@@ -306,9 +297,7 @@ class SoccerLineupGenerator {
             if (syncStatus) syncStatus.classList.remove('hidden');
         } else {
             // User is signed out
-            if (signInBtn && isSupabaseConfigured()) {
-                signInBtn.classList.remove('hidden');
-            }
+            if (signInBtn) signInBtn.classList.remove('hidden');
             if (userMenu) userMenu.classList.add('hidden');
             if (syncStatus) syncStatus.classList.add('hidden');
             this.closeAccountMenu();

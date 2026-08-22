@@ -107,20 +107,6 @@ function notifyListeners(event, user) {
 }
 
 /**
- * Check if cloud sync is available
- */
-export function isCloudAvailable() {
-    return isCloudConfigured();
-}
-
-/**
- * Check if cloud backend is configured (always true with self-hosted)
- */
-export function isCloudConfigured() {
-    return true;
-}
-
-/**
  * Get user settings from database
  */
 export async function getUserSettings() {

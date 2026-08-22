@@ -3,7 +3,7 @@
  * Handles offline-first synchronization between localStorage and the server
  */
 
-import { isSupabaseConfigured, isAuthenticated } from './api-client.js';
+import { isAuthenticated } from './api-client.js';
 import { getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
 import {
     getTeams, createTeam, getPlayers, replaceRoster,
@@ -34,11 +34,6 @@ let syncListeners = [];
 export async function initSync(onStatusChange) {
     if (onStatusChange) {
         syncListeners.push(onStatusChange);
-    }
-
-    if (!isSupabaseConfigured()) {
-        updateStatus(SYNC_STATUS.OFFLINE);
-        return { authenticated: false };
     }
 
     const authenticated = await isAuthenticated();
