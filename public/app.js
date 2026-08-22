@@ -73,6 +73,15 @@ import {
 } from './modules/notifications.js';
 import { decodeShareData, buildShareUrl } from './modules/share-link.js';
 import {
+    downloadTextFile,
+    lineupCsv,
+    lineupClipboardText,
+    lineupText,
+    rosterText,
+    exportFilename,
+    seasonStatsFilename
+} from './modules/export.js';
+import {
     buildRecommendationsHtml,
     buildGameHistoryHtml,
     buildPlayerStatsHtml,
@@ -868,28 +877,7 @@ class SoccerLineupGenerator {
             return;
         }
 
-        let text = `AYSO Lineup - ${this.formation} Formation\n`;
-        text += `${'='.repeat(40)}\n\n`;
-
-        this.lineup.forEach((quarter) => {
-            text += `Quarter ${quarter.quarter}\n`;
-            text += `${'-'.repeat(20)}\n`;
-
-            for (const [position, playerName] of Object.entries(quarter.positions)) {
-                const player = this.players.find(p => p.name === playerName);
-                const number = player?.number ? `#${player.number}` : '';
-                text += `${position}: ${playerName} ${number}\n`;
-            }
-
-            // Add sitting players
-            const sittingPlayers = this.players.filter(p =>
-                p.quartersSitting && p.quartersSitting.includes(quarter.quarter)
-            );
-            if (sittingPlayers.length > 0) {
-                text += `Sitting: ${sittingPlayers.map(p => p.name).join(', ')}\n`;
-            }
-            text += '\n';
-        });
+        const text = lineupClipboardText(this.lineup, this.players, this.formation);
 
         navigator.clipboard.writeText(text).then(() => {
             showNotification('Lineup copied to clipboard!', 'success');
@@ -905,44 +893,11 @@ class SoccerLineupGenerator {
             return;
         }
 
-        // Create CSV header
-        let csv = 'Position,Quarter 1,Quarter 2,Quarter 3,Quarter 4\n';
-
-        // Get all positions
-        const allPositions = [...new Set(this.lineup.flatMap(q => Object.keys(q.positions)))];
-
-        // Add row for each position
-        allPositions.forEach(position => {
-            const row = [position];
-            for (let q = 1; q <= 4; q++) {
-                const quarter = this.lineup.find(l => l.quarter === q);
-                const playerName = quarter?.positions[position] || '';
-                const player = this.players.find(p => p.name === playerName);
-                const display = player?.number ? `${playerName} (#${player.number})` : playerName;
-                row.push(`"${display}"`);
-            }
-            csv += row.join(',') + '\n';
-        });
-
-        // Add sitting row
-        const sittingRow = ['Sitting'];
-        for (let q = 1; q <= 4; q++) {
-            const sitting = this.players
-                .filter(p => p.quartersSitting?.includes(q))
-                .map(p => p.name)
-                .join('; ');
-            sittingRow.push(`"${sitting}"`);
-        }
-        csv += sittingRow.join(',') + '\n';
-
-        // Download
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `lineup_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+        downloadTextFile(
+            exportFilename('lineup', 'csv'),
+            lineupCsv(this.lineup, this.players),
+            'text/csv;charset=utf-8;'
+        );
 
         showNotification('CSV exported successfully', 'success');
     }
@@ -1274,12 +1229,7 @@ class SoccerLineupGenerator {
             return;
         }
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `season-stats-${new Date().toISOString().split('T')[0]}.csv`;
-        link.click();
-        URL.revokeObjectURL(link.href);
+        downloadTextFile(seasonStatsFilename(), csvContent, 'text/csv;charset=utf-8;');
 
         showNotification('Season stats exported to CSV', 'success');
     }
@@ -3131,54 +3081,10 @@ class SoccerLineupGenerator {
     }
 
     exportLineup() {
-        let text = 'AYSO Roster Pro - Game Lineup\n';
-        text += '==============================\n\n';
-        
-        this.lineup.forEach(quarter => {
-            text += `Quarter ${quarter.quarter}\n`;
-            text += '---------\n';
-            
-            this.positions.forEach(position => {
-                const playerName = quarter.positions[position] || 'TBD';
-                const player = this.players.find(p => p.name === playerName);
-                const captainIndicator = player && player.isCaptain ? '⭐ ' : '';
-                const numberStr = player && player.number ? ` #${player.number}` : '';
-                text += `${position}: ${captainIndicator}${playerName}${numberStr}\n`;
-            });
-            
-            const sittingPlayers = this.players.filter(p => p.quartersSitting.includes(quarter.quarter));
-            if (sittingPlayers.length > 0) {
-                const sittingText = sittingPlayers.map(p => {
-                    const captainIndicator = p.isCaptain ? '⭐ ' : '';
-                    const numberStr = p.number ? ` #${p.number}` : '';
-                    return `${captainIndicator}${p.name}${numberStr}`;
-                }).join(', ');
-                text += `Resting: ${sittingText}\n`;
-            }
-            
-            text += '\n';
-        });
-        
-        text += '\nPlayer Summary\n';
-        text += '--------------\n';
-        this.players.forEach(player => {
-            const captainIndicator = player.isCaptain ? '⭐ ' : '';
-            const numberStr = player.number ? ` #${player.number}` : '';
-            text += `${captainIndicator}${player.name}${numberStr}:\n`;
-            text += `  Played: Quarters ${player.quartersPlayed.join(', ') || 'None'}\n`;
-            text += `  Resting: Quarters ${player.quartersSitting.join(', ') || 'None'}\n`;
-            const positions = player.positionsPlayed.map(p => `Q${p.quarter}-${p.position}`).join(', ');
-            text += `  Positions: ${positions || 'None'}\n`;
-            text += `  Captain: ${player.isCaptain ? 'Yes' : 'No'}\n\n`;
-        });
-        
-        // Download file
-        const blob = new Blob([text], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `lineup_${new Date().toISOString().split('T')[0]}.txt`;
-        a.click();
+        downloadTextFile(
+            exportFilename('lineup', 'txt'),
+            lineupText(this.lineup, this.positions, this.players)
+        );
     }
 
     printLineup() {
@@ -3187,32 +3093,14 @@ class SoccerLineupGenerator {
 
     exportPlayers() {
         if (this.players.length === 0) {
-            alert('No players to export');
+            showNotification('No players to export', 'error');
             return;
         }
-        
-        // Create text content in a format compatible with import
-        // Using "Name #Number" format
-        let text = '';
-        this.players.forEach(p => {
-            const numberStr = p.number ? ` #${p.number}` : '';
-            text += `${p.name}${numberStr}\n`;
-        });
-        
-        // Create blob and download
-        const blob = new Blob([text], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `players_${new Date().toISOString().split('T')[0]}.txt`;
-        a.click();
-        
-        // Clean up
-        URL.revokeObjectURL(url);
-        
+
+        downloadTextFile(exportFilename('players', 'txt'), rosterText(this.players));
         showNotification('Players exported successfully. File can be re-imported later.', 'success');
     }
-    
+
     clearAll() {
         if (confirm('Clear all players and lineup? This cannot be undone.')) {
             this.saveStateForUndo();

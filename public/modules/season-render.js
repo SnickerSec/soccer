@@ -7,6 +7,7 @@
  */
 
 import { escapeHtml } from './utils.js';
+import { csvRow } from './export.js';
 
 /**
  * The recommendation sections, in display order. Each `detail` returns the
@@ -236,8 +237,7 @@ export function buildSeasonStatsCsv(stats) {
         ];
     });
 
-    return [
-        CSV_HEADERS.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+    // Through csvRow, which doubles an embedded quote. Wrapping each cell in
+    // quotes and stopping there broke the row for a name like Bob "Bobby" Smith.
+    return [csvRow(CSV_HEADERS), ...rows.map(csvRow)].join('\n');
 }
