@@ -13,10 +13,11 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "test:db": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.integration.config.js",
     "pretest:e2e": "playwright install chromium",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:all": "npm run test && npm run test:e2e"
+    "test:all": "npm run test && npm run test:db && npm run test:e2e"
   },
   "engines": {
     "node": "^20.9.0 || >=22.0.0"
@@ -53,7 +54,8 @@
   "jest": {
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/tests/e2e/"
+      "/tests/e2e/",
+      "/tests/integration/"
     ],
     "transform": {},
     "testEnvironment": "node",

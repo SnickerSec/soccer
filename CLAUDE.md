@@ -8,9 +8,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Run the application locally**: `npm start` (runs on http://localhost:3000)
 - **Install dependencies**: `npm install`
 - **Run unit tests**: `npm test` (Jest; includes the server route tests under `tests/server/`)
+- **Run database tests**: `npm run test:db` (Jest against a real PostgreSQL; skipped without `TEST_DATABASE_URL`)
 - **Run e2e tests**: `npm run test:e2e` (Playwright; starts the server itself)
 - **Run all tests**: `npm run test:all`
 - **Rebuild generated assets**: `npm run build:assets` (icon sprite + PWA icons)
+
+The tests under `tests/server/` mock the connection pool, which proves the
+routes build the right SQL but not that PostgreSQL accepts it. The suite under
+`tests/integration/` executes the statements for real, and is what catches a
+column `db/schema.sql` never gained, a constraint violation surfacing as a 500,
+or a transaction that half-applies. It is opt-in:
+
+```
+createdb soccer_test
+TEST_DATABASE_URL=postgres://localhost/soccer_test npm run test:db
+```
+
+Without `TEST_DATABASE_URL` every test in it reports as skipped, so `npm test`
+and `npm run test:all` still work with no database installed. CI runs it
+against a `postgres:18` service container. The database is truncated between
+tests, so the harness refuses any `TEST_DATABASE_URL` whose database name does
+not contain "test".
 
 `npm run test:e2e` downloads the Chromium build Playwright needs on first run,
 via the `pretest:e2e` hook — roughly 300MB once, then a ~0.5s no-op. Keep
@@ -50,6 +68,9 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
 │   │   └── index.js        # Module exports
 │   └── assets/         # Fonts, PDFs, images
 ├── tests/              # Jest unit tests
+│   ├── server/             # Route tests with a mocked pool
+│   ├── integration/        # Route and schema tests against a real PostgreSQL
+│   └── e2e/                # Playwright browser tests
 ├── docs/               # Documentation (security, privacy)
 ├── test-data/          # Sample player roster files
 ├── package.json        # Dependencies and scripts
