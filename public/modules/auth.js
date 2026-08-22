@@ -11,7 +11,11 @@ let currentUser = null;
 let authListeners = [];
 
 /**
- * Sign in with Google OAuth (redirects to server-side flow)
+ * Sign in with Google OAuth by handing the browser to the server-side flow.
+ *
+ * Returns nothing, and there is nothing to await: the outcome arrives as a
+ * redirect back to the app, not as a value here. Assigning to location does not
+ * stop the script, so a caller that reads a result off this gets undefined.
  */
 export function signInWithGoogle() {
     window.location.href = '/auth/google';

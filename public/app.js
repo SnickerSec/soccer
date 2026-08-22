@@ -500,7 +500,7 @@ class SoccerLineupGenerator {
         // Must be signed in to accept
         if (!this.currentUser) {
             this.showNotification('Please sign in to accept the invitation', 'info');
-            await signInWithGoogle();
+            signInWithGoogle();
             return;
         }
 
@@ -1599,11 +1599,11 @@ class SoccerLineupGenerator {
         // Sign in button
         const signInBtn = document.getElementById('signInBtn');
         if (signInBtn) {
-            signInBtn.addEventListener('click', async () => {
-                const result = await signInWithGoogle();
-                if (!result.success) {
-                    this.showNotification(result.error || 'Sign in failed', 'error');
-                }
+            signInBtn.addEventListener('click', () => {
+                // No result to check: this navigates away, and reading
+                // .success off what it returns threw a TypeError on every
+                // click — invisible only because the page was already leaving.
+                signInWithGoogle();
             });
         }
 
