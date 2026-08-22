@@ -1897,6 +1897,33 @@ small {
     outline-offset: -2px;
 }
 
+/* Picked, waiting for the row to swap with. Solid where a drop target is
+   dashed, so a held selection does not read as a hovered drop target. */
+.draggable-row.swap-selected {
+    background: rgba(52, 152, 219, 0.25);
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: -2px;
+}
+
+.draggable-row:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: -2px;
+}
+
+/* Rows are the touch target for select-to-swap, so give them a finger-sized
+   one; the drag path could get away with whatever height the text needed. */
+@media (pointer: coarse) {
+    .draggable-row td {
+        padding: 11px 8px;
+    }
+}
+
+.lineup-swap-hint {
+    margin: 0 0 12px;
+    font-size: 0.8125rem;
+    color: hsl(var(--muted-foreground));
+}
+
 .draggable-row td {
     padding: 6px 8px;
 }

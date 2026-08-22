@@ -1,12 +1,93 @@
 /**
  * Renders the generated lineup: validation messages and the per-quarter cards.
  *
- * Building the DOM is separated from deciding what a drag means. Rows are made
- * draggable here, but a completed drop is handed back to the caller through
+ * Building the DOM is separated from deciding what a swap means. Rows are made
+ * swappable here, but a completed swap is handed back to the caller through
  * `onSwap` rather than mutating any lineup state directly.
+ *
+ * Two ways to swap, because HTML5 drag-and-drop only covers one of them:
+ *
+ *   - drag a row onto another (mouse)
+ *   - pick a row, then pick its partner (tap, click, or Enter/Space)
+ *
+ * The second exists because dragstart/drop never fire for touch on iOS Safari
+ * or Android Chrome, which made the feature inert on exactly the device this
+ * app is installed on. It doubles as the keyboard path, since a drag has none.
  */
 
 import { createFieldVisualization } from './field-visualization.js';
+
+/**
+ * The row awaiting a partner, or null. Module-level rather than per-grid: only
+ * one selection can be open at a time across the whole lineup, and a swap can
+ * pair rows in different quarters.
+ */
+let pendingSwap = null;
+
+/** Text for the hint line, which doubles as each row's accessible description. */
+const SWAP_HINT_ID = 'lineup-swap-hint';
+const SWAP_HINT_IDLE = 'Drag a player onto another to swap them, or select two players in turn.';
+const SWAP_HINT_ACTIVE = (name) => `${name} selected. Choose who to swap with, or press Escape to cancel.`;
+
+function hintElement() {
+    return document.getElementById(SWAP_HINT_ID);
+}
+
+function setHint(text) {
+    const hint = hintElement();
+    if (hint) hint.textContent = text;
+}
+
+/** Drops the pending selection and clears the marks that show it. */
+function clearPendingSwap() {
+    if (pendingSwap) {
+        pendingSwap.row.classList.remove('swap-selected');
+        pendingSwap.row.setAttribute('aria-selected', 'false');
+    }
+    pendingSwap = null;
+    setHint(SWAP_HINT_IDLE);
+}
+
+/**
+ * Human-readable name for a slot, for the accessible name and the hint.
+ * Resting rows carry their player in the position key, so unpack that.
+ */
+function describeSlot(slot) {
+    const resting = String(slot.position).startsWith('Sitting:');
+    const where = resting ? 'resting' : slot.position;
+    return `${slot.player}, ${where}, quarter ${slot.quarter}`;
+}
+
+/**
+ * Selects a row, or completes the swap if one was already waiting.
+ *
+ * Re-selecting the same row cancels, so a mistaken pick is undone the same way
+ * it was made rather than needing the keyboard.
+ */
+function togglePendingSwap(row, slot, onSwap) {
+    // A regenerate between the two picks leaves the first row detached; treat
+    // that as no selection rather than swapping against a row nobody can see.
+    if (pendingSwap && !document.contains(pendingSwap.row)) {
+        pendingSwap = null;
+    }
+
+    if (!pendingSwap) {
+        pendingSwap = { row, slot };
+        row.classList.add('swap-selected');
+        row.setAttribute('aria-selected', 'true');
+        setHint(SWAP_HINT_ACTIVE(describeSlot(slot)));
+        return;
+    }
+
+    if (pendingSwap.row === row) {
+        clearPendingSwap();
+        return;
+    }
+
+    const from = pendingSwap.slot;
+    clearPendingSwap();
+    onSwap(from.quarter, from.position, slot.quarter, slot.position);
+}
 
 /**
  * Replaces the contents of `container` with the rotation validation result.
@@ -40,16 +121,49 @@ export function renderValidationMessages(container, issues) {
 }
 
 /**
- * Makes a row both a drag source and a drop target.
+ * Makes a row a drag source, a drop target, and a select-to-swap control.
  *
  * `slot` identifies what the row holds — `{ quarter, position, player }`. A
- * drop calls onSwap(fromQuarter, fromPosition, toQuarter, toPosition), where
- * "from" is the row being dragged and "to" is this row.
+ * completed swap calls onSwap(fromQuarter, fromPosition, toQuarter, toPosition),
+ * where "from" is the row picked first and "to" is this row.
  */
 function makeSwappable(row, slot, onSwap) {
     row.draggable = true;
 
+    // Reachable and operable without a pointer, and named so the focus lands
+    // on something announced as a player rather than as "row 3".
+    //
+    // No role override: a <tr> given role="button" stops being a row, which
+    // leaves the table's structure incomplete and can cost a screen reader the
+    // whole lineup. aria-selected is what role="row" already supports for
+    // exactly this "picked, awaiting a partner" state.
+    row.tabIndex = 0;
+    row.setAttribute('aria-label', describeSlot(slot));
+    row.setAttribute('aria-selected', 'false');
+    row.setAttribute('aria-describedby', SWAP_HINT_ID);
+
+    // Fires for taps as well as clicks, which is what gets touch working. A
+    // completed drag does not emit a click, so the two paths do not collide.
+    row.addEventListener('click', () => {
+        togglePendingSwap(row, slot, onSwap);
+    });
+
+    row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            // Space would otherwise scroll the page out from under the lineup
+            e.preventDefault();
+            togglePendingSwap(row, slot, onSwap);
+        } else if (e.key === 'Escape' && pendingSwap) {
+            clearPendingSwap();
+            row.focus();
+        }
+    });
+
     row.addEventListener('dragstart', (e) => {
+        // A drag overrides a half-finished selection rather than combining
+        // with it, so the two ways of swapping cannot interleave into a
+        // pairing the coach did not ask for.
+        clearPendingSwap();
         row.classList.add('dragging');
         e.dataTransfer.setData('text/plain', JSON.stringify(slot));
         e.dataTransfer.effectAllowed = 'move';
@@ -191,7 +305,20 @@ function buildQuarterCard(quarter, { positions, players, onSwap }) {
  * @param options  positions (in display order), players, and onSwap
  */
 export function buildLineupGrid(lineup, options) {
+    // The rows this pointed at are about to be replaced
+    pendingSwap = null;
+
     const fragment = document.createDocumentFragment();
+
+    // Visible as well as announced: select-to-swap leaves no trace on the page
+    // otherwise, and a coach who cannot drag has no way to guess it is there.
+    const hint = document.createElement('p');
+    hint.id = SWAP_HINT_ID;
+    hint.className = 'lineup-swap-hint';
+    hint.textContent = SWAP_HINT_IDLE;
+    hint.setAttribute('role', 'status');
+    fragment.appendChild(hint);
+
     lineup.forEach(quarter => fragment.appendChild(buildQuarterCard(quarter, options)));
     return fragment;
 }
