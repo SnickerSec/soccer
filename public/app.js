@@ -944,7 +944,7 @@ class SoccerLineupGenerator {
 
     // Multi-game tracking
     loadSavedGames() {
-        const saved = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY);
+        const saved = safeGetFromStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY);
         try {
             this.savedGames = saved ? JSON.parse(saved) : [];
         } catch (e) {
@@ -990,7 +990,7 @@ class SoccerLineupGenerator {
         };
 
         this.savedGames.push(game);
-        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.storeOrWarn(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
         this.showNotification(`Game "${game.name}" saved!`, 'success');
 
@@ -1043,7 +1043,7 @@ class SoccerLineupGenerator {
         if (!game) return;
 
         game.notes = notes;
-        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.storeOrWarn(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
         this.showNotification('Notes updated', 'success');
     }
@@ -1229,7 +1229,7 @@ class SoccerLineupGenerator {
         }
 
         this.savedGames = this.savedGames.filter(g => String(g.id) !== String(gameId));
-        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.storeOrWarn(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
 
         // Also delete from cloud if cloud sync is enabled
@@ -1251,7 +1251,7 @@ class SoccerLineupGenerator {
         }
 
         this.savedGames = [];
-        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
+        this.storeOrWarn(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(this.savedGames));
         this.renderSeasonStats();
         this.showNotification('Season history cleared', 'info');
     }
@@ -1307,7 +1307,7 @@ class SoccerLineupGenerator {
 
     // Theme management
     loadTheme() {
-        const savedTheme = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.THEME);
+        const savedTheme = safeGetFromStorage(CONSTANTS.STORAGE_KEYS.THEME);
         if (savedTheme) {
             this.currentTheme = savedTheme;
             document.documentElement.setAttribute('data-theme', savedTheme);
@@ -1317,29 +1317,24 @@ class SoccerLineupGenerator {
     toggleTheme() {
         this.currentTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', this.currentTheme);
-        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.THEME, this.currentTheme);
+        this.storeOrWarn(CONSTANTS.STORAGE_KEYS.THEME, this.currentTheme);
         this.showNotification(`Switched to ${this.currentTheme} theme`, 'info');
     }
 
     // Safe localStorage operations - delegate to module
-    safeGetFromStorage(key) {
-        return safeGetFromStorage(key);
-    }
-
-    safeSetToStorage(key, value) {
+    /**
+     * safeSetToStorage, plus the notification a full quota deserves.
+     *
+     * The only one of these worth wrapping — the rest were pass-throughs that
+     * shadowed the imports they called, which is how a stale copy of
+     * getPositionsForFormation went unnoticed in this file for so long.
+     */
+    storeOrWarn(key, value) {
         const result = safeSetToStorage(key, value);
         if (!result) {
             this.showNotification('Storage quota exceeded. Some data may not be saved.', 'error');
         }
         return result;
-    }
-
-    safeRemoveFromStorage(key) {
-        return safeRemoveFromStorage(key);
-    }
-
-    shuffleArray(array) {
-        return shuffleArray(array);
     }
 
     // Undo/Redo system
@@ -1995,7 +1990,11 @@ class SoccerLineupGenerator {
     }
 
     addPlayer(name, number = null) {
-        const safeName = this.sanitizeHtml(name.trim());
+        // Stored as typed. This used to HTML-escape on the way in, so a coach
+        // named O'Brien was stored — and shown, and synced, and printed — as
+        // "O&#039;Brien". Escaping belongs at the point of rendering, which
+        // every path here already does with textContent or escapeHtml.
+        const safeName = name.trim();
         
         // Validation
         if (!safeName) {
@@ -2064,7 +2063,7 @@ class SoccerLineupGenerator {
         
         // Shuffle the demo names array to ensure randomness
         const shuffledNames = [...demoNames];
-        this.shuffleArray(shuffledNames);
+        shuffleArray(shuffledNames);
         
         // Determine how many players to add based on field size
         let playerCount = 10; // Default for 7v7
@@ -2683,8 +2682,8 @@ class SoccerLineupGenerator {
     
     showWelcomeMessage() {
         // Only show on first visit
-        if (!this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.VISITED)) {
-            this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.VISITED, 'true');
+        if (!safeGetFromStorage(CONSTANTS.STORAGE_KEYS.VISITED)) {
+            this.storeOrWarn(CONSTANTS.STORAGE_KEYS.VISITED, 'true');
             setTimeout(() => {
                 this.showNotification('Welcome to AYSO Roster Pro! Add players to get started.', 'info');
             }, CONSTANTS.WELCOME_MESSAGE_DELAY_MS);
@@ -2852,7 +2851,7 @@ class SoccerLineupGenerator {
             );
 
             // Shuffle within the lowest group for variety
-            this.shuffleArray(lowestCaptainGroup);
+            shuffleArray(lowestCaptainGroup);
 
             // Select captains from lowest group first
             for (let i = 0; i < Math.min(2, lowestCaptainGroup.length); i++) {
@@ -2864,7 +2863,7 @@ class SoccerLineupGenerator {
             // If we need more captains (less than 2 in lowest group), take from next tier
             if (this.captains.length < 2 && sortedPlayers.length > lowestCaptainGroup.length) {
                 const remaining = sortedPlayers.filter(p => !this.captains.includes(p.name));
-                this.shuffleArray(remaining);
+                shuffleArray(remaining);
                 for (let i = 0; i < Math.min(2 - this.captains.length, remaining.length); i++) {
                     const player = remaining[i];
                     player.isCaptain = true;
@@ -3270,15 +3269,15 @@ class SoccerLineupGenerator {
             this.updatePlayerList();
             document.getElementById('lineupDisplay').classList.add('hidden');
             document.getElementById('fileInput').value = '';
-            this.safeRemoveFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS);
-            this.safeRemoveFromStorage(CONSTANTS.STORAGE_KEYS.SETTINGS);
+            safeRemoveFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS);
+            safeRemoveFromStorage(CONSTANTS.STORAGE_KEYS.SETTINGS);
             this.showNotification('All data cleared', 'info');
         }
     }
 
     loadData() {
         // Load players
-        const savedPlayers = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS);
+        const savedPlayers = safeGetFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS);
         if (savedPlayers) {
             try {
                 this.players = JSON.parse(savedPlayers);
@@ -3298,7 +3297,7 @@ class SoccerLineupGenerator {
         }
 
         // Load settings
-        const savedSettings = this.safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SETTINGS);
+        const savedSettings = safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SETTINGS);
         if (savedSettings) {
             try {
                 const settings = JSON.parse(savedSettings);
@@ -3332,7 +3331,7 @@ class SoccerLineupGenerator {
     }
 
     savePlayers() {
-        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.PLAYERS, JSON.stringify(this.players));
+        this.storeOrWarn(CONSTANTS.STORAGE_KEYS.PLAYERS, JSON.stringify(this.players));
 
         // Trigger debounced cloud sync
         if (this.isCloudEnabled) {
@@ -3346,20 +3345,9 @@ class SoccerLineupGenerator {
             playersOnField: this.playersOnField,
             formation: this.formation
         };
-        this.safeSetToStorage(CONSTANTS.STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+        this.storeOrWarn(CONSTANTS.STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     }
 
-    sanitizeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-    }
-    
     showNotification(message, type = 'info') {
         // Remove any existing notification
         const existing = document.querySelector('.notification');
