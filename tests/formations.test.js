@@ -72,6 +72,48 @@ describe('getPositionsForFormation', () => {
     });
 });
 
+/**
+ * The invariant that matters, checked for every formation rather than the
+ * handful spelled out above.
+ *
+ * A 6v6 '3-3' returning the 7v7 array is exactly the drift that shipped: the
+ * generator filled six positions while the UI rendered seven, so every quarter
+ * of every 6v6 lineup carried a "Right Mid — TBD" nobody could ever fill.
+ */
+describe('every formation fields exactly its field size', () => {
+    const fieldSizes = Object.keys(FORMATIONS).map(Number);
+
+    test.each(fieldSizes)('%iv%i', (size) => {
+        for (const formation of getFormationsForFieldSize(size)) {
+            const positions = getPositionsForFormation(size, formation);
+            expect(`${formation}: ${positions.length}`).toBe(`${formation}: ${size}`);
+        }
+    });
+
+    test.each(fieldSizes)('%iv%i has exactly one keeper', (size) => {
+        for (const formation of getFormationsForFieldSize(size)) {
+            const keepers = getPositionsForFormation(size, formation)
+                .filter(position => position === 'Keeper');
+            expect(`${formation}: ${keepers.length}`).toBe(`${formation}: 1`);
+        }
+    });
+
+    test.each(fieldSizes)('%iv%i names no position twice', (size) => {
+        for (const formation of getFormationsForFieldSize(size)) {
+            const positions = getPositionsForFormation(size, formation);
+            // A duplicate name means two players share a slot key, and the
+            // lineup is keyed by position
+            expect(`${formation}: ${new Set(positions).size}`)
+                .toBe(`${formation}: ${positions.length}`);
+        }
+    });
+
+    test.each(fieldSizes)('%iv%i default formation exists', (size) => {
+        const { default: name } = FORMATIONS[size];
+        expect(getFormationsForFieldSize(size)).toContain(name);
+    });
+});
+
 describe('getFormationsForFieldSize', () => {
     test('7v7 should have multiple formations', () => {
         const formations = getFormationsForFieldSize(7);

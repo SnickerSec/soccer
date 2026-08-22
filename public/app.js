@@ -2550,91 +2550,12 @@ class SoccerLineupGenerator {
         this.showNotification(`Updated player number`, 'success');
     }
 
-    getPositionsForFormation(formation) {
-        // For 11v11 (14U-19U)
-        if (this.playersOnField === 11) {
-            switch(formation) {
-                case '4-3-3':
-                    return ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back',
-                            'Left Mid', 'Center Mid', 'Right Mid',
-                            'Left Wing', 'Striker', 'Right Wing'];
-                case '4-4-2':
-                    return ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back',
-                            'Left Mid', 'Left Center Mid', 'Right Center Mid', 'Right Mid',
-                            'Left Striker', 'Right Striker'];
-                case '4-2-3-1':
-                    return ['Keeper', 'Left Back', 'Left Center Back', 'Right Center Back', 'Right Back',
-                            'Left Defensive Mid', 'Right Defensive Mid',
-                            'Left Wing', 'Attacking Mid', 'Right Wing',
-                            'Striker'];
-                case '3-5-2':
-                    return ['Keeper', 'Left Center Back', 'Center Back', 'Right Center Back',
-                            'Left Wing Back', 'Left Mid', 'Center Mid', 'Right Mid', 'Right Wing Back',
-                            'Left Striker', 'Right Striker'];
-                case '5-3-2':
-                    return ['Keeper', 'Left Wing Back', 'Left Center Back', 'Center Back', 'Right Center Back', 'Right Wing Back',
-                            'Left Mid', 'Center Mid', 'Right Mid',
-                            'Left Striker', 'Right Striker'];
-                default:
-                    return this.getPositionsForFormation('4-4-2');
-            }
-        }
-        // For 9v9 (12U standard)
-        else if (this.playersOnField === 9) {
-            switch(formation) {
-                case '3-3-2':
-                    return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 
-                            'Left Mid', 'Center Mid', 'Right Mid', 
-                            'Left Forward', 'Right Forward'];
-                case '3-2-3':
-                    return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 
-                            'Left Mid', 'Right Mid', 
-                            'Left Wing', 'Striker', 'Right Wing'];
-                case '2-3-3':
-                    return ['Keeper', 'Left Back', 'Right Back', 
-                            'Left Mid', 'Center Mid', 'Right Mid', 
-                            'Left Wing', 'Striker', 'Right Wing'];
-                default:
-                    return this.getPositionsForFormation('3-3-2');
-            }
-        }
-        // For 7v7 (10U standard)
-        else if (this.playersOnField === 7 || this.playersOnField === 6) {
-            switch(formation) {
-                case '2-3-1':
-                    if (this.playersOnField === 6) {
-                        return ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'];
-                    }
-                    return ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Center Mid', 'Striker'];
-                case '3-2-1':
-                    if (this.playersOnField === 6) {
-                        return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Striker'];
-                    }
-                    return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'];
-                case '2-2-2':
-                    if (this.playersOnField === 6) {
-                        return ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'];
-                    }
-                    return ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Left Striker', 'Right Striker'];
-                case '3-3':
-                    if (this.playersOnField === 6) {
-                        return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid', 'Right Mid'];
-                    }
-                    return ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid', 'Right Mid'];
-                default:
-                    return this.getPositionsForFormation('2-3-1');
-            }
-        }
-        // For other field sizes, use default formations
-        else if (this.playersOnField === 5) {
-            return ['Keeper', 'Left Back', 'Right Back', 'Midfield', 'Striker'];
-        }
-        // Default fallback to 7v7 2-3-1 formation
-        return ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Center Mid', 'Striker'];
-    }
-    
     updatePositions() {
-        this.positions = this.getPositionsForFormation(this.formation);
+        // Through modules/formations.js, which is also what runLineupWorker
+        // uses. A second copy of this lived here and had drifted: its 6v6 '3-3'
+        // branch returned the 7v7 array, so a 6v6 team was generated with six
+        // positions and rendered with seven — the extra one permanently "TBD".
+        this.positions = getPositionsForFormation(this.playersOnField, this.formation);
     }
     
     updateFieldOptions() {
