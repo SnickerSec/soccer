@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS players (
     status TEXT DEFAULT 'available' CHECK (status IN ('available', 'injured', 'absent')),
     preferred_positions TEXT[] DEFAULT '{}',
     sort_order INTEGER DEFAULT 0,
+    overall_rating INTEGER CONSTRAINT players_overall_rating_range
+        CHECK (overall_rating IS NULL OR (overall_rating >= 1 AND overall_rating <= 5)),
+    positional_ratings JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(team_id, name)
@@ -96,6 +99,30 @@ CREATE TABLE IF NOT EXISTS "session" (
     CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
 );
 CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+
+-- ============================================
+-- SCHEMA UPGRADES
+-- ============================================
+--
+-- CREATE TABLE IF NOT EXISTS skips a table that already exists, columns and
+-- all, so a database created before a column was added never gains it. Adding
+-- each later column here too keeps db/init.js safe to re-run against an
+-- existing database as well as a fresh one.
+
+-- Player ratings: overall_rating is a 1-5 skill level, positional_ratings holds
+-- per-position (keeper/defense/midfield/offense) 1-5 scores.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS overall_rating INTEGER;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS positional_ratings JSONB DEFAULT '{}';
+
+-- ADD CONSTRAINT has no IF NOT EXISTS, so swallow the error when it is already
+-- there (the fresh-install path defines it inline above).
+DO $$
+BEGIN
+    ALTER TABLE players ADD CONSTRAINT players_overall_rating_range
+        CHECK (overall_rating IS NULL OR (overall_rating >= 1 AND overall_rating <= 5));
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ============================================
 -- INDEXES

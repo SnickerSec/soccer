@@ -12,8 +12,9 @@ import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globa
 import request from 'supertest';
 
 const query = jest.fn();
+const connect = jest.fn();
 jest.unstable_mockModule('../../server/db.js', () => ({
-    default: { query, connect: jest.fn() }
+    default: { query, connect }
 }));
 
 const { default: playerRoutes } = await import('../../server/routes/players.js');
@@ -26,8 +27,14 @@ const ALICE = { id: 'user-alice' };
 
 beforeEach(() => {
     query.mockReset();
+    connect.mockReset();
     query.mockResolvedValue(rows());
 });
+
+/** The SQL of the nth call to pool.query, whitespace-collapsed. */
+function sqlOf(callIndex) {
+    return query.mock.calls[callIndex][0].replace(/\s+/g, ' ').trim();
+}
 
 /** Team-scoped routes: the first query is the requireTeamAccess lookup. */
 function memberOfTeamAs(role) {
@@ -250,5 +257,308 @@ describe('DELETE /api/games/:id', () => {
 
         expect(res.status).toBe(200);
         expect(query.mock.calls[2][1]).toEqual(['game-1']);
+    });
+});
+
+/**
+ * The bulk roster write used to open a transaction before validating, and its
+ * two 400 paths returned without rolling back — releasing a connection that was
+ * still idle in a transaction back into the pool. Validation now happens before
+ * any database work, and the write is a single statement, so there is no
+ * transaction left to leak.
+ */
+describe('POST /api/teams/:teamId/players validation', () => {
+    const post = (body) => request(buildApp(playerRoutes, ALICE))
+        .post('/api/teams/team-1/players').send(body);
+
+    test('rejects a non-array payload without touching the database', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: 'nope' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/must be an array/);
+        // Only the requireTeamAccess lookup ran, and no transaction was opened
+        expect(query).toHaveBeenCalledTimes(1);
+        expect(connect).not.toHaveBeenCalled();
+    });
+
+    test('rejects a player with no name without touching the database', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: [{ name: 'Ana' }, { number: 7 }] });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/name is required/);
+        expect(query).toHaveBeenCalledTimes(1);
+        expect(connect).not.toHaveBeenCalled();
+    });
+
+    test('rejects a name over 255 characters', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: [{ name: 'a'.repeat(256) }] });
+
+        expect(res.status).toBe(400);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    test('rejects a rating outside the 1-5 scale the column enforces', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: [{ name: 'Ana', overallRating: 9 }] });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/1 to 5/);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    test('accepts an unrated player', async () => {
+        memberOfTeamAs('coach');
+
+        // 0 is how the UI spells "not rated"; the route stores it as NULL
+        const res = await post({ players: [{ name: 'Ana', overallRating: 0 }] });
+
+        expect(res.status).toBe(200);
+        expect(query.mock.calls[1][1][9]).toBeNull();
+    });
+
+    test('rejects positional ratings that are not an object', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: [{ name: 'Ana', positionalRatings: [1, 2] }] });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/must be an object/);
+    });
+
+    test('caps how many players one request can write', async () => {
+        memberOfTeamAs('coach');
+
+        const players = Array.from({ length: 101 }, (_, i) => ({ name: `Player ${i}` }));
+        const res = await post({ players });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/cannot exceed/);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    test('accepts a roster at the cap', async () => {
+        memberOfTeamAs('coach');
+
+        const players = Array.from({ length: 100 }, (_, i) => ({ name: `Player ${i}` }));
+        const res = await post({ players });
+
+        expect(res.status).toBe(200);
+    });
+
+    test('an empty roster succeeds without a write', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: [] });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data).toEqual([]);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('POST /api/teams/:teamId/players write', () => {
+    const post = (body) => request(buildApp(playerRoutes, ALICE))
+        .post('/api/teams/team-1/players').send(body);
+
+    test('writes the whole roster in one statement', async () => {
+        memberOfTeamAs('coach');
+
+        await post({ players: [{ name: 'Ana' }, { name: 'Bo' }, { name: 'Cy' }] });
+
+        // The access lookup, then exactly one INSERT — not one per player
+        expect(query).toHaveBeenCalledTimes(2);
+        const sql = sqlOf(1);
+        expect(sql).toContain('INSERT INTO players');
+        expect(sql).toContain('ON CONFLICT (team_id, name) DO UPDATE');
+        // team_id is bound once and reused by every row
+        expect(sql).toContain('VALUES ($1, $2,');
+        expect(query.mock.calls[1][1][0]).toBe('team-1');
+    });
+
+    test('numbers sort_order from position when the client omits it', async () => {
+        memberOfTeamAs('coach');
+
+        await post({ players: [{ name: 'Ana' }, { name: 'Bo' }] });
+
+        const values = query.mock.calls[1][1];
+        // [teamId, then 10 params per player]; sort_order is the 8th of each
+        expect(values[8]).toBe(0);
+        expect(values[18]).toBe(1);
+    });
+
+    test('honours an explicit sortOrder', async () => {
+        memberOfTeamAs('coach');
+
+        await post({ players: [{ name: 'Ana', sortOrder: 5 }] });
+
+        expect(query.mock.calls[1][1][8]).toBe(5);
+    });
+
+    test('collapses a repeated name, keeping the last entry', async () => {
+        memberOfTeamAs('coach');
+
+        // ON CONFLICT DO UPDATE cannot hit the same row twice in one statement,
+        // so a duplicate would make Postgres reject the whole write.
+        await post({ players: [{ name: 'Ana', number: 1 }, { name: 'Bo' }, { name: 'Ana', number: 9 }] });
+
+        const values = query.mock.calls[1][1];
+        const names = [values[1], values[11], values[21]];
+        expect(names).toEqual(['Ana', 'Bo', undefined]);
+        // The surviving Ana is the later one...
+        expect(values[2]).toBe(9);
+        // ...and Bo keeps the sort_order its original position implied
+        expect(values[18]).toBe(1);
+    });
+
+    test('returns the roster in the order it was sent', async () => {
+        query.mockReset();
+        query.mockResolvedValueOnce(rows({ role: 'coach' }));
+        // RETURNING gives no order guarantee, so answer out of order on purpose
+        query.mockResolvedValueOnce(rows(
+            { id: 'p2', name: 'Bo' },
+            { id: 'p1', name: 'Ana' }
+        ));
+
+        const res = await post({ players: [{ name: 'Ana' }, { name: 'Bo' }] });
+
+        expect(res.body.data.map(p => p.name)).toEqual(['Ana', 'Bo']);
+    });
+});
+
+describe('POST /api/teams/:teamId/games validation', () => {
+    const post = (body) => request(buildApp(gameRoutes, ALICE))
+        .post('/api/teams/team-1/games').send(body);
+
+    test('rejects a game with no name rather than letting NOT NULL 500', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ notes: 'no name' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/name is required/);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    test('rejects an unparseable date', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ name: 'vs Tigers', date: 'last thursday' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/valid date/);
+    });
+
+    test('accepts the ISO timestamp the client actually sends', async () => {
+        memberOfTeamAs('coach');
+        query.mockResolvedValue(rows({ id: 'game-1', name: 'vs Tigers' }));
+
+        const res = await post({ name: 'vs Tigers', date: '2026-03-14T12:00:00.000Z' });
+
+        expect(res.status).toBe(200);
+    });
+
+    test('rejects captains that are not a list of names', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ name: 'vs Tigers', captains: [{ name: 'Ana' }] });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/captains/);
+    });
+});
+
+describe('POST /api/teams/:teamId/games/bulk validation', () => {
+    const post = (body) => request(buildApp(gameRoutes, ALICE))
+        .post('/api/teams/team-1/games/bulk').send(body);
+
+    test('rejects a non-array payload instead of throwing on iteration', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ games: { name: 'vs Tigers' } });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/must be an array/);
+        expect(connect).not.toHaveBeenCalled();
+    });
+
+    test('rejects a missing payload', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({});
+
+        expect(res.status).toBe(400);
+    });
+
+    test('caps how many games one import can write', async () => {
+        memberOfTeamAs('coach');
+
+        const games = Array.from({ length: 201 }, (_, i) => ({ name: `Game ${i}` }));
+        const res = await post({ games });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/more than 200/);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    test('validates every game, not just the first', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ games: [{ name: 'vs Tigers' }, { notes: 'nameless' }] });
+
+        expect(res.status).toBe(400);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    test('imports in one statement with no transaction to unwind', async () => {
+        memberOfTeamAs('coach');
+
+        await post({ games: [{ name: 'vs Tigers' }, { name: 'vs Bears' }] });
+
+        expect(query).toHaveBeenCalledTimes(2);
+        expect(sqlOf(1)).toContain('INSERT INTO games');
+        expect(connect).not.toHaveBeenCalled();
+        const values = query.mock.calls[1][1];
+        expect(values[1]).toBe('vs Tigers');
+        expect(values[10]).toBe('vs Bears');
+    });
+
+    test('an empty import succeeds without a write', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ games: [] });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data).toEqual([]);
+        expect(query).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('PUT /api/games/:id validation', () => {
+    test('rejects blanking the name', async () => {
+        ownsResourceAs('coach');
+
+        const res = await request(buildApp(gameRoutes, ALICE))
+            .put('/api/games/game-1').send({ name: '   ' });
+
+        expect(res.status).toBe(400);
+        // The lookup and membership check ran; the UPDATE did not
+        expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    test('rejects an unparseable date', async () => {
+        ownsResourceAs('coach');
+
+        const res = await request(buildApp(gameRoutes, ALICE))
+            .put('/api/games/game-1').send({ date: 'soon' });
+
+        expect(res.status).toBe(400);
+        expect(query).toHaveBeenCalledTimes(2);
     });
 });
