@@ -54,6 +54,16 @@ export async function initSync(onStatusChange) {
         await migrateLocalDataToCloud();
     }
 
+    // Drain anything queued while offline BEFORE pulling. sync() overwrites
+    // local storage with the server's copy, so pulling first would replace the
+    // roster the queued edits were made against and strand them.
+    //
+    // This has to happen at startup and not only in the 'online' handler: that
+    // event fires on a transition, so an app reopened on wifi never sees one,
+    // and edits made at the field in an earlier session sat in the queue
+    // forever while the local roster silently reverted.
+    await processQueue();
+
     // Initial sync
     await sync();
 
@@ -280,6 +290,12 @@ export async function processQueue() {
     }
 
     if (!navigator.onLine || !await isAuthenticated()) {
+        return { success: false, processed: 0 };
+    }
+
+    // Every queued action is scoped to a team. With none selected there is
+    // nothing to push to, and draining now would discard the queue.
+    if (!currentTeamId) {
         return { success: false, processed: 0 };
     }
 
