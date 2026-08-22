@@ -589,6 +589,12 @@ describe('PUT /api/games/:id validation', () => {
  * players. Both statements now share one transaction, so what matters here is
  * that it commits on success, rolls back on failure, and always releases the
  * connection.
+ *
+ * The transaction opens with SELECT ... FOR UPDATE on the team, to read and
+ * hold the roster version, and closes by bumping it — so the statement order is
+ * BEGIN, SELECT, DELETE, INSERT, UPDATE, COMMIT. Whether the lock actually
+ * serialises two coaches is not something a mocked client can show; that is
+ * tests/integration/roster-conflict.test.js.
  */
 describe('PUT /api/teams/:teamId/players', () => {
     const put = (body) => request(buildApp(playerRoutes, ALICE))
@@ -616,6 +622,9 @@ describe('PUT /api/teams/:teamId/players', () => {
         return { statements, released };
     }
 
+    /** What the opening SELECT ... FOR UPDATE returns for a live team. */
+    const lockedAt = (version = 3) => rows({ roster_version: version });
+
     test('a viewer cannot replace the roster', async () => {
         memberOfTeamAs('viewer');
 
@@ -636,41 +645,62 @@ describe('PUT /api/teams/:teamId/players', () => {
 
     test('deletes the departed and upserts the rest, then commits', async () => {
         memberOfTeamAs('coach');
-        //           BEGIN     DELETE    INSERT
-        const client = stubClient([rows(), rows(), rows({ id: 'p1', name: 'Ana' })]);
+        //           BEGIN     SELECT       DELETE    INSERT                        UPDATE
+        const client = stubClient([
+            rows(), lockedAt(), rows(), rows({ id: 'p1', name: 'Ana' }), rows({ roster_version: 4 })
+        ]);
 
         const res = await put({ players: [{ name: 'Ana' }] });
 
         expect(res.status).toBe(200);
         expect(res.body.data).toEqual([expect.objectContaining({ id: 'p1', name: 'Ana' })]);
-        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'DELETE', 'INSERT', 'COMMIT']);
+        expect(client.statements.map(s => s.verb))
+            .toEqual(['BEGIN', 'SELECT', 'DELETE', 'INSERT', 'UPDATE', 'COMMIT']);
         // The DELETE keeps exactly the names that were sent
-        expect(client.statements[1].params).toEqual(['team-1', ['Ana']]);
+        expect(client.statements[2].params).toEqual(['team-1', ['Ana']]);
         expect(client.released.count).toBe(1);
+    });
+
+    test('hands back the version the write landed at', async () => {
+        memberOfTeamAs('coach');
+        const client = stubClient([
+            rows(), lockedAt(3), rows(), rows({ id: 'p1', name: 'Ana' }), rows({ roster_version: 4 })
+        ]);
+
+        const res = await put({ players: [{ name: 'Ana' }] });
+
+        // The client sends this back on its next write, so it has to be the
+        // bumped value rather than the one that was read
+        expect(res.body.version).toBe(4);
+        expect(client.statements[4].verb).toBe('UPDATE');
     });
 
     test('an empty roster clears the team without an INSERT', async () => {
         memberOfTeamAs('coach');
-        const client = stubClient();
+        const client = stubClient([rows(), lockedAt(), rows(), rows({ roster_version: 4 })]);
 
         const res = await put({ players: [] });
 
         expect(res.status).toBe(200);
         expect(res.body.data).toEqual([]);
-        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'DELETE', 'COMMIT']);
+        expect(client.statements.map(s => s.verb))
+            .toEqual(['BEGIN', 'SELECT', 'DELETE', 'UPDATE', 'COMMIT']);
         // An empty keep-list deletes every player on the team
-        expect(client.statements[1].params).toEqual(['team-1', []]);
+        expect(client.statements[2].params).toEqual(['team-1', []]);
     });
 
     test('rolls back and releases when the upsert fails', async () => {
         memberOfTeamAs('coach');
-        //           BEGIN     DELETE    INSERT
-        const client = stubClient([rows(), rows(), new Error('constraint violation')]);
+        //           BEGIN     SELECT       DELETE    INSERT
+        const client = stubClient([
+            rows(), lockedAt(), rows(), new Error('constraint violation')
+        ]);
 
         const res = await put({ players: [{ name: 'Ana' }] });
 
         expect(res.status).toBe(500);
-        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'DELETE', 'INSERT', 'ROLLBACK']);
+        expect(client.statements.map(s => s.verb))
+            .toEqual(['BEGIN', 'SELECT', 'DELETE', 'INSERT', 'ROLLBACK']);
         expect(client.released.count).toBe(1);
     });
 
@@ -692,12 +722,63 @@ describe('PUT /api/teams/:teamId/players', () => {
 
     test('collapses duplicate names the same way the upsert does', async () => {
         memberOfTeamAs('coach');
-        const client = stubClient([rows(), rows(), rows()]);
+        const client = stubClient([rows(), lockedAt(), rows(), rows(), rows({ roster_version: 4 })]);
 
         await put({ players: [{ name: 'Ana', number: 1 }, { name: 'Ana', number: 9 }] });
 
-        expect(client.statements[1].params).toEqual(['team-1', ['Ana']]);
+        expect(client.statements[2].params).toEqual(['team-1', ['Ana']]);
         // One row in the INSERT, carrying the later number
-        expect(client.statements[2].params[2]).toBe(9);
+        expect(client.statements[3].params[2]).toBe(9);
+    });
+
+    test('rejects a stale version without touching the roster', async () => {
+        memberOfTeamAs('coach');
+        //           BEGIN     SELECT           SELECT (the roster it lost to)
+        const client = stubClient([rows(), lockedAt(7), rows({ id: 'p1', name: 'Cleo' })]);
+
+        const res = await put({ players: [{ name: 'Ana' }], expectedVersion: 3 });
+
+        expect(res.status).toBe(409);
+        expect(res.body.conflict).toBe(true);
+        expect(res.body.version).toBe(7);
+        expect(res.body.data).toEqual([expect.objectContaining({ name: 'Cleo' })]);
+        // No DELETE, no INSERT, and the transaction is unwound
+        expect(client.statements.map(s => s.verb))
+            .toEqual(['BEGIN', 'SELECT', 'SELECT', 'ROLLBACK']);
+        expect(client.released.count).toBe(1);
+    });
+
+    test('writes when the version matches', async () => {
+        memberOfTeamAs('coach');
+        const client = stubClient([
+            rows(), lockedAt(7), rows(), rows({ id: 'p1', name: 'Ana' }), rows({ roster_version: 8 })
+        ]);
+
+        const res = await put({ players: [{ name: 'Ana' }], expectedVersion: 7 });
+
+        expect(res.status).toBe(200);
+        expect(client.statements.map(s => s.verb))
+            .toEqual(['BEGIN', 'SELECT', 'DELETE', 'INSERT', 'UPDATE', 'COMMIT']);
+    });
+
+    test('a team that vanished mid-request is a 404, not a write', async () => {
+        memberOfTeamAs('coach');
+        //           BEGIN     SELECT finds nothing to lock
+        const client = stubClient([rows(), rows()]);
+
+        const res = await put({ players: [{ name: 'Ana' }], expectedVersion: 1 });
+
+        expect(res.status).toBe(404);
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'SELECT', 'ROLLBACK']);
+        expect(client.released.count).toBe(1);
+    });
+
+    test('a non-integer version is rejected before a transaction opens', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await put({ players: [{ name: 'Ana' }], expectedVersion: '3' });
+
+        expect(res.status).toBe(400);
+        expect(connect).not.toHaveBeenCalled();
     });
 });

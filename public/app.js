@@ -259,9 +259,39 @@ class SoccerLineupGenerator {
         if (!this.isCloudEnabled || !this.currentTeamId) return;
 
         const result = await pushPlayers(this.players);
+
+        // Another coach on this team wrote the roster first. pushPlayers has
+        // already merged and saved, so the roster on screen is out of date —
+        // adopt what actually landed rather than leaving the two diverged.
+        if (result.merged || (result.conflict && result.data)) {
+            this.players = result.data;
+            this.updatePlayerList();
+            this.showNotification(this.describeRosterMerge(result), result.success ? 'info' : 'error');
+            return;
+        }
+
         if (!result.success && !result.queued) {
             console.error('Failed to sync players:', result.error);
         }
+    }
+
+    /**
+     * What to tell the coach after their roster save collided with another's.
+     *
+     * Naming the players matters: "merged" alone gives no way to check whether
+     * the change they just made is the one that survived.
+     */
+    describeRosterMerge(result) {
+        if (!result.success) {
+            return 'Someone else changed the roster while you were saving. Showing theirs — please redo your change.';
+        }
+
+        if (!result.conflicts || result.conflicts.length === 0) {
+            return 'Someone else changed this roster too. Both sets of changes were kept.';
+        }
+
+        const names = result.conflicts.join(', ');
+        return `Someone else changed this roster too. Both sets of changes were kept, except for ${names} — theirs was kept there.`;
     }
 
     async syncGameToCloud(game) {

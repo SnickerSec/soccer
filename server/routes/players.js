@@ -154,15 +154,39 @@ function inSentOrder(rows, sent) {
     return sent.map(p => saved.get(p.name)).filter(Boolean).map(mapPlayer);
 }
 
+/**
+ * The roster's concurrency token. Read alongside the roster so a client can
+ * hand it back on write, and bumped by every write.
+ */
+async function readRosterVersion(client, teamId) {
+    const { rows } = await client.query(
+        'SELECT roster_version FROM teams WHERE id = $1',
+        [teamId]
+    );
+    return rows[0] ? Number(rows[0].roster_version) : null;
+}
+
 // List players for a team
 router.get('/api/teams/:teamId/players', requireTeamAccess('viewer'), async (req, res) => {
     try {
+        const teamId = req.params.teamId;
+
+        // One round trip: the version has to describe the same roster that is
+        // being returned, and two queries could straddle another coach's write.
         const result = await pool.query(
-            `SELECT * FROM players WHERE team_id = $1 ORDER BY sort_order ASC`,
-            [req.params.teamId]
+            `SELECT p.*, t.roster_version
+               FROM teams t
+               LEFT JOIN players p ON p.team_id = t.id
+              WHERE t.id = $1
+              ORDER BY p.sort_order ASC`,
+            [teamId]
         );
 
-        res.json({ success: true, data: result.rows.map(mapPlayer) });
+        // The LEFT JOIN still yields one row for a team with an empty roster
+        const players = result.rows.filter(row => row.id !== null).map(mapPlayer);
+        const version = result.rows[0] ? Number(result.rows[0].roster_version) : null;
+
+        res.json({ success: true, data: players, version });
     } catch (error) {
         console.error('List players error:', error);
         res.status(500).json({ success: false, error: 'Failed to list players' });
@@ -210,11 +234,15 @@ router.post('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req
  * the queue) stayed on the server forever.
  */
 router.put('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req, res) => {
-    const { players } = req.body;
+    const { players, expectedVersion } = req.body;
 
     const invalid = validatePlayers(players);
     if (invalid) {
         return res.status(400).json({ success: false, error: invalid });
+    }
+
+    if (expectedVersion !== undefined && !Number.isInteger(expectedVersion)) {
+        return res.status(400).json({ success: false, error: 'expectedVersion must be an integer' });
     }
 
     const teamId = req.params.teamId;
@@ -224,6 +252,47 @@ router.put('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req,
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        // FOR UPDATE holds the team row for the rest of the transaction, so two
+        // coaches saving at once are serialised here rather than both reading
+        // the same version and both deciding they are current.
+        const locked = await client.query(
+            'SELECT roster_version FROM teams WHERE id = $1 FOR UPDATE',
+            [teamId]
+        );
+
+        if (locked.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, error: 'Team not found' });
+        }
+
+        const currentVersion = Number(locked.rows[0].roster_version);
+
+        // Omitting expectedVersion writes unconditionally. Kept for the offline
+        // queue, whose entries were recorded before any version was known, and
+        // so that an older client is not locked out by a newer server.
+        if (expectedVersion !== undefined && expectedVersion !== currentVersion) {
+            // Read before releasing: still inside the transaction that holds
+            // the lock, so this roster is the one currentVersion describes. On
+            // the pool after ROLLBACK, a third write could land in between and
+            // the pair handed back would not match.
+            const current = await client.query(
+                'SELECT * FROM players WHERE team_id = $1 ORDER BY sort_order ASC',
+                [teamId]
+            );
+
+            await client.query('ROLLBACK');
+
+            // The caller cannot merge without seeing what it collided with, so
+            // send the winning roster back rather than only saying "conflict".
+            return res.status(409).json({
+                success: false,
+                conflict: true,
+                error: 'The roster changed since you loaded it',
+                version: currentVersion,
+                data: current.rows.map(mapPlayer)
+            });
+        }
 
         // Drop whoever is no longer on the roster. An empty roster clears it.
         await client.query(
@@ -240,9 +309,18 @@ router.put('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req,
             rows = result.rows;
         }
 
+        const bumped = await client.query(
+            'UPDATE teams SET roster_version = roster_version + 1 WHERE id = $1 RETURNING roster_version',
+            [teamId]
+        );
+
         await client.query('COMMIT');
 
-        res.json({ success: true, data: inSentOrder(rows, toWrite) });
+        res.json({
+            success: true,
+            data: inSentOrder(rows, toWrite),
+            version: Number(bumped.rows[0].roster_version)
+        });
     } catch (error) {
         // A failed BEGIN would make ROLLBACK throw as well, and that would
         // escape the handler and leave the request hanging.

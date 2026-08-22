@@ -76,10 +76,21 @@ export async function getPlayers(teamId) {
  *
  * Prefer this over deleting and then re-uploading: the server does both in one
  * transaction, so an interrupted sync cannot leave the team with no players.
+ *
+ * `expectedVersion` is the roster version this write was built on. The server
+ * rejects the write with 409 and `conflict: true` when the roster has moved on
+ * since, rather than letting it overwrite another coach's edits.
  */
-export async function replaceRoster(teamId, players) {
+export async function replaceRoster(teamId, players, expectedVersion) {
     try {
-        return await api.put(`/api/teams/${teamId}/players`, { players });
+        const body = { players };
+        // Omitted rather than sent as undefined: the server treats an absent
+        // expectedVersion as an unconditional write, which is what a queued
+        // offline edit needs — it was recorded before any version was known.
+        if (expectedVersion !== undefined && expectedVersion !== null) {
+            body.expectedVersion = expectedVersion;
+        }
+        return await api.put(`/api/teams/${teamId}/players`, body);
     } catch (error) {
         return { success: false, error: error.message };
     }

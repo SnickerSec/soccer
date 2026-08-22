@@ -10,6 +10,7 @@ import {
     getGames, saveGame, bulkImportGames
 } from './cloud-storage.js';
 import { safeGetFromStorage, safeSetToStorage, safeParseJSON } from './storage.js';
+import { mergeRosters } from './roster-merge.js';
 
 // Sync status enum
 export const SYNC_STATUS = {
@@ -25,6 +26,26 @@ let syncStatus = SYNC_STATUS.OFFLINE;
 let currentTeamId = null;
 let lastSyncTime = null;
 let syncListeners = [];
+
+/**
+ * The roster version last read from the server, and the roster as it was at
+ * that version.
+ *
+ * Both are needed to resolve a rejected write: the version says what the write
+ * was built on, and the snapshot is the merge's `base` — without it there is no
+ * way to tell a player this coach removed from one the other coach added.
+ *
+ * Kept in memory rather than localStorage: after a reload the roster is pulled
+ * fresh anyway, and a base that outlived its pull would be worse than none.
+ */
+let rosterVersion = null;
+let rosterBase = null;
+
+/** Records what a pull returned, as the reference for the next write. */
+function rememberRoster(players, version) {
+    rosterBase = JSON.parse(JSON.stringify(players || []));
+    rosterVersion = version ?? null;
+}
 
 /**
  * Initialize the sync engine
@@ -121,6 +142,11 @@ export function getCurrentTeamId() {
 export async function setCurrentTeam(teamId) {
     currentTeamId = teamId;
 
+    // The snapshot describes the team being left; carrying it over would make
+    // the next write claim another team's version.
+    rosterBase = null;
+    rosterVersion = null;
+
     // Save as default team
     await updateUserSettings({ default_team_id: teamId });
 
@@ -163,6 +189,9 @@ export async function sync() {
         safeSetToStorage('ayso_players', JSON.stringify(playersResult.data));
         safeSetToStorage('ayso_lineup_history', JSON.stringify(gamesResult.data));
 
+        // What the next write will claim to be built on
+        rememberRoster(playersResult.data, playersResult.version);
+
         lastSyncTime = new Date();
         updateStatus(SYNC_STATUS.SYNCED);
 
@@ -191,29 +220,95 @@ export async function pushPlayers(players) {
 
     if (!navigator.onLine || !await isAuthenticated()) {
         // Queue for later sync
-        queueChange('players', 'bulk_update', players);
+        queueChange('players', 'bulk_update', players, {
+            expectedVersion: rosterVersion,
+            base: rosterBase
+        });
         return { success: true, queued: true };
     }
 
     updateStatus(SYNC_STATUS.SYNCING);
 
     try {
-        // One atomic replace. Doing this as a delete followed by an upload left
-        // the roster empty if the second request never landed.
-        const result = await replaceRoster(currentTeamId, players);
+        return await writeRoster(players, { expectedVersion: rosterVersion, base: rosterBase });
+    } catch (error) {
+        updateStatus(SYNC_STATUS.ERROR);
+        return { success: false, error: error.message };
+    }
+}
 
+/**
+ * Writes a roster, merging and retrying once if another coach got there first.
+ *
+ * Shared by a live save and by an offline edit replayed from the queue, because
+ * the queued one is the more dangerous of the two: it was built against a
+ * roster that may be hours old, so applying it unconditionally would overwrite
+ * everything done since.
+ *
+ * `expectedVersion` is what the write was built on, `base` the roster at that
+ * version. Both come from the caller rather than module state so a queue entry
+ * can supply the pair it recorded rather than whatever is current now.
+ *
+ * Retried once only: a second rejection means a third writer is active, and
+ * looping would keep rebasing on a roster that keeps moving.
+ */
+async function writeRoster(players, { expectedVersion, base }) {
+    // One atomic replace. Doing this as a delete followed by an upload left
+    // the roster empty if the second request never landed.
+    const result = await replaceRoster(currentTeamId, players, expectedVersion);
+
+    if (!result.conflict) {
         if (!result.success) {
             updateStatus(SYNC_STATUS.ERROR);
             return result;
         }
 
+        rememberRoster(result.data, result.version);
+        safeSetToStorage('ayso_players', JSON.stringify(result.data));
+
         lastSyncTime = new Date();
         updateStatus(SYNC_STATUS.SYNCED);
         return { success: true, data: result.data };
-    } catch (error) {
-        updateStatus(SYNC_STATUS.ERROR);
-        return { success: false, error: error.message };
     }
+
+    // `conflicts` names players both coaches edited differently. Those are
+    // reported rather than settled — the merge keeps the other coach's value,
+    // so the save is safe either way, but the caller should say so rather than
+    // let an edit vanish without a word.
+    const { merged, conflicts } = mergeRosters({
+        base,
+        local: players,
+        remote: result.data
+    });
+
+    const retry = await replaceRoster(currentTeamId, merged, result.version);
+
+    if (!retry.success) {
+        // Includes a second conflict: hand back the server's roster so the
+        // caller can show what is actually there rather than a stale local one.
+        rememberRoster(result.data, result.version);
+        safeSetToStorage('ayso_players', JSON.stringify(result.data));
+        updateStatus(SYNC_STATUS.ERROR);
+        return {
+            success: false,
+            conflict: true,
+            error: 'The roster was changed by someone else while saving',
+            data: result.data
+        };
+    }
+
+    rememberRoster(retry.data, retry.version);
+    safeSetToStorage('ayso_players', JSON.stringify(retry.data));
+
+    lastSyncTime = new Date();
+    updateStatus(SYNC_STATUS.SYNCED);
+
+    return {
+        success: true,
+        merged: true,
+        conflicts,
+        data: retry.data
+    };
 }
 
 /**
@@ -269,12 +364,16 @@ export async function pushGame(game) {
 /**
  * Queue a change for later sync (when offline)
  */
-function queueChange(entityType, action, data) {
+function queueChange(entityType, action, data, context = {}) {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
     queue.push({
         entityType,
         action,
         data,
+        // What the edit was built on, so a replay hours later can be merged
+        // against whatever happened in between rather than overwriting it.
+        // Absent on entries queued by an older version of this code.
+        ...context,
         timestamp: Date.now()
     });
     safeSetToStorage('ayso_sync_queue', JSON.stringify(queue));
@@ -305,7 +404,14 @@ export async function processQueue() {
     for (const item of queue) {
         try {
             if (item.entityType === 'players' && item.action === 'bulk_update') {
-                const result = await replaceRoster(currentTeamId, item.data);
+                // Through the same merge as a live save. An entry recorded
+                // before this carried a version has expectedVersion undefined,
+                // which writes unconditionally — the old behaviour, kept so an
+                // upgrade does not strand what is already queued.
+                const result = await writeRoster(item.data, {
+                    expectedVersion: item.expectedVersion,
+                    base: item.base
+                });
                 if (result.success) {
                     processed++;
                 } else {

@@ -65,6 +65,8 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
 │   │   ├── utils.js        # General utilities (shuffle, escape, etc.)
 │   │   ├── season-stats.js # Season statistics calculations
 │   │   ├── formations.js   # Formation definitions and positions
+│   │   ├── sync.js         # Offline queue and cloud sync
+│   │   ├── roster-merge.js # Three-way merge for a rejected roster save
 │   │   └── index.js        # Module exports
 │   └── assets/         # Fonts, PDFs, images
 ├── tests/              # Jest unit tests
@@ -100,6 +102,25 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
   - Visual field display for each quarter
   - Export/print functionality
 - **styles.css**: Application styling
+
+### Roster concurrency
+
+A team can have several coaches, and a roster save replaces the whole list, so
+two of them editing at once would otherwise mean the second save silently
+discards the first.
+
+`teams.roster_version` is bumped by every roster write and by nothing else (a
+team rename must not invalidate an in-flight roster edit). `GET .../players`
+returns it; `PUT .../players` takes it as `expectedVersion` and answers 409 with
+the winning roster when it no longer matches. The client then merges its version
+against that one — `public/modules/roster-merge.js` — and retries once. Players
+both coaches edited differently come back in `conflicts` and are reported to the
+coach rather than settled silently.
+
+Writes sent without `expectedVersion` apply unconditionally. That is what an
+offline queue entry recorded by an older build does; new entries carry the
+version and base roster they were made against, and replay through the same
+merge.
 
 ### Key Features & Constraints
 The lineup generator enforces AYSO "Everyone Plays" rules:

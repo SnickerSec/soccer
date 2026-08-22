@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS teams (
     name TEXT NOT NULL,
     age_division TEXT DEFAULT '10U',
     created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    -- Bumped by every roster write, and by nothing else. A client sends back
+    -- the value it last read so a write built on a stale roster is rejected
+    -- rather than silently overwriting another coach's edits.
+    roster_version BIGINT NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -113,6 +117,10 @@ CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
 -- per-position (keeper/defense/midfield/offense) 1-5 scores.
 ALTER TABLE players ADD COLUMN IF NOT EXISTS overall_rating INTEGER;
 ALTER TABLE players ADD COLUMN IF NOT EXISTS positional_ratings JSONB DEFAULT '{}';
+
+-- Roster concurrency: a counter bumped only by roster writes, so a team rename
+-- does not invalidate a coach's in-flight roster edit the way updated_at would.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS roster_version BIGINT NOT NULL DEFAULT 1;
 
 -- ADD CONSTRAINT has no IF NOT EXISTS, so swallow the error when it is already
 -- there (the fresh-install path defines it inline above).
