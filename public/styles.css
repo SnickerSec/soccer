@@ -2640,20 +2640,64 @@ button:active {
     align-items: center;
 }
 
-.btn-auth {
-    padding: 6px 12px;
-    font-size: 0.85rem;
+/* Google's branded sign-in button. The colours, the 1px border and the 18px
+   mark come from Google's identity guidelines rather than our own tokens, so
+   the button is recognisably Google's in both themes — that recognition is the
+   whole point of it. Only the size is ours: the compact variant, to sit in the
+   header next to the icon buttons. */
+.btn-google {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #747775;
     border-radius: var(--radius-sm);
-    background: var(--accent-blue);
-    color: white;
-    border: none;
-    cursor: pointer;
+    background: #fff;
+    color: #1f1f1f;
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 0.8125rem;
     font-weight: 500;
-    transition: background 0.2s;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
 }
 
-.btn-auth:hover {
-    background: hsl(var(--primary) / 0.85);
+.btn-google:hover {
+    background: #f7f8f8;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3);
+}
+
+.btn-google:active {
+    background: #f2f3f3;
+}
+
+.btn-google:focus-visible {
+    outline: 2px solid #4285f4;
+    outline-offset: 2px;
+}
+
+/* Dark variant, also from Google's guidelines */
+[data-theme="dark"] .btn-google {
+    border-color: #8e918f;
+    background: #131314;
+    color: #e3e3e3;
+}
+
+[data-theme="dark"] .btn-google:hover {
+    background: #1c1c1d;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .btn-google:active {
+    background: #232324;
+}
+
+.btn-google .google-mark {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
 /* User Menu */
@@ -3044,8 +3088,7 @@ button,
 .btn-primary,
 #addPlayer,
 #generateLineup,
-#generateEvaluation,
-.btn-auth {
+#generateEvaluation {
     background: hsl(var(--primary));
     color: hsl(var(--primary-foreground));
     border: 1px solid transparent;
@@ -3056,8 +3099,7 @@ button,
 .btn-primary:hover:not(:disabled),
 #addPlayer:hover:not(:disabled),
 #generateLineup:hover:not(:disabled),
-#generateEvaluation:hover:not(:disabled),
-.btn-auth:hover:not(:disabled) {
+#generateEvaluation:hover:not(:disabled) {
     background: hsl(var(--primary) / 0.9);
 }
 
@@ -3933,6 +3975,18 @@ footer a {
 
     .site-header .header-controls {
         gap: 6px;
+    }
+
+    /* Not enough room for the label beside the icon buttons; the mark alone is
+       still a sanctioned Google variant, so drop to the square icon-only one */
+    .btn-google {
+        padding: 0;
+        width: 32px;
+        justify-content: center;
+    }
+
+    .btn-google .btn-google-label {
+        display: none;
     }
 
     /* The strip scrolls sideways rather than wrapping; fade the right edge so
