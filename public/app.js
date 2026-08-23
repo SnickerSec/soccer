@@ -82,6 +82,12 @@ import {
     seasonStatsFilename
 } from './modules/export.js';
 import {
+    renderAuthState,
+    renderSyncStatus,
+    renderTeamList,
+    setAccountMenuOpen
+} from './modules/account-menu.js';
+import {
     buildRecommendationsHtml,
     buildGameHistoryHtml,
     buildPlayerStatsHtml,
@@ -320,142 +326,27 @@ class SoccerLineupGenerator {
     }
 
     updateAuthUI(user) {
-        const signInBtn = document.getElementById('signInBtn');
-        const userMenu = document.getElementById('userMenu');
-        const userAvatar = document.getElementById('userAvatar');
-        const syncStatus = document.getElementById('syncStatus');
-
-        if (user) {
-            // User is signed in
-            if (signInBtn) signInBtn.classList.add('hidden');
-            if (userMenu) {
-                userMenu.classList.remove('hidden');
-                if (userAvatar && user.avatarUrl) {
-                    userAvatar.src = user.avatarUrl;
-                    userAvatar.alt = user.displayName;
-                }
-            }
-            const accountName = document.getElementById('accountName');
-            const accountEmail = document.getElementById('accountEmail');
-            if (accountName) accountName.textContent = user.displayName || '';
-            if (accountEmail) accountEmail.textContent = user.email || '';
-
-            if (syncStatus) syncStatus.classList.remove('hidden');
-        } else {
-            // User is signed out
-            if (signInBtn) signInBtn.classList.remove('hidden');
-            if (userMenu) userMenu.classList.add('hidden');
-            if (syncStatus) syncStatus.classList.add('hidden');
-            this.closeAccountMenu();
-        }
+        renderAuthState(user, { onSignedOut: () => this.closeAccountMenu() });
     }
 
     updateSyncStatusUI(status) {
-        const syncStatus = document.getElementById('syncStatus');
-        if (!syncStatus) return;
-
-        const icon = syncStatus.querySelector('.sync-icon');
-        const text = syncStatus.querySelector('.sync-text');
-
-        // Remove all status classes
-        syncStatus.classList.remove('syncing', 'synced', 'error', 'offline');
-
-        switch (status) {
-            case SYNC_STATUS.SYNCING:
-                syncStatus.classList.add('syncing');
-                if (icon) icon.innerHTML = '<svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-sync-syncing"></use></svg>';
-                if (text) text.textContent = 'Syncing...';
-                break;
-            case SYNC_STATUS.SYNCED:
-                syncStatus.classList.add('synced');
-                if (icon) icon.innerHTML = '<svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-sync-synced"></use></svg>';
-                if (text) text.textContent = 'Synced';
-                break;
-            case SYNC_STATUS.ERROR:
-                syncStatus.classList.add('error');
-                if (icon) icon.innerHTML = '<svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-sync-error"></use></svg>';
-                if (text) text.textContent = 'Sync Error';
-                break;
-            case SYNC_STATUS.OFFLINE:
-            default:
-                syncStatus.classList.add('offline');
-                if (icon) icon.innerHTML = '<svg class="icon" aria-hidden="true" focusable="false"><use href="/assets/icons.svg#icon-sync-offline"></use></svg>';
-                if (text) text.textContent = 'Offline';
-                break;
-        }
+        renderSyncStatus(document.getElementById('syncStatus'), status);
     }
 
-    /**
-     * Renders the team list inside the account menu.
-     *
-     * Each team is a menuitemradio: the current one is checked, so the menu
-     * both shows which team is active and switches between them.
-     */
     updateTeamSelector() {
-        const list = document.getElementById('accountTeamList');
-        if (!list) return;
-
-        list.textContent = '';
-
-        if (this.teams.length === 0) {
-            const empty = document.createElement('p');
-            empty.className = 'account-empty';
-            empty.textContent = 'No teams yet';
-            list.appendChild(empty);
-            return;
-        }
-
-        this.teams.forEach(team => {
-            const isCurrent = team.id === this.currentTeamId;
-
-            const item = document.createElement('button');
-            item.type = 'button';
-            item.className = `account-item account-team${isCurrent ? ' is-current' : ''}`;
-            item.setAttribute('role', 'menuitemradio');
-            item.setAttribute('aria-checked', String(isCurrent));
-            item.dataset.teamId = team.id;
-
-            const check = document.createElement('span');
-            check.className = 'account-team-check';
-            check.setAttribute('aria-hidden', 'true');
-            check.innerHTML = isCurrent ? iconMarkup('icon-sync-synced') : '';
-
-            const name = document.createElement('span');
-            name.className = 'account-team-name';
-            name.textContent = team.name;
-
-            const role = document.createElement('span');
-            role.className = 'account-team-role';
-            role.textContent = team.role;
-
-            item.append(check, name, role);
-            item.addEventListener('click', () => {
-                this.closeAccountMenu();
-                if (!isCurrent) this.switchTeam(team.id);
-            });
-
-            list.appendChild(item);
+        renderTeamList(document.getElementById('accountTeamList'), {
+            teams: this.teams,
+            currentTeamId: this.currentTeamId,
+            onSelect: (teamId) => this.switchTeam(teamId)
         });
     }
 
-    /** Opens or closes the account menu. */
     toggleAccountMenu(force) {
-        const trigger = document.getElementById('accountTrigger');
-        const panel = document.getElementById('accountPanel');
-        if (!trigger || !panel) return;
-
-        const open = force ?? panel.hasAttribute('hidden');
-        panel.toggleAttribute('hidden', !open);
-        trigger.setAttribute('aria-expanded', String(open));
-
-        if (open) {
-            // Focus the first item so the menu is usable from the keyboard
-            panel.querySelector('.account-item')?.focus();
-        }
+        setAccountMenuOpen(force);
     }
 
     closeAccountMenu() {
-        this.toggleAccountMenu(false);
+        setAccountMenuOpen(false);
     }
 
     async switchTeam(teamId) {
