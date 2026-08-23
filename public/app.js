@@ -2793,14 +2793,24 @@ class SoccerLineupGenerator {
         }
 
         try {
-            await generateEvaluationPdf({
+            const { undrawableNames } = await generateEvaluationPdf({
                 players: this.players,
                 coachName,
                 assistantCoach,
                 division,
                 gender
             });
-            showNotification('Player Evaluation Form generated successfully!', 'success');
+
+            if (undrawableNames?.length) {
+                // The form is complete apart from these, which came out blank.
+                // Saying nothing would hand over a form that looks finished.
+                showNotification(
+                    `Form generated, but these names could not be printed: ${undrawableNames.join(', ')}. Write them in by hand.`,
+                    'warning'
+                );
+            } else {
+                showNotification('Player Evaluation Form generated successfully!', 'success');
+            }
         } catch (error) {
             console.error('Error generating PDF:', error);
             showNotification(`Error generating PDF: ${describePdfError(error)}`, 'error');

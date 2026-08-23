@@ -126,6 +126,26 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
   - Export/print functionality
 - **styles.css**: Application styling
 
+### The evaluation PDF
+
+`public/modules/evaluation-pdf.js` fills the AYSO template with the roster.
+Text is drawn with an embedded Liberation Sans rather than one of pdf-lib's
+standard fonts: those are WinAnsi-encoded and `drawText` throws on anything
+outside it, so a single player named Łukasz aborted the whole document and
+nobody on the team got a form. Liberation Sans is metric-compatible with the
+Helvetica it replaced, so the layout did not move, and it covers Latin Extended,
+Greek, Cyrillic and Hebrew.
+
+It does not cover CJK, Arabic or Devanagari, and a missing glyph draws as an
+empty box rather than raising. So the module checks and returns
+`undrawableNames`, and the caller tells the coach which names to write in by
+hand — the form is still produced, since one such name should not cost the rest
+of the team theirs.
+
+The font is fetched at generation time from `/assets/`, which the service worker
+caches as immutable, so it costs nothing on first load and is downloaded once.
+Its licence sits beside it: SIL OFL 1.1 requires that.
+
 ### Team roles
 
 `team_members.role` is one of `viewer`, `coach`, `owner`, lowest to highest, and

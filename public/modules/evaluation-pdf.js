@@ -20,6 +20,21 @@ const FONTKIT_URL = '/vendor/fontkit.umd.min.js';
 const TEMPLATE_URL = '/assets/Player Evaluation Form 2025.pdf';
 const SIGNATURE_FONT_URL = '/assets/Autography-DOLnW.otf';
 
+/**
+ * The body font, embedded rather than using StandardFonts.Helvetica.
+ *
+ * The PDF standard fonts are WinAnsi-encoded, and pdf-lib throws on drawText
+ * for anything that encoding cannot represent — so one player named Łukasz
+ * aborted the whole document and nobody on the team got a form. WinAnsi covers
+ * Latin-1 and the CP1252 extras, so accents and curly quotes were fine and
+ * Central European, Turkish and every non-Latin name was not.
+ *
+ * Liberation Sans is metric-compatible with Arial, and so with the Helvetica it
+ * replaces, which is why the layout did not have to move. It covers Latin
+ * Extended, Greek and Cyrillic.
+ */
+const BODY_FONT_URL = '/assets/fonts/LiberationSans-Regular.ttf';
+
 /** Layout measured against the 2025 template. PDF origin is bottom-left. */
 const LAYOUT = {
     fontSize: 11,
@@ -147,6 +162,53 @@ async function loadTemplate() {
     return pdfTemplateCache;
 }
 
+/**
+ * Fetches a font file.
+ *
+ * Cached for the life of the page like the template, so generating several
+ * forms in a row does not re-download them. Reports the URL on failure: the two
+ * fonts fail the same way otherwise, and one of them is optional-looking while
+ * the other carries every name on the form.
+ */
+const fontCache = new Map();
+
+async function loadFont(url) {
+    if (fontCache.has(url)) return fontCache.get(url);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to load font ${url}: ${response.status} ${response.statusText}`);
+    }
+
+    const bytes = await response.arrayBuffer();
+    fontCache.set(url, bytes);
+    return bytes;
+}
+
+/**
+ * Names the font has no glyph for.
+ *
+ * Liberation Sans covers Latin, Greek and Cyrillic but not CJK or Arabic, and a
+ * character it lacks is drawn as an empty box rather than raising anything — so
+ * without this the form comes out looking complete with a name missing from it.
+ * The form is still produced; the caller says which names did not make it.
+ */
+function namesTheFontCannotDraw(fontBytes, names) {
+    let font;
+    try {
+        font = window.fontkit.create(new Uint8Array(fontBytes));
+    } catch {
+        // The check is a courtesy; failing it must not stop the form
+        return [];
+    }
+
+    return names.filter(name =>
+        [...String(name)].some(character =>
+            !/\s/.test(character) && !font.hasGlyphForCodePoint(character.codePointAt(0))
+        )
+    );
+}
+
 /** Draws `text` horizontally centred on `x`. */
 function drawCentered(page, text, { x, y, font, size, color }) {
     const textWidth = font.widthOfTextAtSize(text, size);
@@ -166,18 +228,29 @@ function sortByLastName(players) {
  *
  * Requires loadPdfLibraries() to have resolved first. Throws if the template,
  * fonts or PDF generation fail — the caller decides how to report that.
+ *
+ * Returns `{ undrawableNames }`: names the embedded font has no glyph for, drawn
+ * as empty boxes. The form is still produced, since one such name should not
+ * cost the rest of the team their forms, but the caller has to say so — a form
+ * that looks complete with a name missing is worse than one that reports it.
  */
 export async function generateEvaluationPdf({ players, coachName, assistantCoach, division, gender }) {
-    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    const { PDFDocument, rgb } = window.PDFLib;
     const black = rgb(0, 0, 0);
 
     const pdfDoc = await PDFDocument.load(await loadTemplate());
 
-    // fontkit is what allows the custom signature font to be embedded
+    // fontkit is what allows both custom fonts to be embedded
     pdfDoc.registerFontkit(window.fontkit);
 
-    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const signatureFontBytes = await fetch(SIGNATURE_FONT_URL).then(res => res.arrayBuffer());
+    const [bodyFontBytes, signatureFontBytes] = await Promise.all([
+        loadFont(BODY_FONT_URL),
+        loadFont(SIGNATURE_FONT_URL)
+    ]);
+
+    // subset, so only the glyphs actually used are written into the file — the
+    // form stays the size it was rather than carrying a whole font
+    const bodyFont = await pdfDoc.embedFont(bodyFontBytes, { subset: true });
     const signatureFont = await pdfDoc.embedFont(signatureFontBytes);
 
     const pages = pdfDoc.getPages();
@@ -193,12 +266,12 @@ export async function generateEvaluationPdf({ players, coachName, assistantCoach
     const dateStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
 
     const headerFields = [
-        [coachName, header.coach, helvetica],
-        [division, header.division, helvetica],
-        [genderAbbrev, header.gender, helvetica],
-        [assistantCoach, header.assistant, helvetica],
+        [coachName, header.coach, bodyFont],
+        [division, header.division, bodyFont],
+        [genderAbbrev, header.gender, bodyFont],
+        [assistantCoach, header.assistant, bodyFont],
         [coachName, header.signature, signatureFont],
-        [dateStr, header.date, helvetica]
+        [dateStr, header.date, bodyFont]
     ];
 
     for (const [text, position, font] of headerFields) {
@@ -216,12 +289,12 @@ export async function generateEvaluationPdf({ players, coachName, assistantCoach
 
         const playerName = player.number ? `${player.name} #${player.number}` : player.name;
         drawCentered(currentPage, playerName, {
-            x: layout.nameX, y, font: helvetica, size: layout.fontSize, color: black
+            x: layout.nameX, y, font: bodyFont, size: layout.fontSize, color: black
         });
 
         if (player.rating) {
             drawCentered(currentPage, String(player.rating), {
-                x: layout.ratingX, y, font: helvetica, size: layout.fontSize, color: black
+                x: layout.ratingX, y, font: bodyFont, size: layout.fontSize, color: black
             });
         }
 
@@ -230,10 +303,15 @@ export async function generateEvaluationPdf({ players, coachName, assistantCoach
                 ? player.comment.substring(0, layout.maxCommentLength - 3) + '...'
                 : player.comment;
             drawCentered(currentPage, comment, {
-                x: layout.commentsX, y, font: helvetica, size: layout.commentFontSize, color: black
+                x: layout.commentsX, y, font: bodyFont, size: layout.commentFontSize, color: black
             });
         }
     }
+
+    const undrawable = namesTheFontCannotDraw(
+        bodyFontBytes,
+        sortedPlayers.slice(0, maxPlayers).map(p => p.name)
+    );
 
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -245,6 +323,8 @@ export async function generateEvaluationPdf({ players, coachName, assistantCoach
     link.click();
 
     URL.revokeObjectURL(url);
+
+    return { undrawableNames: undrawable };
 }
 
 /** Maps a generation failure to something a coach can act on. */

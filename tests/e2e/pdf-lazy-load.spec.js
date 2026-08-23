@@ -43,3 +43,56 @@ test.describe('PDF library loading', () => {
         expect(errors).toEqual([]);
     });
 });
+
+test.describe('Evaluation PDF and player names', () => {
+    /**
+     * The form used to be drawn with a PDF standard font, which is WinAnsi —
+     * so one player named Łukasz threw and nobody on the team got a form. An
+     * embedded Unicode font replaced it.
+     */
+    async function generateFor(page, names) {
+        await page.goto('/');
+        for (const name of names) {
+            await page.fill('#playerName', name);
+            await page.click('#addPlayer');
+        }
+        await page.click('#evaluation-tab-btn');
+        await page.fill('#coachName', 'Coach Taylor');
+
+        const download = page.waitForEvent('download', { timeout: 20000 });
+        await page.click('#generateEvaluation');
+        return download;
+    }
+
+    test('a Central European name no longer stops the whole form', async ({ page }) => {
+        const download = await generateFor(page, ['Ana Smith', 'Łukasz Ştefan']);
+
+        expect(await download).toBeTruthy();
+        await expect(page.locator('.notification')).toContainText(/successfully/i);
+    });
+
+    test('a Cyrillic name is printed too', async ({ page }) => {
+        const download = await generateFor(page, ['Ana Smith', 'Анна Иванова']);
+
+        expect(await download).toBeTruthy();
+        await expect(page.locator('.notification')).toContainText(/successfully/i);
+    });
+
+    test('a name the font cannot draw is named, not silently blank', async ({ page }) => {
+        // The form is still produced — one such name must not cost the rest of
+        // the team theirs — but a form that looks finished with a name missing
+        // from it is worse than one that says so.
+        const download = await generateFor(page, ['Ana Smith', '田中 さくら']);
+
+        expect(await download).toBeTruthy();
+        await expect(page.locator('.notification')).toContainText('田中 さくら');
+        await expect(page.locator('.notification')).toContainText(/could not be printed/i);
+    });
+
+    test('an all-Latin roster says nothing about missing names', async ({ page }) => {
+        const download = await generateFor(page, ['Ana Smith', "O'Brien", 'Núñez']);
+
+        expect(await download).toBeTruthy();
+        await expect(page.locator('.notification')).not.toContainText(/could not be printed/i);
+    });
+});
