@@ -641,7 +641,7 @@ export default function App() {
 
     playersRef.current = created;
     setPlayers(created);
-    setCaptains([created[0].name]);
+    setCaptains(created.slice(0, 2).map((p) => p.name));
     toast.success(`Loaded ${created.length} demo players`);
   };
 
@@ -666,6 +666,24 @@ export default function App() {
     try {
       const positions = getPositionsForFormation(curSettings.fieldPlayers, curSettings.formation);
       const stats = calculatePlayerStats(curPlayers, gameHistory);
+
+      // Select 2 team captains from active players (favoring players who have served as captain least)
+      const statsMap = stats?.players || {};
+      const activeCandidates = [...activePlayers]
+        .map((p) => ({
+          name: p.name,
+          captainCount: statsMap[p.name]?.captainGames || 0,
+          randomKey: Math.random(),
+        }))
+        .sort((a, b) => {
+          if (a.captainCount !== b.captainCount) return a.captainCount - b.captainCount;
+          return a.randomKey - b.randomKey;
+        });
+
+      const selectedCaptains = activeCandidates.slice(0, 2).map((c) => c.name);
+      if (selectedCaptains.length > 0) {
+        setCaptains(selectedCaptains);
+      }
 
       const result = generateLineup({
         players: JSON.parse(JSON.stringify(activePlayers)),
