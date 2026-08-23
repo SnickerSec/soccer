@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   LayoutGrid,
   MapPin,
+  Layers,
   Star,
 } from 'lucide-react';
 import {
@@ -44,7 +45,7 @@ export function LineupSection({
   onToggleMustRest,
   onToggleNoKeeper,
 }) {
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'pitch'
+  const [viewMode, setViewMode] = useState('all'); // 'all', 'table', 'pitch'
   const [pendingSwap, setPendingSwap] = useState(null); // { quarter, position, player }
   const pendingSwapRef = useRef(null);
 
@@ -120,26 +121,36 @@ export function LineupSection({
       {/* Header & View Toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-3">
         <h2 className="text-xl font-bold tracking-tight">Game Lineup</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border">
           <Button
             type="button"
-            variant={viewMode === 'grid' ? 'default' : 'outline'}
+            variant={viewMode === 'all' ? 'default' : 'ghost'}
             size="sm"
-            onClick={() => setViewMode('grid')}
-            className="text-xs flex items-center gap-1.5"
+            onClick={() => setViewMode('all')}
+            className="text-xs h-7 px-2.5 flex items-center gap-1.5 cursor-pointer"
           >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Grid View
+            <Layers className="h-3.5 w-3.5" />
+            Combined
           </Button>
           <Button
             type="button"
-            variant={viewMode === 'pitch' ? 'default' : 'outline'}
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+            className="text-xs h-7 px-2.5 flex items-center gap-1.5 cursor-pointer"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Table Only
+          </Button>
+          <Button
+            type="button"
+            variant={viewMode === 'pitch' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setViewMode('pitch')}
-            className="text-xs flex items-center gap-1.5"
+            className="text-xs h-7 px-2.5 flex items-center gap-1.5 cursor-pointer"
           >
             <MapPin className="h-3.5 w-3.5" />
-            Field Pitch
+            Pitch Only
           </Button>
         </div>
       </div>
@@ -204,8 +215,9 @@ export function LineupSection({
 
                 <CardContent className="p-3 flex-1 flex flex-col justify-between space-y-3">
                   {/* Position Table */}
-                  <table className="w-full text-xs">
-                    <tbody>
+                  {viewMode !== 'pitch' && (
+                    <table className="w-full text-xs">
+                      <tbody>
                       {canonicalPositions.map((posName) => {
                         const playerVal = positions[posName];
                         const playerName = typeof playerVal === 'string' ? playerVal : (playerVal?.name || 'TBD');
@@ -405,13 +417,16 @@ export function LineupSection({
                       })}
                     </tbody>
                   </table>
+                  )}
 
                   {/* Field Pitch Diagram */}
-                  <FieldVisualization
-                    quarterNumber={qNum}
-                    positions={positions}
-                    players={playerStats}
-                  />
+                  {viewMode !== 'table' && (
+                    <FieldVisualization
+                      quarterNumber={qNum}
+                      positions={positions}
+                      players={playerStats}
+                    />
+                  )}
                 </CardContent>
               </Card>
             );
