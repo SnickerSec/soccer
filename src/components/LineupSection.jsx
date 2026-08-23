@@ -17,6 +17,7 @@ import {
   MapPin,
   Layers,
   Star,
+  Play,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -44,6 +45,7 @@ export function LineupSection({
   onRegenerate,
   onToggleMustRest,
   onToggleNoKeeper,
+  onOpenMatchday,
 }) {
   const [viewMode, setViewMode] = useState('all'); // 'all', 'table', 'pitch'
   const [pendingSwap, setPendingSwap] = useState(null); // { quarter, position, player }
@@ -194,6 +196,19 @@ export function LineupSection({
 
       {/* Sticky Action Buttons Bar */}
       <div className="action-buttons-inline sticky top-2 z-30 flex flex-wrap items-center gap-2 p-3 sm:p-4 rounded-lg border bg-card/95 backdrop-blur shadow-md action-buttons">
+        <Button
+          type="button"
+          variant="default"
+          size="sm"
+          id="openMatchday"
+          data-action="openMatchday"
+          onClick={onOpenMatchday}
+          className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground font-semibold shadow-sm btn-matchday cursor-pointer"
+        >
+          <Play className="h-3.5 w-3.5 fill-current" />
+          Live Match
+        </Button>
+
         <Button
           type="button"
           variant="secondary"

@@ -8,6 +8,7 @@ import { EvaluationTab } from '@/components/EvaluationTab';
 import { TeamModal } from '@/components/TeamModal';
 import { SaveGameModal } from '@/components/SaveGameModal';
 import { GameNotesModal } from '@/components/GameNotesModal';
+import { MatchdayDialog } from '@/components/MatchdayDialog';
 import { InviteModal } from '@/components/InviteModal';
 import { ShareLineupDialog } from '@/components/ShareLineupDialog';
 import { Footer } from '@/components/Footer';
@@ -120,6 +121,7 @@ export default function App() {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [teamModalInitialTeamId, setTeamModalInitialTeamId] = useState(null);
   const [isSaveGameOpen, setIsSaveGameOpen] = useState(false);
+  const [isMatchdayOpen, setIsMatchdayOpen] = useState(false);
   const [notesModalGame, setNotesModalGame] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
@@ -1022,6 +1024,7 @@ export default function App() {
             onRegenerate={handleGenerateLineup}
             onToggleMustRest={handleToggleMustRest}
             onToggleNoKeeper={handleToggleNoKeeper}
+            onOpenMatchday={() => setIsMatchdayOpen(true)}
           />
         </div>
 
@@ -1097,6 +1100,17 @@ export default function App() {
         isOpen={isSaveGameOpen}
         onClose={() => setIsSaveGameOpen(false)}
         onSave={handleSaveGame}
+      />
+
+      <MatchdayDialog
+        isOpen={isMatchdayOpen}
+        onClose={() => setIsMatchdayOpen(false)}
+        lineup={lineup}
+        players={players}
+        captains={captains}
+        teamName={currentTeam?.name || 'Our Team'}
+        ageDivision={settings.ageDivision}
+        onSaveGame={handleSaveGame}
       />
 
       <GameNotesModal
