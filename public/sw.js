@@ -1,5 +1,5 @@
 // Service Worker for AYSO Roster Pro - Offline Support
-const CACHE_NAME = 'ayso-roster-pro-v35';
+const CACHE_NAME = 'ayso-roster-pro-v36';
 
 // App shell: fetched on install so a first-time visitor who later goes offline
 // still gets a working app. Keep this in sync with the modules in public/modules/.
@@ -57,9 +57,20 @@ const isImmutable = (pathname) => IMMUTABLE_PATHS.some((prefix) => pathname.star
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then((cache) => {
+            .then(async (cache) => {
                 console.log('Service Worker: Caching app shell');
-                return cache.addAll(ASSETS_TO_CACHE);
+                await Promise.all(
+                    ASSETS_TO_CACHE.map(async (url) => {
+                        try {
+                            const res = await fetch(url);
+                            if (res.ok) {
+                                await cache.put(url, res);
+                            }
+                        } catch (e) {
+                            console.warn('Service worker asset caching error:', url, e);
+                        }
+                    })
+                );
             })
             .then(() => self.skipWaiting())
     );
@@ -128,7 +139,7 @@ self.addEventListener('fetch', (event) => {
                 .catch(() => {
                     // Offline: fall back to the cached shell for navigations
                     if (!cached && event.request.mode === 'navigate') {
-                        return caches.match('/index.html');
+                        return caches.match('/index.html') || caches.match('/');
                     }
                     return cached;
                 });

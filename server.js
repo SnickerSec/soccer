@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
@@ -55,6 +56,10 @@ app.use((req, res, next) => {
 // middleware. A cold page load is ~18 asset requests, so counting them against
 // the 100-per-15-min budget would lock out coaches sharing a club/school NAT.
 // This also skips a session-store DB lookup on every CSS/JS request.
+const distDir = path.join(__dirname, 'dist');
+if (fs.existsSync(distDir)) {
+    app.use(express.static(distDir));
+}
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check endpoint for Railway

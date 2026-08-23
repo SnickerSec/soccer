@@ -1,0 +1,115 @@
+/**
+ * Application Constants
+ * Centralized configuration values for the AYSO Roster Pro application
+ */
+
+export const CONSTANTS = {
+    // Player constraints
+    MAX_PLAYERS: 30,
+    MAX_PLAYER_NAME_LENGTH: 50,
+    MIN_PLAYER_NUMBER: 1,
+    MAX_PLAYER_NUMBER: 99,
+    MAX_CAPTAINS: 2,
+
+    // File constraints
+    MAX_FILE_SIZE_BYTES: 1024 * 1024, // 1MB
+    MAX_FILE_SIZE_DISPLAY: '1MB',
+
+    // Lineup generation
+    MAX_GENERATION_ATTEMPTS: 500,
+    GENERATION_DELAY_MS: 10,
+
+    // Quarters
+    DEFAULT_QUARTERS: 4,
+    MAX_SITTING_QUARTERS: 2,
+    MAX_GOALIE_QUARTERS: 1,
+
+    // PDF generation
+    MAX_COMMENT_LENGTH: 50,
+    PLAYERS_PER_PDF_PAGE: 10,
+    MAX_PLAYERS_PDF: 20,
+
+    // UI timing
+    NOTIFICATION_DURATION_MS: 3000,
+    NOTIFICATION_FADE_MS: 300,
+    WELCOME_MESSAGE_DELAY_MS: 500,
+
+    // Undo/Redo
+    MAX_UNDO_STACK_SIZE: 20,
+
+    // LocalStorage keys
+    STORAGE_KEYS: {
+        PLAYERS: 'ayso_players',
+        SETTINGS: 'ayso_settings',
+        VISITED: 'ayso_visited',
+        THEME: 'ayso_theme',
+        LINEUP_HISTORY: 'ayso_lineup_history',
+        SYNC_QUEUE: 'ayso_sync_queue',
+        MIGRATION_STATUS: 'ayso_migration_status',
+        CURRENT_TEAM: 'ayso_current_team'
+    },
+
+    // Cloud sync settings
+    CLOUD: {
+        SYNC_DEBOUNCE_MS: 2000,
+        INVITE_EXPIRY_DAYS: 7,
+        MAX_TEAMS: 10
+    },
+
+    // Team member roles
+    TEAM_ROLES: {
+        OWNER: 'owner',
+        COACH: 'coach',
+        VIEWER: 'viewer'
+    },
+
+    // Theme options
+    THEMES: {
+        DARK: 'dark',
+        LIGHT: 'light'
+    },
+
+    // Player status options
+    PLAYER_STATUS: {
+        AVAILABLE: 'available',
+        INJURED: 'injured',
+        ABSENT: 'absent'
+    },
+
+    // Position categories
+    POSITION_TYPES: {
+        KEEPER: 'keeper',
+        DEFENSIVE: 'defensive',
+        OFFENSIVE: 'offensive'
+    },
+
+    // Default formations by field size
+    DEFAULT_FORMATIONS: {
+        5: '2-2',
+        6: '2-3-1',
+        7: '2-3-1',
+        9: '3-3-2',
+        11: '4-4-2'
+    },
+
+    // Age divisions and their field sizes
+    AGE_DIVISIONS: {
+        '10U': { fieldSize: 7, altFieldSize: 6 },
+        '12U': { fieldSize: 9 },
+        '14U': { fieldSize: 11 },
+        '16U': { fieldSize: 11 },
+        '19U': { fieldSize: 11 }
+    },
+
+    // Keyboard shortcuts
+    KEYBOARD_SHORTCUTS: {
+        GENERATE: { key: 'g', ctrl: true, description: 'Generate lineup' },
+        DEMO: { key: 'd', ctrl: true, description: 'Load demo players' },
+        PRINT: { key: 'p', ctrl: true, description: 'Print lineup' },
+        EXPORT: { key: 'e', ctrl: true, description: 'Export lineup' },
+        UNDO: { key: 'z', ctrl: true, description: 'Undo' },
+        REDO: { key: 'y', ctrl: true, description: 'Redo' }
+    }
+};
+
+export default CONSTANTS;
