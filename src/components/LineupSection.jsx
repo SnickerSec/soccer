@@ -296,9 +296,11 @@ export function LineupSection({
                                 </span>
                               )}
                               {isCaptain && (
-                                <span className="captain-star text-captain shrink-0">⭐</span>
+                                <span className="captain-star text-amber-500 dark:text-amber-400 shrink-0 text-xs">⭐</span>
                               )}
-                              <span className="truncate">{playerName}</span>
+                              <span className={cn("truncate font-medium text-foreground", isCaptain && "font-semibold text-amber-600 dark:text-amber-300")}>
+                                {playerName}
+                              </span>
                             </td>
                           </tr>
                         );
@@ -392,9 +394,11 @@ export function LineupSection({
                                 </span>
                               )}
                               {isCaptain && (
-                                <span className="captain-star text-captain shrink-0">⭐</span>
+                                <span className="captain-star text-amber-500 dark:text-amber-400 shrink-0 text-xs">⭐</span>
                               )}
-                              <span className="truncate">{sitName}</span>
+                              <span className={cn("truncate font-medium text-foreground", isCaptain && "font-semibold text-amber-600 dark:text-amber-300")}>
+                                {sitName}
+                              </span>
                             </td>
                           </tr>
                         );

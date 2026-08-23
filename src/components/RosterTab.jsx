@@ -193,7 +193,7 @@ export function RosterTab({
                   aria-label={player.name}
                   className={cn(
                     "flex flex-wrap sm:flex-nowrap items-center justify-between p-3 gap-3 transition-colors hover:bg-muted/40",
-                    isCaptain && "bg-captain/5",
+                    isCaptain && "bg-amber-500/10 dark:bg-amber-400/10 border-l-2 border-l-amber-500 dark:border-l-amber-400",
                     status === 'injured' && "opacity-75 bg-destructive/5",
                     status === 'absent' && "opacity-50"
                   )}
@@ -230,9 +230,12 @@ export function RosterTab({
                     {/* Name Display */}
                     <div className="flex items-center gap-1.5 flex-1 truncate">
                       {isCaptain && (
-                        <span className="captain-star text-captain shrink-0" title="Team Captain">⭐</span>
+                        <span className="captain-star text-amber-500 dark:text-amber-400 shrink-0 text-base" title="Team Captain">⭐</span>
                       )}
-                      <span className={cn("text-sm font-medium truncate", isCaptain && "text-captain-foreground font-semibold")}>
+                      <span className={cn(
+                        "text-sm font-medium text-foreground truncate",
+                        isCaptain && "font-semibold text-amber-600 dark:text-amber-300"
+                      )}>
                         {player.name}
                       </span>
                     </div>
