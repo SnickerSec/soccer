@@ -19,6 +19,9 @@ import {
   Star,
   Play,
   FileDown,
+  ChevronLeft,
+  ChevronRight,
+  Smartphone,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -50,8 +53,54 @@ export function LineupSection({
   onExportPdf,
 }) {
   const [viewMode, setViewMode] = useState('all'); // 'all', 'table', 'pitch'
+  const [mobileQuarter, setMobileQuarter] = useState('all'); // 'all', 1, 2, 3, 4
   const [pendingSwap, setPendingSwap] = useState(null); // { quarter, position, player }
   const pendingSwapRef = useRef(null);
+
+  const touchStartXRef = useRef(0);
+  const touchStartYRef = useRef(0);
+
+  const handleTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartXRef.current) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    // Primarily horizontal swipe (> 45px)
+    if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+      if (deltaX < 0) {
+        // Swiped left -> Next quarter
+        handleNextMobileQuarter();
+      } else {
+        // Swiped right -> Previous quarter
+        handlePrevMobileQuarter();
+      }
+    }
+  };
+
+  const handleNextMobileQuarter = () => {
+    setMobileQuarter((prev) => {
+      const next = prev === 'all' ? 2 : prev === 4 ? 1 : prev + 1;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(15); } catch (_) {}
+      }
+      return next;
+    });
+  };
+
+  const handlePrevMobileQuarter = () => {
+    setMobileQuarter((prev) => {
+      const prevQ = prev === 'all' ? 4 : prev === 1 ? 4 : prev - 1;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(15); } catch (_) {}
+      }
+      return prevQ;
+    });
+  };
 
   useEffect(() => {
     pendingSwapRef.current = null;
@@ -315,8 +364,62 @@ export function LineupSection({
         </Button>
       </div>
 
+      {/* Mobile Quarter Selector / Swipe Toolbar */}
+      <div className="flex md:hidden items-center justify-between gap-2 p-2 rounded-lg border bg-muted/20">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handlePrevMobileQuarter}
+          className="h-7 w-7 p-0"
+          aria-label="Previous Quarter"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant={mobileQuarter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setMobileQuarter('all')}
+            className="h-7 px-2 text-[11px] font-bold"
+          >
+            All
+          </Button>
+          {[1, 2, 3, 4].map((qNum) => (
+            <Button
+              key={qNum}
+              type="button"
+              variant={mobileQuarter === qNum ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setMobileQuarter(qNum)}
+              className="h-7 px-2 text-[11px] font-bold"
+            >
+              Q{qNum}
+            </Button>
+          ))}
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleNextMobileQuarter}
+          className="h-7 w-7 p-0"
+          aria-label="Next Quarter"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
       {/* Quarters Display */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="lineupGrid">
+      <div
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+        id="lineupGrid"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
           {quarters.map((quarter, qIndex) => {
             const qNum = quarter.quarter || qIndex + 1;
             const positions = quarter.positions || {};
@@ -325,7 +428,10 @@ export function LineupSection({
             return (
               <Card
                 key={qNum}
-                className="quarter-lineup overflow-hidden shadow-sm flex flex-col rounded-lg border bg-card"
+                className={cn(
+                  "quarter-lineup overflow-hidden shadow-sm flex flex-col rounded-lg border bg-card transition-opacity",
+                  mobileQuarter !== 'all' && Number(mobileQuarter) !== Number(qNum) ? "hidden md:flex" : "flex"
+                )}
               >
                 <CardHeader className="py-2.5 px-4 bg-muted/30 border-b">
                   <CardTitle className="text-sm font-semibold flex items-center justify-between">
