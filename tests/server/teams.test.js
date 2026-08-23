@@ -10,8 +10,9 @@ import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globa
 import request from 'supertest';
 
 const query = jest.fn();
+const connect = jest.fn();
 jest.unstable_mockModule('../../server/db.js', () => ({
-    default: { query, connect: jest.fn() }
+    default: { query, connect }
 }));
 
 const { default: teamRoutes } = await import('../../server/routes/teams.js');
@@ -285,25 +286,170 @@ describe('POST /api/teams/:teamId/invite', () => {
     });
 });
 
+/**
+ * Removing a member runs in a transaction: it locks the target row, counts the
+ * remaining owners if that row is one, and only then deletes. Whether the lock
+ * actually serialises two owners removing each other is
+ * tests/integration/team-membership.test.js; this covers the shape.
+ */
 describe('DELETE /api/teams/:teamId/members/:memberId', () => {
+    /**
+     * A client answering with `responses` in order, recording its statements.
+     * Every statement consumes one response, BEGIN and COMMIT included.
+     */
+    function stubClient(responses = []) {
+        const statements = [];
+        const released = { count: 0 };
+        let i = 0;
+
+        connect.mockResolvedValue({
+            query: async (sql, params) => {
+                statements.push({ verb: String(sql).trim().split(/\s+/)[0].toUpperCase(), sql, params });
+                const next = responses[i++];
+                if (next instanceof Error) throw next;
+                return next ?? rows();
+            },
+            release: () => { released.count++; }
+        });
+
+        return { statements, released };
+    }
+
     test('denies a coach removing members', async () => {
         actingAs('coach');
+        stubClient();
 
         const res = await request(buildApp(teamRoutes, ALICE))
             .delete('/api/teams/team-1/members/member-2');
 
         expect(res.status).toBe(403);
-        expect(query).toHaveBeenCalledTimes(1);
+        expect(connect).not.toHaveBeenCalled();
     });
 
-    test('scopes the delete to the team, so a member id from another team cannot be removed', async () => {
+    test('scopes the lookup to the team, so a member id from another team is not found', async () => {
         actingAs('owner');
+        //                        BEGIN     SELECT finds nothing
+        const client = stubClient([rows(), rows()]);
+
+        const res = await request(buildApp(teamRoutes, ALICE))
+            .delete('/api/teams/team-1/members/member-2');
+
+        expect(res.status).toBe(404);
+        expect(client.statements[1].params).toEqual(['member-2', 'team-1']);
+        expect(client.statements[1].sql).toContain('team_id = $2');
+        expect(client.released.count).toBe(1);
+    });
+
+    test('removes a coach without counting owners', async () => {
+        actingAs('owner');
+        //                        BEGIN     SELECT target        DELETE
+        const client = stubClient([rows(), rows({ role: 'coach' }), rows()]);
 
         const res = await request(buildApp(teamRoutes, ALICE))
             .delete('/api/teams/team-1/members/member-2');
 
         expect(res.status).toBe(200);
-        expect(query.mock.calls[1][1]).toEqual(['member-2', 'team-1']);
-        expect(query.mock.calls[1][0]).toContain('team_id = $2');
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'SELECT', 'DELETE', 'COMMIT']);
+    });
+
+    test('locks the row it is about to remove', async () => {
+        actingAs('owner');
+        const client = stubClient([rows(), rows({ role: 'coach' }), rows()]);
+
+        await request(buildApp(teamRoutes, ALICE))
+            .delete('/api/teams/team-1/members/member-2');
+
+        expect(client.statements[1].sql).toContain('FOR UPDATE');
+    });
+
+    test('refuses to remove the last owner', async () => {
+        actingAs('owner');
+        //                        BEGIN     SELECT target        COUNT owners
+        const client = stubClient([rows(), rows({ role: 'owner' }), rows({ count: 1 })]);
+
+        const res = await request(buildApp(teamRoutes, ALICE))
+            .delete('/api/teams/team-1/members/member-2');
+
+        expect(res.status).toBe(409);
+        // No DELETE, and the transaction is unwound
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'SELECT', 'SELECT', 'ROLLBACK']);
+        expect(client.released.count).toBe(1);
+    });
+
+    test('removes an owner when another remains', async () => {
+        actingAs('owner');
+        const client = stubClient([rows(), rows({ role: 'owner' }), rows({ count: 2 }), rows()]);
+
+        const res = await request(buildApp(teamRoutes, ALICE))
+            .delete('/api/teams/team-1/members/member-2');
+
+        expect(res.status).toBe(200);
+        expect(client.statements.map(s => s.verb))
+            .toEqual(['BEGIN', 'SELECT', 'SELECT', 'DELETE', 'COMMIT']);
+    });
+
+    test('still answers when the rollback itself fails', async () => {
+        actingAs('owner');
+        // A dropped connection fails BEGIN and ROLLBACK alike
+        const client = stubClient([
+            new Error('connection terminated'),
+            new Error('connection terminated')
+        ]);
+
+        const res = await request(buildApp(teamRoutes, ALICE))
+            .delete('/api/teams/team-1/members/member-2');
+
+        expect(res.status).toBe(500);
+        expect(client.released.count).toBe(1);
+    });
+});
+
+describe('DELETE /api/teams/:teamId/membership', () => {
+    function stubClient(responses = []) {
+        const statements = [];
+        let i = 0;
+        connect.mockResolvedValue({
+            query: async (sql, params) => {
+                statements.push({ verb: String(sql).trim().split(/\s+/)[0].toUpperCase(), sql, params });
+                const next = responses[i++];
+                if (next instanceof Error) throw next;
+                return next ?? rows();
+            },
+            release: () => {}
+        });
+        return { statements };
+    }
+
+    test('a viewer may leave — the lowest role is enough', async () => {
+        actingAs('viewer');
+        stubClient([rows(), rows({ id: 'member-9', role: 'viewer' }), rows()]);
+
+        const res = await request(buildApp(teamRoutes, ALICE))
+            .delete('/api/teams/team-1/membership');
+
+        expect(res.status).toBe(200);
+    });
+
+    test('takes the caller\'s own row, from the session rather than the request', async () => {
+        actingAs('coach');
+        const client = stubClient([rows(), rows({ id: 'member-9', role: 'coach' }), rows()]);
+
+        await request(buildApp(teamRoutes, ALICE))
+            .delete('/api/teams/team-1/membership')
+            .send({ user_id: 'user-mallory' });
+
+        expect(client.statements[1].params).toEqual(['team-1', 'user-alice']);
+        expect(client.statements[2].params).toEqual(['member-9']);
+    });
+
+    test('refuses when the caller is the only owner', async () => {
+        actingAs('owner');
+        const client = stubClient([rows(), rows({ id: 'member-1', role: 'owner' }), rows({ count: 1 })]);
+
+        const res = await request(buildApp(teamRoutes, ALICE))
+            .delete('/api/teams/team-1/membership');
+
+        expect(res.status).toBe(409);
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'SELECT', 'SELECT', 'ROLLBACK']);
     });
 });

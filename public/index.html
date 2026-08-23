@@ -390,6 +390,10 @@
                 <div class="modal-actions">
                     <button id="backToTeamList" class="btn-secondary">Back</button>
                     <button id="editTeamBtn" class="btn-primary">Edit Name</button>
+                    <!-- Shown to anyone who is not the team's only owner: an
+                         invite could be accepted but not undone, so a coach on
+                         the wrong team had no way off it. -->
+                    <button id="leaveTeamBtn" class="btn-danger">Leave Team</button>
                     <button id="deleteTeamBtn" class="btn-danger">Delete Team</button>
                 </div>
             </div>

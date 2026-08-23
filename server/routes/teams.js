@@ -167,16 +167,131 @@ router.post('/api/teams/:teamId/invite', requireTeamAccess('owner'), async (req,
 });
 
 // Remove a team member
+/**
+ * Removes a member from a team.
+ *
+ * The last owner cannot be removed. Every administrative route on a team —
+ * rename, invite, remove, and delete — requires owner, and no route grants the
+ * role, so a team with none is unadministrable and cannot even be deleted. It
+ * stays in every member's list with the roster and season history inside.
+ *
+ * The UI never offered the button for an owner row, which is not the same as
+ * the server refusing it.
+ */
 router.delete('/api/teams/:teamId/members/:memberId', requireTeamAccess('owner'), async (req, res) => {
+    const { teamId, memberId } = req.params;
+
+    const client = await pool.connect();
     try {
-        await pool.query(
-            'DELETE FROM team_members WHERE id = $1 AND team_id = $2',
-            [req.params.memberId, req.params.teamId]
+        await client.query('BEGIN');
+
+        // FOR UPDATE holds the row, so two owners removing each other at once
+        // cannot both see an owner remaining and both proceed.
+        const target = await client.query(
+            'SELECT role FROM team_members WHERE id = $1 AND team_id = $2 FOR UPDATE',
+            [memberId, teamId]
         );
+
+        if (target.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, error: 'Member not found' });
+        }
+
+        if (target.rows[0].role === 'owner') {
+            const owners = await client.query(
+                `SELECT count(*)::int AS count FROM team_members
+                 WHERE team_id = $1 AND role = 'owner' AND joined_at IS NOT NULL`,
+                [teamId]
+            );
+
+            if (owners.rows[0].count <= 1) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({
+                    success: false,
+                    error: 'A team must keep one owner. Make someone else an owner first, or delete the team.'
+                });
+            }
+        }
+
+        await client.query(
+            'DELETE FROM team_members WHERE id = $1 AND team_id = $2',
+            [memberId, teamId]
+        );
+
+        await client.query('COMMIT');
         res.json({ success: true });
     } catch (error) {
+        // A failed BEGIN would make ROLLBACK throw too, and that would escape
+        // the handler and leave the request hanging.
+        try {
+            await client.query('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('Rollback failed after remove member error:', rollbackError);
+        }
         console.error('Remove member error:', error);
         res.status(500).json({ success: false, error: 'Failed to remove member' });
+    } finally {
+        client.release();
+    }
+});
+
+/**
+ * Leaves a team.
+ *
+ * Membership was one-way: an invite could be accepted but not undone, and only
+ * an owner could remove anyone — so a coach who joined the wrong team was on it
+ * for good. Any member can drop their own row; the last owner still cannot,
+ * for the reason above.
+ */
+router.delete('/api/teams/:teamId/membership', requireTeamAccess('viewer'), async (req, res) => {
+    const { teamId } = req.params;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const own = await client.query(
+            `SELECT id, role FROM team_members
+             WHERE team_id = $1 AND user_id = $2 AND joined_at IS NOT NULL
+             FOR UPDATE`,
+            [teamId, req.user.id]
+        );
+
+        if (own.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, error: 'Not a member of this team' });
+        }
+
+        if (own.rows[0].role === 'owner') {
+            const owners = await client.query(
+                `SELECT count(*)::int AS count FROM team_members
+                 WHERE team_id = $1 AND role = 'owner' AND joined_at IS NOT NULL`,
+                [teamId]
+            );
+
+            if (owners.rows[0].count <= 1) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({
+                    success: false,
+                    error: 'You are the only owner. Make someone else an owner first, or delete the team.'
+                });
+            }
+        }
+
+        await client.query('DELETE FROM team_members WHERE id = $1', [own.rows[0].id]);
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (error) {
+        try {
+            await client.query('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('Rollback failed after leave team error:', rollbackError);
+        }
+        console.error('Leave team error:', error);
+        res.status(500).json({ success: false, error: 'Failed to leave team' });
+    } finally {
+        client.release();
     }
 });
 

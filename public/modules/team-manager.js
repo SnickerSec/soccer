@@ -70,21 +70,18 @@ export async function removeMember(teamId, memberId) {
 }
 
 /**
- * Leave a team (remove self)
+ * Leave a team.
+ *
+ * Goes to /membership rather than looking up your own member id and passing it
+ * to the owner-only removal route, which is what this used to do — so it was
+ * unusable by the people who need it, and never wired to anything.
+ *
+ * The server refuses if you are the team's only owner, since nothing could then
+ * administer or delete the team.
  */
 export async function leaveTeam(teamId) {
-    // Find own membership and remove
-    const user = await getUser();
-    if (!user) return { success: false, error: 'Not authenticated' };
-
     try {
-        const membersResult = await getTeamMembers(teamId);
-        if (!membersResult.success) return membersResult;
-
-        const self = membersResult.data.find(m => m.userId === user.id);
-        if (!self) return { success: false, error: 'Not a member' };
-
-        return await removeMember(teamId, self.id);
+        return await api.delete(`/api/teams/${teamId}/membership`);
     } catch (error) {
         return { success: false, error: error.message };
     }

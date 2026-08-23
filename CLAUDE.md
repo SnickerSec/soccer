@@ -126,6 +126,20 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
   - Export/print functionality
 - **styles.css**: Application styling
 
+### Team roles
+
+`team_members.role` is one of `viewer`, `coach`, `owner`, lowest to highest, and
+`roleSatisfies` treats an unrecognised value as below everything so an odd row
+denies rather than grants. Viewers read; coaches write players and games; owners
+rename, invite, remove members and delete the team.
+
+A team must always keep one owner. Nothing grants the role, so a team with none
+cannot be renamed, invited to, administered or even deleted — it would sit in
+every member's list with the roster and season history inside. Both routes that
+could remove the last one refuse: `DELETE .../members/:memberId` and
+`DELETE .../membership`, the latter being how any member leaves a team on their
+own.
+
 ### Roster concurrency
 
 A team can have several coaches, and a roster save replaces the whole list, so

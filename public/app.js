@@ -50,6 +50,7 @@ import {
     updateTeam,
     deleteTeam,
     getTeamMembers,
+    leaveTeam,
     generateInviteLink,
     getInviteInfo,
     acceptInvite,
@@ -535,7 +536,10 @@ class SoccerLineupGenerator {
         const deleteBtn = document.getElementById('deleteTeamBtn');
         const editBtn = document.getElementById('editTeamBtn');
 
-        if (team.role === 'owner') {
+        const leaveBtn = document.getElementById('leaveTeamBtn');
+        const isOwner = team.role === 'owner';
+
+        if (isOwner) {
             inviteSection?.classList.remove('hidden');
             if (deleteBtn) deleteBtn.style.display = 'block';
             if (editBtn) editBtn.style.display = 'block';
@@ -543,6 +547,15 @@ class SoccerLineupGenerator {
             inviteSection?.classList.add('hidden');
             if (deleteBtn) deleteBtn.style.display = 'none';
             if (editBtn) editBtn.style.display = 'none';
+        }
+
+        // Leaving is for everyone except the only owner, who has nobody to hand
+        // the team to — the server refuses that too, this just does not offer it.
+        if (leaveBtn) {
+            const otherOwners = result.success
+                ? result.data.filter(m => m.role === 'owner' && m.userId !== this.currentUser?.id)
+                : [];
+            leaveBtn.style.display = (isOwner && otherOwners.length === 0) ? 'none' : 'block';
         }
 
         // Hide invite link container
@@ -632,6 +645,42 @@ class SoccerLineupGenerator {
         } else {
             showNotification(result.error || 'Failed to delete team', 'error');
         }
+    }
+
+    /**
+     * Leaves a team.
+     *
+     * Same aftermath as deleting one: if it was the team in use there is
+     * nothing behind the cached roster and season history any more.
+     */
+    async handleLeaveTeam() {
+        const teamId = document.getElementById('teamDetailsView')?.dataset.teamId;
+        const team = this.teams.find(t => t.id === teamId);
+        if (!team) return;
+
+        if (!confirm(`Leave "${team.name}"? You will need a new invite to rejoin.`)) {
+            return;
+        }
+
+        const result = await leaveTeam(teamId);
+        if (!result.success) {
+            showNotification(result.error || 'Failed to leave team', 'error');
+            return;
+        }
+
+        const wasCurrent = teamId === this.currentTeamId;
+        await this.loadTeams();
+        if (wasCurrent) {
+            if (this.teams.length > 0) {
+                await this.switchTeam(this.teams[0].id);
+            } else {
+                this.currentTeamId = null;
+                this.clearLocalTeamData();
+            }
+        }
+        this.showTeamView('list');
+        this.renderTeamList();
+        showNotification(`Left ${team.name}`, 'success');
     }
 
     async handleGenerateInviteLink() {
@@ -1514,6 +1563,11 @@ class SoccerLineupGenerator {
         const deleteTeamBtn = document.getElementById('deleteTeamBtn');
         if (deleteTeamBtn) {
             deleteTeamBtn.addEventListener('click', () => this.handleDeleteTeam());
+        }
+
+        const leaveTeamBtn = document.getElementById('leaveTeamBtn');
+        if (leaveTeamBtn) {
+            leaveTeamBtn.addEventListener('click', () => this.handleLeaveTeam());
         }
 
         const generateInviteLinkBtn = document.getElementById('generateInviteLink');
