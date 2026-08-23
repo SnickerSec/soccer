@@ -192,6 +192,99 @@ export function LineupSection({
         {getHintText()}
       </p>
 
+      {/* Sticky Action Buttons Bar */}
+      <div className="action-buttons-inline sticky top-2 z-30 flex flex-wrap items-center gap-2 p-3 sm:p-4 rounded-lg border bg-card/95 backdrop-blur shadow-md action-buttons">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          id="copyLineup"
+          data-action="copyLineup"
+          onClick={onCopyLineup}
+          className="flex items-center gap-1.5 text-xs btn-copy"
+        >
+          <Copy className="h-3.5 w-3.5" />
+          Copy
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          id="shareLineup"
+          data-action="shareLineup"
+          onClick={onShareLineup}
+          className="dropdown-trigger flex items-center gap-1.5 text-xs btn-share cursor-pointer"
+        >
+          <Share2 className="h-3.5 w-3.5" />
+          Share
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          id="exportCSV"
+          data-action="exportCSV"
+          onClick={onExportCSV}
+          className="flex items-center gap-1.5 text-xs btn-csv"
+        >
+          <FileSpreadsheet className="h-3.5 w-3.5" />
+          CSV
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          id="exportLineup"
+          data-action="exportLineup"
+          onClick={onExportText}
+          className="flex items-center gap-1.5 text-xs btn-export"
+        >
+          <FileText className="h-3.5 w-3.5" />
+          Text
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          id="printLineup"
+          data-action="printLineup"
+          onClick={onPrintLineup}
+          className="flex items-center gap-1.5 text-xs btn-print"
+        >
+          <Printer className="h-3.5 w-3.5" />
+          Print
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-action="regenerateLineup"
+          onClick={onRegenerate}
+          className="flex items-center gap-1.5 text-xs btn-regenerate"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Regenerate
+        </Button>
+
+        <Button
+          type="button"
+          variant="success"
+          size="sm"
+          id="saveGame"
+          data-action="saveGame"
+          onClick={onSaveGame}
+          className="flex items-center gap-1.5 text-xs ml-auto btn-save-game"
+        >
+          <Save className="h-3.5 w-3.5" />
+          Save Game
+        </Button>
+      </div>
+
       {/* Quarters Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="lineupGrid">
           {quarters.map((quarter, qIndex) => {
@@ -432,99 +525,6 @@ export function LineupSection({
             );
           })}
         </div>
-
-      {/* Action Buttons Bar */}
-      <div className="action-buttons-inline flex flex-wrap items-center gap-2 p-4 rounded-lg border bg-card shadow-sm action-buttons">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          id="copyLineup"
-          data-action="copyLineup"
-          onClick={onCopyLineup}
-          className="flex items-center gap-1.5 text-xs btn-copy"
-        >
-          <Copy className="h-3.5 w-3.5" />
-          Copy
-        </Button>
-
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          id="shareLineup"
-          data-action="shareLineup"
-          onClick={onShareLineup}
-          className="dropdown-trigger flex items-center gap-1.5 text-xs btn-share cursor-pointer"
-        >
-          <Share2 className="h-3.5 w-3.5" />
-          Share
-        </Button>
-
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          id="exportCSV"
-          data-action="exportCSV"
-          onClick={onExportCSV}
-          className="flex items-center gap-1.5 text-xs btn-csv"
-        >
-          <FileSpreadsheet className="h-3.5 w-3.5" />
-          CSV
-        </Button>
-
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          id="exportLineup"
-          data-action="exportLineup"
-          onClick={onExportText}
-          className="flex items-center gap-1.5 text-xs btn-export"
-        >
-          <FileText className="h-3.5 w-3.5" />
-          Text
-        </Button>
-
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          id="printLineup"
-          data-action="printLineup"
-          onClick={onPrintLineup}
-          className="flex items-center gap-1.5 text-xs btn-print"
-        >
-          <Printer className="h-3.5 w-3.5" />
-          Print
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          data-action="regenerateLineup"
-          onClick={onRegenerate}
-          className="flex items-center gap-1.5 text-xs btn-regenerate"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          Regenerate
-        </Button>
-
-        <Button
-          type="button"
-          variant="success"
-          size="sm"
-          id="saveGame"
-          data-action="saveGame"
-          onClick={onSaveGame}
-          className="flex items-center gap-1.5 text-xs ml-auto btn-save-game"
-        >
-          <Save className="h-3.5 w-3.5" />
-          Save Game
-        </Button>
-      </div>
 
       {/* Player Summary Section */}
       {playerStats.length > 0 && (
