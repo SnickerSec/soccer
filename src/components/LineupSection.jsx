@@ -18,6 +18,7 @@ import {
   Layers,
   Star,
   Play,
+  FileDown,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -46,6 +47,7 @@ export function LineupSection({
   onToggleMustRest,
   onToggleNoKeeper,
   onOpenMatchday,
+  onExportPdf,
 }) {
   const [viewMode, setViewMode] = useState('all'); // 'all', 'table', 'pitch'
   const [pendingSwap, setPendingSwap] = useState(null); // { quarter, position, player }
@@ -233,6 +235,19 @@ export function LineupSection({
         >
           <Share2 className="h-3.5 w-3.5" />
           Share
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          id="exportPdf"
+          data-action="exportPdf"
+          onClick={onExportPdf}
+          className="flex items-center gap-1.5 text-xs btn-pdf cursor-pointer"
+        >
+          <FileDown className="h-3.5 w-3.5 text-primary" />
+          AYSO PDF
         </Button>
 
         <Button

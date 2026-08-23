@@ -58,6 +58,7 @@ import {
   exportFilename,
   seasonStatsFilename,
 } from '@/modules/export';
+import { generateMatchCardPdf } from '@/modules/match-card-pdf';
 import { buildShareUrl, decodeShareData } from '@/modules/share-link';
 import { toast } from 'sonner';
 
@@ -764,6 +765,26 @@ export default function App() {
     window.print();
   };
 
+  const handleExportPdf = async () => {
+    if (!lineup) return;
+    try {
+      toast.info('Generating official AYSO Match Card PDF...');
+      await generateMatchCardPdf({
+        lineup,
+        players,
+        captains,
+        teamName: currentTeam?.name || 'Our Team',
+        ageDivision: settings.ageDivision,
+        date: new Date().toLocaleDateString(),
+        coachName: currentUser?.name || currentUser?.email || 'Coach',
+      });
+      toast.success('Downloaded official AYSO Match Card PDF!');
+    } catch (err) {
+      console.error('Match card PDF export failed:', err);
+      toast.error('Failed to generate match card PDF');
+    }
+  };
+
   const handleSwapPositions = (fromQuarter, fromPosition, toQuarter, toPosition) => {
     if (!lineup) return;
     saveSnapshot();
@@ -1025,6 +1046,7 @@ export default function App() {
             onToggleMustRest={handleToggleMustRest}
             onToggleNoKeeper={handleToggleNoKeeper}
             onOpenMatchday={() => setIsMatchdayOpen(true)}
+            onExportPdf={handleExportPdf}
           />
         </div>
 
