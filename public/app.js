@@ -88,6 +88,7 @@ import {
     setAccountMenuOpen
 } from './modules/account-menu.js';
 import { buildRosterList } from './modules/roster-render.js';
+import { openRatingDialog } from './modules/rating-dialog.js';
 import {
     buildRecommendationsHtml,
     buildGameHistoryHtml,
@@ -1625,7 +1626,7 @@ class SoccerLineupGenerator {
                 } else if (prefType === 'mustRest') {
                     this.toggleRestPreference(playerName);
                 } else if (prefType === 'rating') {
-                    this.openRatingDialog(playerName);
+                    this.editPlayerRatings(playerName);
                     return; // Don't update player list yet
                 }
                 this.updatePlayerList();
@@ -2109,129 +2110,21 @@ class SoccerLineupGenerator {
         }
     }
 
-    openRatingDialog(playerName) {
+    /** Opens the ratings dialog and writes back what the coach set. */
+    editPlayerRatings(playerName) {
         const player = this.players.find(p => p.name === playerName);
         if (!player) return;
 
-        // Remove any existing rating dialog
-        const existing = document.querySelector('.rating-dialog');
-        if (existing) existing.remove();
+        openRatingDialog(player, {
+            onSave: ({ overallRating, positionalRatings }) => {
+                player.overallRating = overallRating;
+                player.positionalRatings = positionalRatings;
 
-        const dialog = document.createElement('dialog');
-        dialog.className = 'rating-dialog';
-
-        const categories = [
-            { key: 'overall', label: 'Overall', value: player.overallRating || 0 },
-            { key: 'keeper', label: 'Goalkeeper', value: (player.positionalRatings || {}).keeper || 0 },
-            { key: 'defense', label: 'Defense', value: (player.positionalRatings || {}).defense || 0 },
-            { key: 'midfield', label: 'Midfield', value: (player.positionalRatings || {}).midfield || 0 },
-            { key: 'offense', label: 'Offense', value: (player.positionalRatings || {}).offense || 0 }
-        ];
-
-        const title = document.createElement('h3');
-        title.textContent = `Ratings: ${playerName}`;
-        dialog.appendChild(title);
-
-        const form = document.createElement('div');
-        form.className = 'rating-form';
-
-        categories.forEach(cat => {
-            const row = document.createElement('div');
-            row.className = 'rating-row';
-
-            const label = document.createElement('label');
-            label.textContent = cat.label;
-            row.appendChild(label);
-
-            const starsDiv = document.createElement('div');
-            starsDiv.className = 'rating-stars';
-            starsDiv.dataset.category = cat.key;
-
-            for (let i = 1; i <= 5; i++) {
-                const star = document.createElement('button');
-                star.type = 'button';
-                star.className = `rating-star${i <= cat.value ? ' filled' : ''}`;
-                star.dataset.value = i;
-                star.textContent = '★';
-                star.addEventListener('click', () => {
-                    // Toggle off if clicking same value
-                    const currentVal = parseInt(starsDiv.dataset.currentValue) || 0;
-                    const newVal = currentVal === i ? 0 : i;
-                    starsDiv.dataset.currentValue = newVal;
-                    starsDiv.querySelectorAll('.rating-star').forEach((s, idx) => {
-                        s.classList.toggle('filled', idx < newVal);
-                    });
-                });
-                starsDiv.appendChild(star);
-            }
-            starsDiv.dataset.currentValue = cat.value;
-
-            row.appendChild(starsDiv);
-            form.appendChild(row);
-        });
-
-        dialog.appendChild(form);
-
-        const btnRow = document.createElement('div');
-        btnRow.className = 'rating-dialog-buttons';
-
-        const clearBtn = document.createElement('button');
-        clearBtn.textContent = 'Clear All';
-        clearBtn.className = 'btn-secondary';
-        clearBtn.addEventListener('click', () => {
-            form.querySelectorAll('.rating-stars').forEach(starsDiv => {
-                starsDiv.dataset.currentValue = 0;
-                starsDiv.querySelectorAll('.rating-star').forEach(s => s.classList.remove('filled'));
-            });
-        });
-        btnRow.appendChild(clearBtn);
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.className = 'btn-secondary';
-        cancelBtn.addEventListener('click', () => {
-            dialog.close();
-            dialog.remove();
-        });
-        btnRow.appendChild(cancelBtn);
-
-        const saveBtn = document.createElement('button');
-        saveBtn.textContent = 'Save';
-        saveBtn.className = 'btn-primary';
-        saveBtn.addEventListener('click', () => {
-            const overall = parseInt(form.querySelector('[data-category="overall"]').dataset.currentValue) || 0;
-            const keeper = parseInt(form.querySelector('[data-category="keeper"]').dataset.currentValue) || 0;
-            const defense = parseInt(form.querySelector('[data-category="defense"]').dataset.currentValue) || 0;
-            const midfield = parseInt(form.querySelector('[data-category="midfield"]').dataset.currentValue) || 0;
-            const offense = parseInt(form.querySelector('[data-category="offense"]').dataset.currentValue) || 0;
-
-            player.overallRating = overall || null;
-            player.positionalRatings = {};
-            if (keeper) player.positionalRatings.keeper = keeper;
-            if (defense) player.positionalRatings.defense = defense;
-            if (midfield) player.positionalRatings.midfield = midfield;
-            if (offense) player.positionalRatings.offense = offense;
-
-            this.savePlayers();
-            this.updatePlayerList();
-            dialog.close();
-            dialog.remove();
-            showNotification(`Ratings updated for ${playerName}`, 'success');
-        });
-        btnRow.appendChild(saveBtn);
-
-        dialog.appendChild(btnRow);
-
-        // Close on backdrop click
-        dialog.addEventListener('click', (e) => {
-            if (e.target === dialog) {
-                dialog.close();
-                dialog.remove();
+                this.savePlayers();
+                this.updatePlayerList();
+                showNotification(`Ratings updated for ${playerName}`, 'success');
             }
         });
-
-        document.body.appendChild(dialog);
-        dialog.showModal();
     }
 
     updatePlayerNumber(playerIndex, value) {
