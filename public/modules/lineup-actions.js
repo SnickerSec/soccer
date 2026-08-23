@@ -14,6 +14,16 @@ import { iconMarkup } from './icons.js';
  *
  * Returns null when the source button is missing, so a markup change degrades
  * to a missing button rather than a thrown error that breaks the whole lineup.
+ *
+ * The id is stripped from the clone. cloneNode copies it, which left two
+ * elements answering to #shareLineup and #saveGame — and getElementById returns
+ * whichever comes first in the document, which is the clone, since the action
+ * bar is inserted above the static markup it was cloned from. The startup
+ * wiring in app.js runs before any lineup exists so it always found the
+ * original, but that is timing rather than design.
+ *
+ * data-action replaces it: a stable hook for tests and styling that does not
+ * have to be unique.
  */
 function cloneAction(sourceId, onClick) {
     const source = document.getElementById(sourceId);
@@ -23,6 +33,11 @@ function cloneAction(sourceId, onClick) {
     }
 
     const clone = source.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.dataset.action = sourceId;
+    // Icons and spans inside carry ids of their own in some of these buttons
+    clone.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+
     clone.addEventListener('click', onClick);
     return clone;
 }
@@ -63,7 +78,10 @@ function buildDropdown(label, iconId, items) {
 /** The standalone Regenerate button, which has no counterpart in index.html. */
 function buildRegenerateButton(onRegenerate) {
     const button = document.createElement('button');
-    button.id = 'regenerateLineup';
+    // data-action rather than an id, to match the cloned buttons beside it:
+    // the bar is rebuilt on every render and an id here would be one more
+    // thing that has to stay unique across that.
+    button.dataset.action = 'regenerateLineup';
     button.className = 'btn-export';
     button.style.background = '#3498db';
     button.setAttribute('aria-label', 'Regenerate a new lineup with different positions');

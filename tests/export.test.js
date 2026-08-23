@@ -55,6 +55,42 @@ describe('csvField', () => {
     });
 });
 
+describe('csvField and spreadsheet formulas', () => {
+    test.each([
+        ['=', '=HYPERLINK("http://evil.test","click")'],
+        ['+', '+1+1'],
+        ['-', '-cmd|calc'],
+        ['@', '@SUM(A1:A9)']
+    ])('a value starting with %s is not left as a formula', (_lead, value) => {
+        // Excel and Sheets evaluate these on open, and the names come from
+        // whoever shares the team
+        expect(csvField(value).startsWith('"\'')).toBe(true);
+    });
+
+    test('a plain negative number stays a number', () => {
+        expect(csvField('-5')).toBe('"-5"');
+        expect(csvField(-5)).toBe('"-5"');
+    });
+
+    test('a plain negative decimal stays a number', () => {
+        expect(csvField('-2.5')).toBe('"-2.5"');
+    });
+
+    test('an ordinary name is untouched', () => {
+        expect(csvField('Ana')).toBe('"Ana"');
+        expect(csvField("O'Brien")).toBe('"O\'Brien"');
+    });
+
+    test('a percentage from the season stats is untouched', () => {
+        expect(csvField('85%')).toBe('"85%"');
+    });
+
+    test('a name that both starts a formula and contains a quote gets both fixes', () => {
+        // Neutralised, then the inner quote doubled
+        expect(csvField('=Bob "Bobby"')).toBe('"\'=Bob ""Bobby"""');
+    });
+});
+
 describe('csvRow', () => {
     test('joins fields with commas', () => {
         expect(csvRow(['Ana', 7])).toBe('"Ana","7"');

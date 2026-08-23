@@ -16,7 +16,7 @@ test.describe('Game history', () => {
         await page.click('#generateLineup');
         await expect(page.locator('.action-buttons-inline')).toBeVisible({ timeout: 20000 });
 
-        await page.locator('.action-buttons-inline #saveGame').click();
+        await page.locator('.action-buttons-inline [data-action="saveGame"]').click();
         await page.fill('#saveGameName', name);
         await page.fill('#saveGameDate', date);
         await page.click('#confirmSaveGame');

@@ -7,6 +7,29 @@
  * rule is the kind of thing that is only ever noticed when it is wrong.
  */
 
+/** Leading characters a spreadsheet reads as the start of a formula. */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/** A value that is just a number, which no spreadsheet treats as a formula. */
+const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;
+
+/**
+ * Stops a spreadsheet from evaluating a value as a formula.
+ *
+ * Excel and Sheets run a cell beginning = + - or @ on open, so a player named
+ * `=HYPERLINK(...)` executes on whoever opens the roster. The names come from
+ * whoever shares the team, which is a smaller circle than the internet but not
+ * a circle that has to be trusted.
+ *
+ * A leading apostrophe is the usual fix; spreadsheets read it as "this is
+ * text" and do not show it. Plain negative numbers are left alone, so a real
+ * -1 stays a number rather than becoming text.
+ */
+function neutralizeFormula(text) {
+    if (!FORMULA_LEAD.test(text) || PLAIN_NUMBER.test(text)) return text;
+    return `'${text}`;
+}
+
 /**
  * One CSV field, quoted per RFC 4180.
  *
@@ -16,7 +39,8 @@
  * fields, shifting every column after it on that row.
  */
 export function csvField(value) {
-    return `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const text = neutralizeFormula(String(value ?? ''));
+    return `"${text.replace(/"/g, '""')}"`;
 }
 
 /** A CSV line from a list of values. */

@@ -13,14 +13,14 @@ import { test, expect } from '@playwright/test';
 /**
  * The share link the app puts on the clipboard.
  *
- * The action bar is cloned above the lineup once one exists, and the clone
- * keeps its ids — so there are two #shareLineup in the document and only the
- * one inside the open dropdown is clickable.
+ * The action bar is cloned above the lineup once one exists. The clones carry
+ * data-action rather than the id they were cloned from, so that two elements
+ * do not answer to the same id.
  */
 async function shareAndReadLink(page) {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.locator('.dropdown-trigger', { hasText: 'Share' }).first().click();
-    await page.locator('#shareLineup:visible').first().click();
+    await page.locator('[data-action="shareLineup"]').click();
     return page.evaluate(() => navigator.clipboard.readText());
 }
 

@@ -23,7 +23,7 @@ test.describe('Save Game', () => {
         });
 
         await generateLineup(page);
-        await page.locator('.action-buttons-inline #saveGame').click();
+        await page.locator('.action-buttons-inline [data-action="saveGame"]').click();
 
         await expect(page.locator('#saveGameModal')).toBeVisible();
         expect(promptShown).toBe(false);
@@ -35,7 +35,7 @@ test.describe('Save Game', () => {
 
     test('saves the name and date entered in the modal', async ({ page }) => {
         await generateLineup(page);
-        await page.locator('.action-buttons-inline #saveGame').click();
+        await page.locator('.action-buttons-inline [data-action="saveGame"]').click();
 
         await page.fill('#saveGameName', 'vs Tigers');
         await page.fill('#saveGameDate', '2026-03-14');
@@ -55,7 +55,7 @@ test.describe('Save Game', () => {
 
     test('cancelling the modal saves nothing', async ({ page }) => {
         await generateLineup(page);
-        await page.locator('.action-buttons-inline #saveGame').click();
+        await page.locator('.action-buttons-inline [data-action="saveGame"]').click();
 
         await page.fill('#saveGameName', 'Discarded');
         await page.click('#cancelSaveGame');
