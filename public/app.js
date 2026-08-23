@@ -89,6 +89,8 @@ import {
 } from './modules/account-menu.js';
 import { buildRosterList } from './modules/roster-render.js';
 import { openRatingDialog } from './modules/rating-dialog.js';
+import { buildEvaluationList } from './modules/evaluation-render.js';
+import { buildPlayerSummaryTable } from './modules/player-summary.js';
 import {
     buildRecommendationsHtml,
     buildGameHistoryHtml,
@@ -1992,80 +1994,12 @@ class SoccerLineupGenerator {
     }
 
     updateEvaluationList() {
-        const evalList = document.getElementById('evaluationPlayerList');
-        evalList.textContent = '';
-
-        if (this.players.length === 0) {
-            const emptyDiv = document.createElement('div');
-            emptyDiv.className = 'evaluation-empty';
-            emptyDiv.textContent = 'No players added yet. Add players in the Roster Management tab.';
-            evalList.appendChild(emptyDiv);
-            return;
-        }
-
-        this.players.forEach((player, index) => {
-            const playerDiv = document.createElement('div');
-            playerDiv.className = 'evaluation-player-item';
-
-            // Player name div
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'eval-player-name';
-            nameDiv.appendChild(document.createTextNode(player.name));
-            if (player.number) {
-                const numberSpan = document.createElement('span');
-                numberSpan.className = 'eval-player-number';
-                numberSpan.textContent = `#${player.number}`;
-                nameDiv.appendChild(numberSpan);
-            }
-            playerDiv.appendChild(nameDiv);
-
-            // Rating group
-            const ratingGroup = document.createElement('div');
-            ratingGroup.className = 'eval-rating-group';
-            const ratingLabel = document.createElement('label');
-            ratingLabel.setAttribute('for', `rating-${index}`);
-            ratingLabel.textContent = 'Rating';
-            ratingGroup.appendChild(ratingLabel);
-
-            const ratingSelect = document.createElement('select');
-            ratingSelect.id = `rating-${index}`;
-            ratingSelect.addEventListener('change', () => this.updatePlayerRating(index, ratingSelect.value));
-            const ratingOptions = [
-                { value: '', text: '-' },
-                { value: '1', text: '1 - Limited' },
-                { value: '2', text: '2 - Fair' },
-                { value: '3', text: '3 - Average' },
-                { value: '4', text: '4 - Very Accomplished' },
-                { value: '5', text: '5 - Excellent' }
-            ];
-            ratingOptions.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt.value;
-                option.textContent = opt.text;
-                option.selected = player.rating === parseInt(opt.value);
-                ratingSelect.appendChild(option);
-            });
-            ratingGroup.appendChild(ratingSelect);
-            playerDiv.appendChild(ratingGroup);
-
-            // Comment group
-            const commentGroup = document.createElement('div');
-            commentGroup.className = 'eval-comment-group';
-            const commentLabel = document.createElement('label');
-            commentLabel.setAttribute('for', `comment-${index}`);
-            commentLabel.textContent = 'Comments / Parental Support';
-            commentGroup.appendChild(commentLabel);
-
-            const textarea = document.createElement('textarea');
-            textarea.id = `comment-${index}`;
-            textarea.placeholder = 'Enter comments about player skill or parental support...';
-            textarea.value = player.comment || '';
-            textarea.addEventListener('change', () => this.updatePlayerComment(index, textarea.value));
-            commentGroup.appendChild(textarea);
-            playerDiv.appendChild(commentGroup);
-
-            evalList.appendChild(playerDiv);
-        });
+        const list = document.getElementById('evaluationPlayerList');
+        list.textContent = '';
+        list.appendChild(buildEvaluationList(this.players, {
+            onRatingChange: (index, value) => this.updatePlayerRating(index, value),
+            onCommentChange: (index, text) => this.updatePlayerComment(index, text)
+        }));
     }
 
     updatePlayerRating(index, rating) {
@@ -2662,83 +2596,10 @@ class SoccerLineupGenerator {
     }
 
     getPlayerSummary() {
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        const headers = ['Rest', 'No Keeper', 'Player', 'Captain', 'Quarters Played', 'Quarters Resting', 'Defense/Offense', 'Positions'];
-        headers.forEach(text => {
-            const th = document.createElement('th');
-            th.textContent = text;
-            headerRow.appendChild(th);
+        return buildPlayerSummaryTable(this.players, {
+            onToggleRest: (name) => this.toggleRestPreference(name),
+            onToggleNoKeeper: (name) => this.toggleNoKeeperPreference(name)
         });
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
-
-        this.players.forEach(player => {
-            const tr = document.createElement('tr');
-
-            // Rest checkbox
-            const tdRest = document.createElement('td');
-            const restCheckbox = document.createElement('input');
-            restCheckbox.type = 'checkbox';
-            restCheckbox.className = 'rest-checkbox';
-            restCheckbox.checked = player.mustRest;
-            restCheckbox.title = 'Check to ensure this player rests at least 1 quarter';
-            restCheckbox.addEventListener('change', () => this.toggleRestPreference(player.name));
-            tdRest.appendChild(restCheckbox);
-            tr.appendChild(tdRest);
-
-            // No Keeper checkbox
-            const tdNoKeeper = document.createElement('td');
-            const noKeeperCheckbox = document.createElement('input');
-            noKeeperCheckbox.type = 'checkbox';
-            noKeeperCheckbox.className = 'no-keeper-checkbox';
-            noKeeperCheckbox.checked = player.noKeeper;
-            noKeeperCheckbox.title = 'Check to prevent this player from playing keeper';
-            noKeeperCheckbox.addEventListener('change', () => this.toggleNoKeeperPreference(player.name));
-            tdNoKeeper.appendChild(noKeeperCheckbox);
-            tr.appendChild(tdNoKeeper);
-
-            // Player name
-            const tdPlayer = document.createElement('td');
-            tdPlayer.textContent = player.name + (player.number ? ` #${player.number}` : '');
-            tr.appendChild(tdPlayer);
-
-            // Captain
-            const tdCaptain = document.createElement('td');
-            tdCaptain.textContent = player.isCaptain ? '⭐ Yes' : 'No';
-            tr.appendChild(tdCaptain);
-
-            // Quarters Played
-            const tdPlayed = document.createElement('td');
-            tdPlayed.textContent = player.quartersPlayed.join(', ') || 'None';
-            tr.appendChild(tdPlayed);
-
-            // Quarters Resting
-            const tdResting = document.createElement('td');
-            tdResting.textContent = player.quartersSitting.join(', ') || 'None';
-            tr.appendChild(tdResting);
-
-            // Defense/Offense
-            const tdDO = document.createElement('td');
-            const defensive = player.defensiveQuarters || 0;
-            const offensive = player.offensiveQuarters || 0;
-            tdDO.textContent = `D: ${defensive} / O: ${offensive}`;
-            tr.appendChild(tdDO);
-
-            // Positions
-            const tdPositions = document.createElement('td');
-            const positions = player.positionsPlayed.map(p => `Q${p.quarter}: ${p.position}`).join(', ');
-            tdPositions.textContent = positions || 'None';
-            tr.appendChild(tdPositions);
-
-            tbody.appendChild(tr);
-        });
-
-        table.appendChild(tbody);
-        return table;
     }
 
     exportLineup() {
