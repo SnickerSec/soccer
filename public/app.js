@@ -87,6 +87,7 @@ import {
     renderTeamList,
     setAccountMenuOpen
 } from './modules/account-menu.js';
+import { buildRosterList } from './modules/roster-render.js';
 import {
     buildRecommendationsHtml,
     buildGameHistoryHtml,
@@ -1933,140 +1934,16 @@ class SoccerLineupGenerator {
         const exportBtn = document.getElementById('exportPlayers');
 
         count.textContent = this.players.length;
-        list.innerHTML = '';
+        exportBtn.style.display = this.players.length > 0 ? 'block' : 'none';
 
-        // Show/hide export button based on whether there are players
-        if (this.players.length > 0) {
-            exportBtn.style.display = 'block';
-        } else {
-            exportBtn.style.display = 'none';
-        }
-
-        this.players.forEach((player, index) => {
-            const li = document.createElement('li');
-            const isCaptain = this.captains.includes(player.name);
-            const status = player.status || CONSTANTS.PLAYER_STATUS.AVAILABLE;
-
-            li.setAttribute('role', 'listitem');
-            li.setAttribute('aria-label', `Player ${player.name}${player.number ? ' number ' + player.number : ''}`);
-
-            // Status indicator class
-            const statusClass = status === CONSTANTS.PLAYER_STATUS.INJURED ? 'status-injured' :
-                               status === CONSTANTS.PLAYER_STATUS.ABSENT ? 'status-absent' : 'status-available';
-
-            // Build DOM elements instead of innerHTML to avoid XSS
-            const container = document.createElement('div');
-            container.className = 'player-item-container';
-
-            // Captain checkbox
-            const captainCheckbox = document.createElement('input');
-            captainCheckbox.type = 'checkbox';
-            captainCheckbox.className = 'captain-checkbox';
-            captainCheckbox.checked = isCaptain;
-            captainCheckbox.dataset.player = player.name;
-            captainCheckbox.setAttribute('aria-label', `Select ${player.name} as captain`);
-            captainCheckbox.title = 'Captain';
-            container.appendChild(captainCheckbox);
-
-            // Player number input
-            const numberInput = document.createElement('input');
-            numberInput.type = 'number';
-            numberInput.className = 'player-number-edit';
-            numberInput.value = player.number || '';
-            numberInput.placeholder = '#';
-            numberInput.min = CONSTANTS.MIN_PLAYER_NUMBER;
-            numberInput.max = CONSTANTS.MAX_PLAYER_NUMBER;
-            numberInput.dataset.index = index;
-            numberInput.setAttribute('aria-label', `Jersey number for ${player.name}`);
-            numberInput.onclick = (e) => e.stopPropagation();
-            container.appendChild(numberInput);
-
-            // Player name display
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'player-name-display';
-            if (isCaptain) {
-                const starSpan = document.createElement('span');
-                starSpan.className = 'captain-star';
-                starSpan.textContent = '★';
-                nameSpan.appendChild(starSpan);
-                nameSpan.appendChild(document.createTextNode(' '));
+        list.textContent = '';
+        list.appendChild(buildRosterList(this.players, {
+            captains: this.captains,
+            numberRange: {
+                min: CONSTANTS.MIN_PLAYER_NUMBER,
+                max: CONSTANTS.MAX_PLAYER_NUMBER
             }
-            nameSpan.appendChild(document.createTextNode(player.name));
-            container.appendChild(nameSpan);
-
-            // Preferences container
-            const prefsDiv = document.createElement('div');
-            prefsDiv.className = 'player-preferences';
-
-            // No keeper button
-            const noKeeperBtn = document.createElement('button');
-            noKeeperBtn.type = 'button';
-            noKeeperBtn.className = `pref-checkbox no-keeper${player.noKeeper ? ' active' : ''}`;
-            noKeeperBtn.dataset.player = player.name;
-            noKeeperBtn.dataset.pref = 'noKeeper';
-            noKeeperBtn.setAttribute('aria-label', `Toggle no goalkeeper for ${player.name}`);
-            noKeeperBtn.setAttribute('aria-pressed', player.noKeeper);
-            noKeeperBtn.title = 'No Keeper';
-            noKeeperBtn.textContent = 'GK';
-            prefsDiv.appendChild(noKeeperBtn);
-
-            // Must rest button
-            const mustRestBtn = document.createElement('button');
-            mustRestBtn.type = 'button';
-            mustRestBtn.className = `pref-checkbox must-rest${player.mustRest ? ' active' : ''}`;
-            mustRestBtn.dataset.player = player.name;
-            mustRestBtn.dataset.pref = 'mustRest';
-            mustRestBtn.setAttribute('aria-label', `Toggle must rest for ${player.name}`);
-            mustRestBtn.setAttribute('aria-pressed', player.mustRest);
-            mustRestBtn.title = 'Must Rest';
-            mustRestBtn.textContent = 'R';
-            prefsDiv.appendChild(mustRestBtn);
-
-            // Rating button
-            const ratingBtn = document.createElement('button');
-            ratingBtn.type = 'button';
-            const hasRating = player.overallRating != null;
-            ratingBtn.className = `pref-checkbox player-rating-btn${hasRating ? ' active' : ''}`;
-            ratingBtn.dataset.player = player.name;
-            ratingBtn.dataset.pref = 'rating';
-            ratingBtn.setAttribute('aria-label', `Set ratings for ${player.name}`);
-            ratingBtn.title = hasRating ? `Overall: ${player.overallRating}/5` : 'Set Rating';
-            ratingBtn.textContent = hasRating ? player.overallRating : '★';
-            prefsDiv.appendChild(ratingBtn);
-
-            // Status select
-            const statusSelect = document.createElement('select');
-            statusSelect.className = `player-status-select ${statusClass}`;
-            statusSelect.dataset.player = player.name;
-            statusSelect.setAttribute('aria-label', `Status for ${player.name}`);
-            const statusOptions = [
-                { value: 'available', text: '●' },
-                { value: 'injured', text: '✚' },
-                { value: 'absent', text: '✖' }
-            ];
-            statusOptions.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt.value;
-                option.textContent = opt.text;
-                option.selected = status === opt.value;
-                statusSelect.appendChild(option);
-            });
-            prefsDiv.appendChild(statusSelect);
-
-            container.appendChild(prefsDiv);
-            li.appendChild(container);
-
-            // Remove button
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'remove-btn';
-            removeBtn.dataset.player = player.name;
-            removeBtn.setAttribute('aria-label', `Remove ${player.name} from roster`);
-            removeBtn.title = 'Remove player';
-            removeBtn.textContent = '×';
-            li.appendChild(removeBtn);
-
-            list.appendChild(li);
-        });
+        }));
 
         // Also update evaluation list
         this.updateEvaluationList();
