@@ -21,6 +21,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { calculatePlayerStats, getLineupRecommendations } from '@/modules/season-stats';
+import { PlayerHeatmapCard } from './PlayerHeatmapCard';
 import { cn } from '@/lib/utils';
 
 function formatDisplayDate(dateStr) {
@@ -216,6 +217,13 @@ export function SeasonTab({
           )}
         </CardContent>
       </Card>
+
+      {/* Player Development & Position Heatmap */}
+      <PlayerHeatmapCard
+        players={players}
+        stats={stats}
+        gameHistory={gameHistory}
+      />
 
       {/* Player Statistics Table */}
       <Card className="shadow-sm overflow-hidden">
