@@ -418,66 +418,6 @@ export function LineupSection({
           })}
         </div>
 
-      {/* Player Summary Section */}
-      {playerStats.length > 0 && (
-        <Card className="player-summary overflow-hidden shadow-sm border bg-card">
-          <CardHeader className="py-3 px-4 border-b bg-muted/20">
-            <CardTitle className="text-sm font-semibold tracking-tight">Player Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/40 border-b">
-                <tr>
-                  {SUMMARY_HEADERS.map((header) => (
-                    <th
-                      key={header}
-                      scope="col"
-                      className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap"
-                    >
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {playerStats.map((player) => {
-                  const cells = summaryCells(player);
-                  return (
-                    <tr key={player.name} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          className="rest-checkbox h-3.5 w-3.5 rounded border-primary cursor-pointer accent-primary"
-                          title="Check to ensure this player rests at least 1 quarter"
-                          aria-label={`Must rest at least one quarter for ${player.name}`}
-                          checked={Boolean(player.mustRest)}
-                          onChange={() => onToggleMustRest && onToggleMustRest(player.name)}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          className="no-keeper-checkbox h-3.5 w-3.5 rounded border-primary cursor-pointer accent-primary"
-                          title="Check to prevent this player from playing keeper"
-                          aria-label={`Never play keeper for ${player.name}`}
-                          checked={Boolean(player.noKeeper)}
-                          onChange={() => onToggleNoKeeper && onToggleNoKeeper(player.name)}
-                        />
-                      </td>
-                      {cells.map((text, cIdx) => (
-                        <td key={cIdx} className="px-3 py-2 whitespace-nowrap">
-                          {text}
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Action Buttons Bar */}
       <div className="action-buttons-inline flex flex-wrap items-center gap-2 p-4 rounded-lg border bg-card shadow-sm action-buttons">
         <Button
@@ -570,6 +510,66 @@ export function LineupSection({
           Save Game
         </Button>
       </div>
+
+      {/* Player Summary Section */}
+      {playerStats.length > 0 && (
+        <Card className="player-summary overflow-hidden shadow-sm border bg-card">
+          <CardHeader className="py-3 px-4 border-b bg-muted/20">
+            <CardTitle className="text-sm font-semibold tracking-tight">Player Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 border-b">
+                <tr>
+                  {SUMMARY_HEADERS.map((header) => (
+                    <th
+                      key={header}
+                      scope="col"
+                      className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap"
+                    >
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {playerStats.map((player) => {
+                  const cells = summaryCells(player);
+                  return (
+                    <tr key={player.name} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          className="rest-checkbox h-3.5 w-3.5 rounded border-primary cursor-pointer accent-primary"
+                          title="Check to ensure this player rests at least 1 quarter"
+                          aria-label={`Must rest at least one quarter for ${player.name}`}
+                          checked={Boolean(player.mustRest)}
+                          onChange={() => onToggleMustRest && onToggleMustRest(player.name)}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          className="no-keeper-checkbox h-3.5 w-3.5 rounded border-primary cursor-pointer accent-primary"
+                          title="Check to prevent this player from playing keeper"
+                          aria-label={`Never play keeper for ${player.name}`}
+                          checked={Boolean(player.noKeeper)}
+                          onChange={() => onToggleNoKeeper && onToggleNoKeeper(player.name)}
+                        />
+                      </td>
+                      {cells.map((text, cIdx) => (
+                        <td key={cIdx} className="px-3 py-2 whitespace-nowrap">
+                          {text}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
     </section>
   );
 }
