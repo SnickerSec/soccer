@@ -103,12 +103,15 @@ export function isOffensivePosition(position) {
  * Get formation description
  */
 export function getFormationDescription(playersOnField, formation) {
+    const targetFormation = formation !== undefined ? formation : playersOnField;
     const descriptions = {
-        // 7v7
+        // 6v6 & 7v7
         '2-3-1': 'Balanced attack with wing play',
         '3-2-1': 'Defensive with counter-attack focus',
         '2-2-2': 'Two striker formation for aggressive play',
         '3-3': 'No dedicated striker, possession-based',
+        // 5v5
+        '2-2': 'Small-sided formation with 2 defenders and attacking players',
         // 9v9
         '3-3-2': 'Balanced with two forwards',
         '3-2-3': 'Wide attacking play with wingers',
@@ -121,5 +124,5 @@ export function getFormationDescription(playersOnField, formation) {
         '5-3-2': 'Defensive with wing backs pushing up'
     };
 
-    return descriptions[formation] || '';
+    return descriptions[targetFormation] || '';
 }

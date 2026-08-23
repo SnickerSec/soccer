@@ -20,7 +20,7 @@ export function GameSettings({
   playerCount = 0,
 }) {
   const availableFormations = getFormationsForFieldSize(fieldPlayers);
-  const formationDesc = getFormationDescription(formation);
+  const formationDesc = getFormationDescription(fieldPlayers, formation);
 
   const getAgeRules = () => {
     switch (ageDivision) {
