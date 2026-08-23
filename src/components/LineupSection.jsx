@@ -147,24 +147,24 @@ export function LineupSection({
       {/* Validation Messages */}
       <div id="validationMessages" role="status" aria-live="polite">
         {isCompliant ? (
-          <Alert variant="success" className="border-success/40 bg-success/10">
-            <CheckCircle2 className="h-4 w-4 text-success" />
-            <AlertTitle className="text-sm font-semibold text-success">
+          <Alert variant="success" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <AlertTitle className="text-sm font-semibold text-emerald-900 dark:text-emerald-300">
               AYSO Everyone Plays Compliant
             </AlertTitle>
-            <AlertDescription className="text-xs text-success-foreground/80 mt-1">
+            <AlertDescription className="text-xs text-emerald-800 dark:text-emerald-200 mt-1 leading-relaxed">
               All active players play at least 50% of the game. Goalkeepers and sit rotations meet all fair play guidelines.
             </AlertDescription>
           </Alert>
         ) : (
-          <Alert variant="warning" className="border-warning/40 bg-warning/10">
-            <AlertTriangle className="h-4 w-4 text-warning" />
-            <AlertTitle className="text-sm font-semibold text-warning">
+          <Alert variant="warning" className="border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertTitle className="text-sm font-semibold text-amber-900 dark:text-amber-300">
               Lineup Notices ({warnings.length})
             </AlertTitle>
-            <AlertDescription className="text-xs mt-1 space-y-1">
+            <AlertDescription className="text-xs text-amber-800 dark:text-amber-200 mt-1 space-y-1 leading-relaxed">
               {warnings.map((warn, i) => (
-                <div key={i}>• {warn}</div>
+                <div key={i} className="font-medium">• {warn}</div>
               ))}
             </AlertDescription>
           </Alert>
