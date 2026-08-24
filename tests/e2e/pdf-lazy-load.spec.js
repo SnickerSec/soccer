@@ -13,7 +13,14 @@ test.describe('PDF library loading', () => {
         expect(vendorRequests).toEqual([]);
 
         // And nothing is pulled from the old CDN
-        expect(requested.filter(u => u.includes('unpkg.com'))).toEqual([]);
+        expect(requested.filter(u => {
+            try {
+                const { hostname } = new URL(u);
+                return hostname === 'unpkg.com' || hostname.endsWith('.unpkg.com');
+            } catch {
+                return false;
+            }
+        })).toEqual([]);
 
         // Globals are absent until something needs them
         expect(await page.evaluate(() => typeof window.PDFLib)).toBe('undefined');
