@@ -10,6 +10,7 @@ import { SaveGameModal } from '@/components/SaveGameModal';
 import { GameNotesModal } from '@/components/GameNotesModal';
 import { MatchdayDialog } from '@/components/MatchdayDialog';
 import { CustomFormationModal } from '@/components/CustomFormationModal';
+import { RosterImportModal } from '@/components/RosterImportModal';
 import { InviteModal } from '@/components/InviteModal';
 import { ShareLineupDialog } from '@/components/ShareLineupDialog';
 import { Footer } from '@/components/Footer';
@@ -60,6 +61,7 @@ import {
   seasonStatsFilename,
 } from '@/modules/export';
 import { generateMatchCardPdf } from '@/modules/match-card-pdf';
+import { extractPlayersFromFile } from '@/modules/roster-importer';
 import { buildShareUrl, decodeShareData } from '@/modules/share-link';
 import { toast } from 'sonner';
 
@@ -125,6 +127,7 @@ export default function App() {
   const [isSaveGameOpen, setIsSaveGameOpen] = useState(false);
   const [isMatchdayOpen, setIsMatchdayOpen] = useState(false);
   const [isCustomFormationOpen, setIsCustomFormationOpen] = useState(false);
+  const [rosterImportData, setRosterImportData] = useState(null);
   const [notesModalGame, setNotesModalGame] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
@@ -548,39 +551,34 @@ export default function App() {
     reader.onload = (e) => {
       try {
         const text = e.target.result;
-        let newPlayers = [];
-
-        if (file.name.endsWith('.json')) {
-          const parsed = JSON.parse(text);
-          newPlayers = Array.isArray(parsed) ? parsed : parsed.players || [];
-        } else {
-          // Parse .txt: lines with "Name #Number" or just "Name"
-          const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-          newPlayers = lines.map((line, idx) => {
-            const match = line.trim().match(/^(.*?)(?:\s+#?(\d+))?$/);
-            const pName = match ? match[1].trim() : line.trim();
-            const pNum = match && match[2] ? parseInt(match[2], 10) : undefined;
-            return {
-              name: pName,
-              number: pNum,
-              status: 'available',
-            };
-          });
-        }
-
-        if (newPlayers.length > 0) {
-          saveSnapshot();
-          setPlayers(newPlayers);
-          setCaptains([]);
-          toast.success(`Imported ${newPlayers.length} players successfully`);
+        const result = extractPlayersFromFile(text, file.name);
+        if (result.players && result.players.length > 0) {
+          setRosterImportData(result);
         } else {
           toast.error('No valid players found in file');
         }
       } catch (err) {
+        console.error('File import parse error:', err);
         toast.error('Failed to read file: invalid format');
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleConfirmRosterImport = (importedPlayers, mode = 'replace') => {
+    saveSnapshot();
+    if (mode === 'replace') {
+      setPlayers(importedPlayers);
+      setCaptains([]);
+      setLineup(null);
+    } else {
+      // Append mode: keep existing players and add new ones (skip duplicate names)
+      const existingNames = new Set(players.map((p) => p.name.toLowerCase().trim()));
+      const uniqueNew = importedPlayers.filter(
+        (p) => !existingNames.has(p.name.toLowerCase().trim())
+      );
+      setPlayers([...players, ...uniqueNew]);
+    }
   };
 
   const handleExportRoster = () => {
@@ -1151,6 +1149,13 @@ export default function App() {
           settingsRef.current = newSettings;
           setSettings(newSettings);
         }}
+      />
+
+      <RosterImportModal
+        isOpen={Boolean(rosterImportData)}
+        onClose={() => setRosterImportData(null)}
+        parsedData={rosterImportData}
+        onConfirmImport={handleConfirmRosterImport}
       />
 
       <GameNotesModal

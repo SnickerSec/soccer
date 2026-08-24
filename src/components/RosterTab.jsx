@@ -58,7 +58,7 @@ export function RosterTab({
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept=".txt,.json"
+            accept=".csv,.tsv,.txt,.json"
             className="hidden"
             id="fileInput"
           />
@@ -68,9 +68,10 @@ export function RosterTab({
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 text-xs"
+            id="importRosterButton"
           >
             <Upload className="h-3.5 w-3.5" />
-            Import (.txt / .json)
+            Import Roster (.csv / .txt / .json)
           </Button>
 
           {players.length > 0 && (
