@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   Trash2,
   Calendar,
+  CalendarCheck,
   FileText,
   Lightbulb,
   Trophy,
@@ -45,12 +46,16 @@ export function SeasonTab({
   onViewGame,
 }) {
   const stats = calculatePlayerStats(players, gameHistory);
-  const recommendations = getLineupRecommendations(gameHistory, players);
+  const recommendations = getLineupRecommendations(players, gameHistory, stats);
+
+  const totalRosterSpots = Object.values(stats).reduce((acc, s) => acc + (s.gamesOnRoster || 0), 0);
+  const totalAttended = Object.values(stats).reduce((acc, s) => acc + (s.gamesAttended || 0), 0);
+  const squadAttendancePct = totalRosterSpots > 0 ? Math.round((totalAttended / totalRosterSpots) * 100) : 100;
 
   return (
     <div className="space-y-6">
       {/* Summary Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="shadow-sm">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 rounded-lg bg-primary/10 text-primary">
@@ -78,6 +83,20 @@ export function SeasonTab({
             </div>
           </CardContent>
         </Card>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CalendarCheck className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold tracking-tight" id="squadAttendanceRate">
+                {squadAttendancePct}%
+              </div>
+              <div className="text-xs text-muted-foreground">Squad Attendance Rate</div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Recommendations Banner */}
@@ -86,7 +105,8 @@ export function SeasonTab({
         (recommendations.shouldSit?.length > 0) ||
         (recommendations.shouldCaptain?.length > 0) ||
         (recommendations.needsOffense?.length > 0) ||
-        (recommendations.needsDefense?.length > 0)
+        (recommendations.needsDefense?.length > 0) ||
+        (recommendations.returningFromAbsence?.length > 0)
       ) && (
         <Card className="border-primary/30 bg-primary/5 shadow-sm" id="lineupRecommendations">
           <CardHeader className="py-3 px-4 border-b border-primary/20 flex flex-row items-center gap-2">
@@ -96,6 +116,16 @@ export function SeasonTab({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 text-xs space-y-2">
+            {recommendations.returningFromAbsence?.length > 0 && (
+              <div>
+                <span className="font-semibold text-foreground">Returning from Absence: </span>
+                <span className="text-muted-foreground">
+                  {recommendations.returningFromAbsence
+                    .map((p) => `${p.name} (missed ${p.gamesAbsent} game${p.gamesAbsent > 1 ? 's' : ''})`)
+                    .join(', ')} — Prioritize playing time
+                </span>
+              </div>
+            )}
             {recommendations.shouldKeep?.length > 0 && (
               <div>
                 <span className="font-semibold text-foreground">Recommended Goalkeepers: </span>
@@ -241,6 +271,7 @@ export function SeasonTab({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[180px]">Player</TableHead>
+                    <TableHead className="text-center">Attendance</TableHead>
                     <TableHead className="text-center">Games</TableHead>
                     <TableHead className="text-center">Quarters</TableHead>
                     <TableHead className="text-center">GK</TableHead>
@@ -255,6 +286,25 @@ export function SeasonTab({
                     <TableRow key={playerName}>
                       <TableCell className="font-medium text-xs">
                         {playerName}
+                      </TableCell>
+                      <TableCell className="text-center text-xs">
+                        {playerStat.gamesOnRoster > 0 ? (
+                          <Badge
+                            variant={
+                              playerStat.gamesAbsent === 0
+                                ? 'success'
+                                : playerStat.gamesAbsent > 1
+                                ? 'destructive'
+                                : 'warning'
+                            }
+                            className="text-[10px] px-1.5 py-0"
+                          >
+                            {Math.round(((playerStat.gamesAttended || 0) / playerStat.gamesOnRoster) * 100)}%
+                            {playerStat.gamesAbsent > 0 && ` (${playerStat.gamesAbsent} missed)`}
+                          </Badge>
+                        ) : (
+                          '–'
+                        )}
                       </TableCell>
                       <TableCell className="text-center text-xs">{playerStat.gamesPlayed || 0}</TableCell>
                       <TableCell className="text-center text-xs font-semibold text-primary">

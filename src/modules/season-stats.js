@@ -70,13 +70,27 @@ function createEmptyStats() {
     };
 }
 
-/**
- * Get lineup recommendations based on season history
- */
-export function getLineupRecommendations(players, savedGames, stats) {
-    const availablePlayers = players.filter(p => p.status === 'available');
+export function getLineupRecommendations(arg1, arg2, arg3) {
+    let players, savedGames;
 
-    if (availablePlayers.length === 0 || savedGames.length === 0) {
+    const isGameArray = (arr) =>
+        Array.isArray(arr) && arr.length > 0 && Boolean(arr[0].quarters || arr[0].date || Array.isArray(arr[0].players));
+
+    if (isGameArray(arg1)) {
+        savedGames = arg1;
+        players = Array.isArray(arg2) ? arg2 : [];
+    } else if (isGameArray(arg2)) {
+        players = Array.isArray(arg1) ? arg1 : [];
+        savedGames = arg2;
+    } else {
+        players = Array.isArray(arg1) ? arg1 : [];
+        savedGames = Array.isArray(arg2) ? arg2 : [];
+    }
+
+    const stats = arg3 || calculatePlayerStats(players, savedGames);
+    const availablePlayers = (players || []).filter(p => !p.status || p.status === 'available');
+
+    if (availablePlayers.length === 0 || (savedGames || []).length === 0) {
         return null;
     }
 
@@ -86,7 +100,8 @@ export function getLineupRecommendations(players, savedGames, stats) {
         shouldCaptain: [],
         needsOffense: [],
         needsDefense: [],
-        positionVariety: []
+        positionVariety: [],
+        returningFromAbsence: [],
     };
 
     // Calculate data for each player
@@ -177,6 +192,18 @@ export function getLineupRecommendations(players, savedGames, stats) {
                 .slice(0, 2)
                 .map(([pos]) => pos)
                 .join(', ')
+        }));
+
+    // Players returning from absence (missed games previously, now available)
+    recommendations.returningFromAbsence = availablePlayers
+        .filter(p => {
+            const s = stats[p.name];
+            return s && s.gamesAbsent > 0;
+        })
+        .slice(0, 3)
+        .map(p => ({
+            name: p.name,
+            gamesAbsent: stats[p.name]?.gamesAbsent || 0,
         }));
 
     return recommendations;
