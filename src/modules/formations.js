@@ -61,10 +61,49 @@ export const FORMATIONS = {
     }
 };
 
+import { CONSTANTS } from '../constants.js';
+import { safeGetFromStorage, safeSetToStorage, safeParseJSON } from './storage.js';
+
+export function getCustomFormations() {
+    return safeParseJSON(safeGetFromStorage(CONSTANTS.STORAGE_KEYS.CUSTOM_FORMATIONS), []);
+}
+
+export function saveCustomFormation({ name, fieldSize, positions, description = '' }) {
+    const list = getCustomFormations().filter(
+        f => !(f.name === name && Number(f.fieldSize) === Number(fieldSize))
+    );
+    const newForm = {
+        name,
+        fieldSize: Number(fieldSize),
+        positions: Array.isArray(positions) ? positions : [],
+        description: description || `Custom ${name} formation (${fieldSize}v${fieldSize})`,
+    };
+    list.push(newForm);
+    safeSetToStorage(CONSTANTS.STORAGE_KEYS.CUSTOM_FORMATIONS, JSON.stringify(list));
+    return newForm;
+}
+
+export function deleteCustomFormation(name, fieldSize) {
+    const list = getCustomFormations().filter(
+        f => !(f.name === name && Number(f.fieldSize) === Number(fieldSize))
+    );
+    safeSetToStorage(CONSTANTS.STORAGE_KEYS.CUSTOM_FORMATIONS, JSON.stringify(list));
+    return true;
+}
+
 /**
  * Get positions for a given formation and field size
  */
 export function getPositionsForFormation(playersOnField, formation) {
+    // Check custom formations first
+    const customList = getCustomFormations();
+    const customMatch = customList.find(
+        f => f.name === formation && Number(f.fieldSize) === Number(playersOnField)
+    );
+    if (customMatch && customMatch.positions?.length > 0) {
+        return customMatch.positions;
+    }
+
     const fieldFormations = FORMATIONS[playersOnField];
 
     if (!fieldFormations) {
@@ -80,9 +119,15 @@ export function getPositionsForFormation(playersOnField, formation) {
  */
 export function getFormationsForFieldSize(playersOnField) {
     const fieldFormations = FORMATIONS[playersOnField];
-    if (!fieldFormations) return [];
+    const builtIn = fieldFormations
+        ? Object.keys(fieldFormations).filter(key => key !== 'default')
+        : [];
 
-    return Object.keys(fieldFormations).filter(key => key !== 'default');
+    const customList = getCustomFormations()
+        .filter(f => Number(f.fieldSize) === Number(playersOnField))
+        .map(f => f.name);
+
+    return Array.from(new Set([...builtIn, ...customList]));
 }
 
 /**
@@ -104,6 +149,16 @@ export function isOffensivePosition(position) {
  */
 export function getFormationDescription(playersOnField, formation) {
     const targetFormation = formation !== undefined ? formation : playersOnField;
+
+    // Check custom formations description
+    const customList = getCustomFormations();
+    const customMatch = customList.find(
+        f => f.name === targetFormation && (!playersOnField || Number(f.fieldSize) === Number(playersOnField))
+    );
+    if (customMatch && customMatch.description) {
+        return customMatch.description;
+    }
+
     const descriptions = {
         // 6v6 & 7v7
         '2-3-1': 'Balanced attack with wing play',
@@ -124,5 +179,5 @@ export function getFormationDescription(playersOnField, formation) {
         '5-3-2': 'Defensive with wing backs pushing up'
     };
 
-    return descriptions[targetFormation] || '';
+    return descriptions[targetFormation] || 'Tactical player distribution across the field';
 }

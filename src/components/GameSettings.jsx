@@ -18,6 +18,7 @@ export function GameSettings({
   onGenerateLineup,
   isGenerating,
   playerCount = 0,
+  onOpenCustomFormation,
 }) {
   const availableFormations = getFormationsForFieldSize(fieldPlayers);
   const formationDesc = getFormationDescription(fieldPlayers, formation);
@@ -119,9 +120,19 @@ export function GameSettings({
 
           {/* Formation */}
           <div className="space-y-1.5">
-            <label htmlFor="formation" className="text-xs font-medium text-muted-foreground">
-              Formation:
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="formation" className="text-xs font-medium text-muted-foreground">
+                Formation:
+              </label>
+              <button
+                type="button"
+                id="openCustomFormation"
+                onClick={onOpenCustomFormation}
+                className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+              >
+                + Custom
+              </button>
+            </div>
             <select
               id="formation"
               aria-label="Select formation for the lineup"

@@ -9,6 +9,7 @@ import { TeamModal } from '@/components/TeamModal';
 import { SaveGameModal } from '@/components/SaveGameModal';
 import { GameNotesModal } from '@/components/GameNotesModal';
 import { MatchdayDialog } from '@/components/MatchdayDialog';
+import { CustomFormationModal } from '@/components/CustomFormationModal';
 import { InviteModal } from '@/components/InviteModal';
 import { ShareLineupDialog } from '@/components/ShareLineupDialog';
 import { Footer } from '@/components/Footer';
@@ -123,6 +124,7 @@ export default function App() {
   const [teamModalInitialTeamId, setTeamModalInitialTeamId] = useState(null);
   const [isSaveGameOpen, setIsSaveGameOpen] = useState(false);
   const [isMatchdayOpen, setIsMatchdayOpen] = useState(false);
+  const [isCustomFormationOpen, setIsCustomFormationOpen] = useState(false);
   const [notesModalGame, setNotesModalGame] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
@@ -1029,6 +1031,7 @@ export default function App() {
             onGenerateLineup={handleGenerateLineup}
             isGenerating={isGenerating}
             playerCount={players.length}
+            onOpenCustomFormation={() => setIsCustomFormationOpen(true)}
           />
 
           {/* Lineup Section */}
@@ -1133,6 +1136,21 @@ export default function App() {
         teamName={currentTeam?.name || 'Our Team'}
         ageDivision={settings.ageDivision}
         onSaveGame={handleSaveGame}
+      />
+
+      <CustomFormationModal
+        isOpen={isCustomFormationOpen}
+        onClose={() => setIsCustomFormationOpen(false)}
+        initialFieldSize={settings.fieldPlayers || 7}
+        onFormationCreated={(formName, sz) => {
+          const newSettings = {
+            ...settingsRef.current,
+            fieldPlayers: sz,
+            formation: formName,
+          };
+          settingsRef.current = newSettings;
+          setSettings(newSettings);
+        }}
       />
 
       <GameNotesModal

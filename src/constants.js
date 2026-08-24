@@ -46,7 +46,8 @@ export const CONSTANTS = {
         LINEUP_HISTORY: 'ayso_lineup_history',
         SYNC_QUEUE: 'ayso_sync_queue',
         MIGRATION_STATUS: 'ayso_migration_status',
-        CURRENT_TEAM: 'ayso_current_team'
+        CURRENT_TEAM: 'ayso_current_team',
+        CUSTOM_FORMATIONS: 'ayso_custom_formations'
     },
 
     // Cloud sync settings
