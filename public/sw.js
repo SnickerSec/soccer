@@ -36,6 +36,7 @@ const ASSETS_TO_CACHE = [
     '/modules/share-link.js',
     '/modules/rating-dialog.js',
     '/modules/roster-render.js',
+    '/modules/schedule.js',
     '/modules/season-render.js',
     '/modules/season-stats.js',
     '/modules/storage.js',

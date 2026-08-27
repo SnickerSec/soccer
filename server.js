@@ -17,6 +17,7 @@ import playerRoutes from './server/routes/players.js';
 import gameRoutes from './server/routes/games.js';
 import settingsRoutes from './server/routes/settings.js';
 import inviteRoutes from './server/routes/invites.js';
+import fixtureRoutes from './server/routes/fixtures.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -154,6 +155,7 @@ app.use(playerRoutes);
 app.use(gameRoutes);
 app.use(settingsRoutes);
 app.use(inviteRoutes);
+app.use(fixtureRoutes);
 
 // CSRF error handler
 app.use((err, req, res, next) => {

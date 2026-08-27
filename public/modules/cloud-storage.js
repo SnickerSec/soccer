@@ -165,3 +165,63 @@ export async function bulkImportGames(teamId, games) {
         return { success: false, error: error.message };
     }
 }
+
+// ============================================
+// FIXTURE / SCHEDULE OPERATIONS
+// ============================================
+
+/**
+ * Get all fixtures for a team
+ */
+export async function getFixtures(teamId) {
+    try {
+        return await api.get(`/api/teams/${teamId}/fixtures`);
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Save a new fixture
+ */
+export async function saveFixture(teamId, fixture) {
+    try {
+        return await api.post(`/api/teams/${teamId}/fixtures`, fixture);
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Update a fixture
+ */
+export async function updateFixture(fixtureId, updates) {
+    try {
+        return await api.put(`/api/fixtures/${fixtureId}`, updates);
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Delete a fixture
+ */
+export async function deleteFixture(fixtureId) {
+    try {
+        return await api.delete(`/api/fixtures/${fixtureId}`);
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Bulk import fixtures
+ */
+export async function bulkImportFixtures(teamId, fixtures) {
+    try {
+        return await api.post(`/api/teams/${teamId}/fixtures/bulk`, { fixtures });
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+

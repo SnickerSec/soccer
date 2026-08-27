@@ -37,6 +37,8 @@ export function MatchdayDialog({
   captains = [],
   teamName = 'Our Team',
   ageDivision = '10U',
+  initialOpponent = '',
+  fixture = null,
   onSaveGame,
 }) {
   const defaultMinutes = ageDivision === '10U' ? 12.5 : ageDivision === '12U' ? 15 : 10;
@@ -47,17 +49,20 @@ export function MatchdayDialog({
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
-  const [opponentName, setOpponentName] = useState('Opponent');
+  const [opponentName, setOpponentName] = useState(fixture?.opponent || initialOpponent || 'Opponent');
   const [events, setEvents] = useState([]);
   const [selectedFieldPlayer, setSelectedFieldPlayer] = useState(null);
   const [activeLineup, setActiveLineup] = useState(lineup);
 
-  // Sync lineup when opened
+  // Sync lineup and opponent when opened
   useEffect(() => {
     if (lineup) {
       setActiveLineup(JSON.parse(JSON.stringify(lineup)));
     }
-  }, [lineup, isOpen]);
+    if (fixture?.opponent || initialOpponent) {
+      setOpponentName(fixture?.opponent || initialOpponent);
+    }
+  }, [lineup, isOpen, fixture, initialOpponent]);
 
   // Timer interval
   useEffect(() => {

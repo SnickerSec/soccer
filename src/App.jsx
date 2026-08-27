@@ -4,11 +4,13 @@ import { RosterTab } from '@/components/RosterTab';
 import { GameSettings } from '@/components/GameSettings';
 import { LineupSection } from '@/components/LineupSection';
 import { SeasonTab } from '@/components/SeasonTab';
+import { ScheduleTab } from '@/components/ScheduleTab';
 import { EvaluationTab } from '@/components/EvaluationTab';
 import { TeamModal } from '@/components/TeamModal';
 import { SaveGameModal } from '@/components/SaveGameModal';
 import { GameNotesModal } from '@/components/GameNotesModal';
 import { MatchdayDialog } from '@/components/MatchdayDialog';
+import { FixtureModal } from '@/components/FixtureModal';
 import { CustomFormationModal } from '@/components/CustomFormationModal';
 import { RosterImportModal } from '@/components/RosterImportModal';
 import { InviteModal } from '@/components/InviteModal';
@@ -50,7 +52,13 @@ import {
   getInviteTokenFromUrl,
   clearInviteTokenFromUrl,
 } from '@/modules/team-manager';
-import { deleteGame as deleteGameFromCloud } from '@/modules/cloud-storage';
+import {
+  deleteGame as deleteGameFromCloud,
+  getFixtures,
+  saveFixture as saveFixtureToCloud,
+  updateFixture as updateFixtureInCloud,
+  deleteFixture as deleteFixtureFromCloud,
+} from '@/modules/cloud-storage';
 import {
   downloadTextFile,
   lineupCsv,
@@ -115,6 +123,15 @@ export default function App() {
     return Array.isArray(saved) ? saved : [];
   });
 
+  // Match Schedule Fixtures
+  const [fixtures, setFixtures] = useState(() => {
+    const saved = safeParseJSON(
+      safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SCHEDULE),
+      []
+    );
+    return Array.isArray(saved) ? saved : [];
+  });
+
   // Auth & Teams
   const [currentUser, setCurrentUser] = useState(null);
   const [teams, setTeams] = useState([]);
@@ -127,6 +144,9 @@ export default function App() {
   const [isSaveGameOpen, setIsSaveGameOpen] = useState(false);
   const [isMatchdayOpen, setIsMatchdayOpen] = useState(false);
   const [isCustomFormationOpen, setIsCustomFormationOpen] = useState(false);
+  const [isFixtureModalOpen, setIsFixtureModalOpen] = useState(false);
+  const [editingFixture, setEditingFixture] = useState(null);
+  const [matchdayFixture, setMatchdayFixture] = useState(null);
   const [rosterImportData, setRosterImportData] = useState(null);
   const [notesModalGame, setNotesModalGame] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
@@ -238,6 +258,14 @@ export default function App() {
       JSON.stringify(gameHistory)
     );
   }, [gameHistory]);
+
+  // Persist schedule fixtures
+  useEffect(() => {
+    safeSetToStorage(
+      CONSTANTS.STORAGE_KEYS.SCHEDULE,
+      JSON.stringify(fixtures)
+    );
+  }, [fixtures]);
 
   // Check URL for share parameter or invite token on mount
   useEffect(() => {
@@ -440,6 +468,18 @@ export default function App() {
       []
     );
     setGameHistory(localHistory);
+    const localFixtures = safeParseJSON(
+      safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SCHEDULE),
+      []
+    );
+    setFixtures(localFixtures);
+    if (teamId) {
+      getFixtures(teamId).then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setFixtures(res.data);
+        }
+      }).catch(() => {});
+    }
     toast.success(`Switched to ${selected?.name || 'team'}`);
   };
 
@@ -953,6 +993,86 @@ export default function App() {
     toast.info('Season history cleared');
   };
 
+  // Schedule & Fixture handlers
+  const handleAddFixture = () => {
+    setEditingFixture(null);
+    setIsFixtureModalOpen(true);
+  };
+
+  const handleEditFixture = (fixture) => {
+    setEditingFixture(fixture);
+    setIsFixtureModalOpen(true);
+  };
+
+  const handleSaveFixture = async (fixtureData) => {
+    if (fixtureData.id) {
+      setFixtures((prev) =>
+        prev.map((f) => (f.id === fixtureData.id ? { ...f, ...fixtureData, updatedAt: new Date().toISOString() } : f))
+      );
+      if (currentUser && currentTeam) {
+        try {
+          await updateFixtureInCloud(fixtureData.id, fixtureData);
+        } catch (e) {
+          console.error('Failed to update cloud fixture:', e);
+        }
+      }
+    } else {
+      const newFixture = {
+        ...fixtureData,
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `fix-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setFixtures((prev) => [...prev, newFixture]);
+      if (currentUser && currentTeam) {
+        try {
+          const res = await saveFixtureToCloud(currentTeam.id, newFixture);
+          if (res.success && res.data?.id) {
+            setFixtures((prev) =>
+              prev.map((f) => (f.id === newFixture.id ? res.data : f))
+            );
+          }
+        } catch (e) {
+          console.error('Failed to save cloud fixture:', e);
+        }
+      }
+    }
+  };
+
+  const handleDeleteFixture = async (fixture) => {
+    if (!confirm(`Are you sure you want to delete match vs "${fixture.opponent}"?`)) {
+      return;
+    }
+    setFixtures((prev) => prev.filter((f) => f.id !== fixture.id));
+    if (currentUser && currentTeam && fixture.id) {
+      try {
+        await deleteFixtureFromCloud(fixture.id);
+      } catch (e) {
+        console.error('Failed to delete cloud fixture:', e);
+      }
+    }
+    toast.info('Match deleted');
+  };
+
+  const handleGenerateLineupForFixture = (fixture) => {
+    setActiveTab('roster');
+    if (!lineup) {
+      handleGenerateLineup();
+    }
+    toast.info(`Match against ${fixture.opponent} selected. Lineup ready for review!`);
+  };
+
+  const handleLaunchMatchdayForFixture = (fixture) => {
+    if (!lineup) {
+      const generated = generateLineup(players, settings);
+      if (generated && generated.quarters) {
+        setLineup(generated);
+      }
+    }
+    setMatchdayFixture(fixture);
+    setIsMatchdayOpen(true);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
@@ -1046,8 +1166,29 @@ export default function App() {
             onRegenerate={handleGenerateLineup}
             onToggleMustRest={handleToggleMustRest}
             onToggleNoKeeper={handleToggleNoKeeper}
-            onOpenMatchday={() => setIsMatchdayOpen(true)}
+            onOpenMatchday={() => {
+              setMatchdayFixture(null);
+              setIsMatchdayOpen(true);
+            }}
             onExportPdf={handleExportPdf}
+          />
+        </div>
+
+        {/* Schedule Tab Panel */}
+        <div
+          id="schedule-tab"
+          className={cn(activeTab === 'schedule' ? "active block" : "hidden")}
+        >
+          <ScheduleTab
+            fixtures={fixtures}
+            players={players}
+            teamName={currentTeam?.name || 'Our Team'}
+            ageDivision={settings.ageDivision}
+            onAddFixture={handleAddFixture}
+            onEditFixture={handleEditFixture}
+            onDeleteFixture={handleDeleteFixture}
+            onGenerateLineupForFixture={handleGenerateLineupForFixture}
+            onLaunchMatchdayForFixture={handleLaunchMatchdayForFixture}
           />
         </div>
 
@@ -1127,13 +1268,28 @@ export default function App() {
 
       <MatchdayDialog
         isOpen={isMatchdayOpen}
-        onClose={() => setIsMatchdayOpen(false)}
+        onClose={() => {
+          setIsMatchdayOpen(false);
+          setMatchdayFixture(null);
+        }}
         lineup={lineup}
         players={players}
         captains={captains}
         teamName={currentTeam?.name || 'Our Team'}
         ageDivision={settings.ageDivision}
+        fixture={matchdayFixture}
         onSaveGame={handleSaveGame}
+      />
+
+      <FixtureModal
+        isOpen={isFixtureModalOpen}
+        onClose={() => {
+          setIsFixtureModalOpen(false);
+          setEditingFixture(null);
+        }}
+        fixture={editingFixture}
+        players={players}
+        onSave={handleSaveFixture}
       />
 
       <CustomFormationModal

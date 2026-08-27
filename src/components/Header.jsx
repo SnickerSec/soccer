@@ -124,7 +124,7 @@ export function Header({
 
         {/* Navigation Tabs */}
         <nav aria-label="Sections" className="site-nav tab-navigation flex justify-center">
-          <div role="tablist" className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full grid-cols-3 min-w-[300px] max-w-[380px]">
+          <div role="tablist" className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full grid-cols-4 min-w-[360px] max-w-[520px]">
             <button
               type="button"
               role="tab"
@@ -133,11 +133,25 @@ export function Header({
               aria-selected={activeTab === 'roster'}
               onClick={() => onTabChange && onTabChange('roster')}
               className={cn(
-                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
+                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
                 activeTab === 'roster' && "active bg-background text-foreground shadow font-semibold"
               )}
             >
               Roster
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="schedule-tab-btn"
+              aria-controls="schedule-tab"
+              aria-selected={activeTab === 'schedule'}
+              onClick={() => onTabChange && onTabChange('schedule')}
+              className={cn(
+                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
+                activeTab === 'schedule' && "active bg-background text-foreground shadow font-semibold"
+              )}
+            >
+              Schedule
             </button>
             <button
               type="button"
@@ -147,11 +161,11 @@ export function Header({
               aria-selected={activeTab === 'season'}
               onClick={() => onTabChange && onTabChange('season')}
               className={cn(
-                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
+                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
                 activeTab === 'season' && "active bg-background text-foreground shadow font-semibold"
               )}
             >
-              Season Tracker
+              Season
             </button>
             <button
               type="button"
@@ -161,11 +175,11 @@ export function Header({
               aria-selected={activeTab === 'evaluation'}
               onClick={() => onTabChange && onTabChange('evaluation')}
               className={cn(
-                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
+                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
                 activeTab === 'evaluation' && "active bg-background text-foreground shadow font-semibold"
               )}
             >
-              Player Evaluation
+              Evaluation
             </button>
           </div>
         </nav>
