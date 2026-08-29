@@ -99,7 +99,7 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
 ├── docs/               # Documentation (security, privacy)
 ├── test-data/          # Sample player roster files
 ├── package.json        # Dependencies and scripts
-└── railway.json        # Railway deployment config
+└── .railway/railway.ts # Railway deployment config (Infrastructure as Code)
 ```
 
 ### Backend (server.js)
@@ -229,7 +229,22 @@ The lineup generator enforces AYSO "Everyone Plays" rules:
 - Supports multiple formations (5v5, 7v7, 9v9, 11v11)
 
 ### Deployment
-Configured for Railway deployment via **railway.json** with automatic builds using Nixpacks.
+Configured for Railway deployment via **`.railway/railway.ts`** with automatic
+builds using Nixpacks.
+
+That file is the whole desired state, not a patch: anything it does not declare
+is deleted on apply. The first draft of it planned to remove all five service
+variables and disconnect the GitHub repo, simply by not mentioning them. So the
+source is declared explicitly and the variables are held with `preserve()`,
+which keeps Railway's existing value without writing a secret into this repo.
+
+It replaced `railway.json`, which Railway deprecated with a 2026-12-01 cutoff.
+Do not migrate it with `railway config migrate`: that drops `preDeployCommand`,
+the builder and the restart policy to comments rather than translating them,
+and losing the first of those would silently stop migrations running on deploy.
+
+Preview with `railway config plan` before every `railway config apply`, and read
+the destroy count. Note that an apply triggers a deployment of its own.
 
 ## Guidelines
 
