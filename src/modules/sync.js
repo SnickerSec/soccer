@@ -440,6 +440,14 @@ export async function processQueue() {
                 } else {
                     remaining.push(item);
                 }
+            } else {
+                // An entry this build has no branch for: queued by a newer one,
+                // or a type added to queueChange and forgotten here. Keeping it
+                // costs a no-op per drain, where falling through to neither
+                // branch dropped the coach's edit with nothing to show for it.
+                console.warn('Sync queue: keeping an entry this build cannot replay:',
+                    item.entityType, item.action);
+                remaining.push(item);
             }
         } catch (error) {
             console.error('Queue processing error:', error);
