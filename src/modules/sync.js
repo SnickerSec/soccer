@@ -11,6 +11,7 @@ import {
 } from './cloud-storage.js';
 import { safeGetFromStorage, safeSetToStorage, safeParseJSON } from './storage.js';
 import { mergeRosters } from './roster-merge.js';
+import { surviveMerge } from './player-rename.js';
 
 // Sync status enum
 export const SYNC_STATUS = {
@@ -210,7 +211,7 @@ export async function sync() {
 /**
  * Push local players to cloud
  */
-export async function pushPlayers(players) {
+export async function pushPlayers(players, { renames } = {}) {
     if (!currentTeamId) {
         return { success: false, error: 'No team selected' };
     }
@@ -219,10 +220,13 @@ export async function pushPlayers(players) {
     safeSetToStorage('ayso_players', JSON.stringify(players));
 
     if (!navigator.onLine || !await isAuthenticated()) {
-        // Queue for later sync
+        // Queue for later sync. The renames travel with the roster that
+        // carries the new names, so replaying the entry still moves the
+        // player's saved games with them however much later that happens.
         queueChange('players', 'bulk_update', players, {
             expectedVersion: rosterVersion,
-            base: rosterBase
+            base: rosterBase,
+            renames
         });
         return { success: true, queued: true };
     }
@@ -230,7 +234,11 @@ export async function pushPlayers(players) {
     updateStatus(SYNC_STATUS.SYNCING);
 
     try {
-        return await writeRoster(players, { expectedVersion: rosterVersion, base: rosterBase });
+        return await writeRoster(players, {
+            expectedVersion: rosterVersion,
+            base: rosterBase,
+            renames
+        });
     } catch (error) {
         updateStatus(SYNC_STATUS.ERROR);
         return { success: false, error: error.message };
@@ -252,10 +260,10 @@ export async function pushPlayers(players) {
  * Retried once only: a second rejection means a third writer is active, and
  * looping would keep rebasing on a roster that keeps moving.
  */
-async function writeRoster(players, { expectedVersion, base }) {
+async function writeRoster(players, { expectedVersion, base, renames }) {
     // One atomic replace. Doing this as a delete followed by an upload left
     // the roster empty if the second request never landed.
-    const result = await replaceRoster(currentTeamId, players, expectedVersion);
+    const result = await replaceRoster(currentTeamId, players, expectedVersion, renames);
 
     if (!result.conflict) {
         if (!result.success) {
@@ -281,7 +289,12 @@ async function writeRoster(players, { expectedVersion, base }) {
         remote: result.data
     });
 
-    const retry = await replaceRoster(currentTeamId, merged, result.version);
+    // The first attempt was rolled back, so nothing was renamed yet and the
+    // retry has to carry the renames again — but only those the merge actually
+    // kept. See surviveMerge.
+    const { renames: keptRenames, roster, dropped } = surviveMerge(merged, renames);
+
+    const retry = await replaceRoster(currentTeamId, roster, result.version, keptRenames);
 
     if (!retry.success) {
         // Includes a second conflict: hand back the server's roster so the
@@ -306,7 +319,9 @@ async function writeRoster(players, { expectedVersion, base }) {
     return {
         success: true,
         merged: true,
-        conflicts,
+        // Deduplicated: an abandoned rename is usually also a merge conflict on
+        // the same player, and naming them twice reads as two separate losses.
+        conflicts: [...new Set([...conflicts, ...dropped])],
         data: retry.data
     };
 }
@@ -410,7 +425,8 @@ export async function processQueue() {
                 // upgrade does not strand what is already queued.
                 const result = await writeRoster(item.data, {
                     expectedVersion: item.expectedVersion,
-                    base: item.base
+                    base: item.base,
+                    renames: item.renames
                 });
                 if (result.success) {
                     processed++;

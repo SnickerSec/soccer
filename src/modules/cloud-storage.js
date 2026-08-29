@@ -81,7 +81,7 @@ export async function getPlayers(teamId) {
  * rejects the write with 409 and `conflict: true` when the roster has moved on
  * since, rather than letting it overwrite another coach's edits.
  */
-export async function replaceRoster(teamId, players, expectedVersion) {
+export async function replaceRoster(teamId, players, expectedVersion, renames) {
     try {
         const body = { players };
         // Omitted rather than sent as undefined: the server treats an absent
@@ -89,6 +89,12 @@ export async function replaceRoster(teamId, players, expectedVersion) {
         // offline edit needs — it was recorded before any version was known.
         if (expectedVersion !== undefined && expectedVersion !== null) {
             body.expectedVersion = expectedVersion;
+        }
+        // Renames ride along with the roster they belong to, so the name moves
+        // across the player's saved games in the same transaction that saves
+        // the new roster rather than in a second request that could not land.
+        if (Array.isArray(renames) && renames.length > 0) {
+            body.renames = renames;
         }
         return await api.put(`/api/teams/${teamId}/players`, body);
     } catch (error) {

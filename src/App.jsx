@@ -32,6 +32,11 @@ import {
 import { generateLineup, validateLineup } from '@/modules/lineup-engine';
 import { calculatePlayerStats } from '@/modules/season-stats';
 import {
+  validateRename,
+  renameInGames,
+  renameInLineup,
+} from '@/modules/player-rename';
+import {
   initAuth,
   signInWithGoogle,
   signOut,
@@ -168,6 +173,9 @@ export default function App() {
   const currentTeamRef = useRef(currentTeam);
   currentTeamRef.current = currentTeam;
   const testAuthUserRef = useRef(null);
+  // Renames waiting to be told to the server. Held rather than sent on their
+  // own so they travel with the roster push that already carries the new name.
+  const pendingRenamesRef = useRef([]);
 
   // Track state for undo
   const saveSnapshot = useCallback(() => {
@@ -237,12 +245,42 @@ export default function App() {
       )
     );
     if (currentUser && currentTeam) {
+      // Drained here so the rename and the roster that already carries the new
+      // name reach the server as one write: it moves the player's saved games
+      // in the same transaction that saves the roster. Put back if the write
+      // fails, so the next push carries them again rather than leaving the
+      // server's history pointing at a name nobody holds.
+      const renames = pendingRenamesRef.current;
+      pendingRenamesRef.current = [];
+      const keepForRetry = () => {
+        if (renames.length > 0) {
+          pendingRenamesRef.current = [...renames, ...pendingRenamesRef.current];
+        }
+      };
       pushPlayers(
         players.map((p) => ({
           ...p,
           isCaptain: captains.includes(p.name),
-        }))
-      ).catch(() => {});
+        })),
+        { renames }
+      )
+        .then((result) => {
+          if (!result) return;
+          if (result.success === false) {
+            keepForRetry();
+            return;
+          }
+          // Players another coach edited at the same time, which the merge
+          // settled in their favour — including a rename it had to abandon.
+          // Saying so is the point of tracking them: an edit that vanishes
+          // without a word is the one a coach acts on at the next game.
+          if (result.conflicts?.length > 0) {
+            toast.warning(
+              `Another coach was editing at the same time. Their version won for: ${result.conflicts.join(', ')}.`
+            );
+          }
+        })
+        .catch(keepForRetry);
     }
   }, [players, captains, currentUser, currentTeam]);
 
@@ -530,6 +568,39 @@ export default function App() {
       safeSetToStorage(CONSTANTS.STORAGE_KEYS.PLAYERS, JSON.stringify(updated));
       return updated;
     });
+  };
+
+  /**
+   * Renames a player and moves their season history with them.
+   *
+   * A player is identified by name throughout — season stats key on it, and a
+   * saved game records it rather than an id — so the name is rewritten across
+   * the saved games, the current lineup and the captain list together. Leaving
+   * any of them behind would split one player into two: the renamed one with
+   * no history, and an orphan holding all of it.
+   *
+   * Deliberately not added to the undo stack. Undo restores players, captains
+   * and settings but not the game history, so undoing a rename would put the
+   * old name back on the roster while the games kept the new one — the very
+   * split this avoids. Renaming back is the exact inverse and costs a tap.
+   */
+  const handleRenamePlayer = (from, newName) => {
+    const to = (newName || '').trim();
+    if (to === from) return;
+
+    const error = validateRename(players, from, to);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    setPlayers((prev) => prev.map((p) => (p.name === from ? { ...p, name: to } : p)));
+    setCaptains((prev) => prev.map((c) => (c === from ? to : c)));
+    setGameHistory((prev) => renameInGames(prev, from, to));
+    setLineup((prev) => renameInLineup(prev, from, to));
+
+    pendingRenamesRef.current.push({ from, to });
+    toast.success(`Renamed ${from} to ${to}`);
   };
 
   const handleToggleMustRest = (name) => {
@@ -1106,6 +1177,7 @@ export default function App() {
             onAddPlayer={handleAddPlayer}
             onRemovePlayer={handleRemovePlayer}
             onUpdatePlayer={handleUpdatePlayer}
+            onRenamePlayer={handleRenamePlayer}
             onToggleCaptain={handleToggleCaptain}
             onImportFile={handleImportFile}
             onExportRoster={handleExportRoster}

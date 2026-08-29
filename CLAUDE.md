@@ -179,6 +179,33 @@ offline queue entry recorded by an older build does; new entries carry the
 version and base roster they were made against, and replay through the same
 merge.
 
+### Renaming a player
+
+Nothing carries a player id. `players` is keyed `UNIQUE(team_id, name)`, the
+roster replace matches rows by name, and a saved game records names inside
+`player_snapshot`, `lineup` and `captains`. Season stats key on name too. So a
+rename has to move the name everywhere at once, or it splits one player into a
+renamed entry with no history and an orphan holding all of it.
+
+`PUT .../players` therefore takes an optional `renames: [{from, to}]`, applied
+*before* the delete-and-upsert in the same transaction. Order matters: renaming
+first means the upsert matches the row by its new name and updates it, where
+renaming afterwards would have the DELETE see a name no longer on the roster
+and remove the player, minting a new id. Chains and swaps (A→B with B→C) are
+refused rather than ordered, and a target name already on the roster answers
+409 rather than reaching the unique constraint as a 500.
+
+The rewriting itself is pure and lives in `server/player-rename.js`, mirrored
+client-side by `src/modules/player-rename.js` — the app is offline-first, so
+the local roster and game history move immediately whether or not the write
+lands. A rename that loses the three-way merge is dropped rather than saved
+alongside the name it lost to; `surviveMerge` decides that, and the abandoned
+name is reported to the coach with the merge conflicts.
+
+Renames are not undoable. The undo stack holds players, captains and settings
+but not the game history, so undoing a rename would restore the old name to the
+roster while the games kept the new one. Renaming back is the exact inverse.
+
 ### Key Features & Constraints
 The lineup generator enforces AYSO "Everyone Plays" rules:
 - No player sits more than 1 quarter consecutively

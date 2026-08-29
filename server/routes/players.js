@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth, requireTeamAccess, getTeamRole, roleSatisfies } from '../middleware.js';
+import { validateRenames, renameMap, rewriteGameNames } from '../player-rename.js';
 
 const router = Router();
 
@@ -155,6 +156,69 @@ function inSentOrder(rows, sent) {
 }
 
 /**
+ * Moves a player's name across the roster and every game that records it.
+ *
+ * Runs inside the roster-replace transaction and before the replace itself, so
+ * the upsert that follows matches the renamed row by its new name and updates
+ * it rather than deleting the old row and inserting a fresh one — which would
+ * hand the player a new id and drop the row's history.
+ *
+ * Returns an error message when a target name is already taken. Letting that
+ * reach the UNIQUE(team_id, name) constraint instead would surface as an
+ * opaque 500 from inside the transaction.
+ */
+async function applyRenames(client, teamId, renames) {
+    const map = renameMap(renames);
+    const froms = [...map.keys()];
+    const tos = [...map.values()];
+
+    const taken = await client.query(
+        'SELECT name FROM players WHERE team_id = $1 AND name = ANY($2::text[])',
+        [teamId, tos]
+    );
+
+    if (taken.rows.length > 0) {
+        return `A player named "${taken.rows[0].name}" is already on this roster`;
+    }
+
+    // One statement for the whole set: unnest pairs each old name with its new
+    // one, so a rename costs a single round trip however many it carries. A
+    // `from` that is no longer on the roster simply matches nothing.
+    await client.query(
+        `UPDATE players SET name = pairs.to_name
+         FROM (SELECT unnest($2::text[]) AS from_name, unnest($3::text[]) AS to_name) AS pairs
+         WHERE players.team_id = $1 AND players.name = pairs.from_name`,
+        [teamId, froms, tos]
+    );
+
+    // Games hold names inside JSONB and a TEXT[], so they are rewritten in
+    // JavaScript rather than in SQL. Only the rows that actually mention the
+    // player are written back.
+    const games = await client.query(
+        'SELECT id, player_snapshot, lineup, captains FROM games WHERE team_id = $1',
+        [teamId]
+    );
+
+    for (const row of games.rows) {
+        const rewritten = rewriteGameNames(row, map);
+        if (!rewritten.changed) continue;
+
+        await client.query(
+            `UPDATE games SET player_snapshot = $1, lineup = $2, captains = $3
+             WHERE id = $4`,
+            [
+                JSON.stringify(rewritten.playerSnapshot),
+                JSON.stringify(rewritten.lineup),
+                rewritten.captains,
+                row.id
+            ]
+        );
+    }
+
+    return null;
+}
+
+/**
  * The roster's concurrency token. Read alongside the roster so a client can
  * hand it back on write, and bumped by every write.
  */
@@ -234,11 +298,16 @@ router.post('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req
  * the queue) stayed on the server forever.
  */
 router.put('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req, res) => {
-    const { players, expectedVersion } = req.body;
+    const { players, expectedVersion, renames } = req.body;
 
     const invalid = validatePlayers(players);
     if (invalid) {
         return res.status(400).json({ success: false, error: invalid });
+    }
+
+    const invalidRenames = validateRenames(renames);
+    if (invalidRenames) {
+        return res.status(400).json({ success: false, error: invalidRenames });
     }
 
     if (expectedVersion !== undefined && !Number.isInteger(expectedVersion)) {
@@ -292,6 +361,16 @@ router.put('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req,
                 version: currentVersion,
                 data: current.rows.map(mapPlayer)
             });
+        }
+
+        // Before the replace, so the upsert below matches renamed players by
+        // their new name and keeps their row — see applyRenames.
+        if (Array.isArray(renames) && renames.length > 0) {
+            const renameError = await applyRenames(client, teamId, renames);
+            if (renameError) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ success: false, error: renameError });
+            }
         }
 
         // Drop whoever is no longer on the roster. An empty roster clears it.

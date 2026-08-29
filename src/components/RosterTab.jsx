@@ -9,6 +9,7 @@ import {
   Plus,
   Sparkles,
   X,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RatingDialog } from './RatingDialog';
@@ -19,6 +20,7 @@ export function RosterTab({
   onAddPlayer,
   onRemovePlayer,
   onUpdatePlayer,
+  onRenamePlayer,
   onToggleCaptain,
   onImportFile,
   onExportRoster,
@@ -29,6 +31,29 @@ export function RosterTab({
   const [nameInput, setNameInput] = useState('');
   const [numberInput, setNumberInput] = useState('');
   const [ratingPlayer, setRatingPlayer] = useState(null);
+  const [renamingPlayer, setRenamingPlayer] = useState(null);
+  const [renameInput, setRenameInput] = useState('');
+  // Escape has to tell the blur that follows it not to save. Both fire, and a
+  // state flag set by the keydown is not visible to the blur handler's closure.
+  const cancelRenameRef = useRef(false);
+
+  const startRename = (player) => {
+    setRenamingPlayer(player.name);
+    setRenameInput(player.name);
+  };
+
+  const finishRename = () => {
+    if (cancelRenameRef.current) {
+      cancelRenameRef.current = false;
+      setRenamingPlayer(null);
+      return;
+    }
+    const next = renameInput.trim();
+    if (renamingPlayer && next && next !== renamingPlayer) {
+      onRenamePlayer?.(renamingPlayer, next);
+    }
+    setRenamingPlayer(null);
+  };
 
   const handleAddSubmit = (e) => {
     e.preventDefault();
@@ -252,15 +277,51 @@ export function RosterTab({
 
                     {/* Name Display */}
                     <div className="flex items-center gap-1.5 flex-1 truncate">
-                      {isCaptain && (
-                        <span className="captain-star text-amber-500 dark:text-amber-400 shrink-0 text-base" title="Team Captain">⭐</span>
+                      {renamingPlayer === player.name ? (
+                        <Input
+                          autoFocus
+                          value={renameInput}
+                          maxLength={255}
+                          onChange={(e) => setRenameInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.currentTarget.blur();
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              cancelRenameRef.current = true;
+                              e.currentTarget.blur();
+                            }
+                          }}
+                          onBlur={finishRename}
+                          aria-label={`New name for ${player.name}`}
+                          className="player-name-edit h-8 text-sm flex-1 min-w-0"
+                        />
+                      ) : (
+                        <>
+                          {isCaptain && (
+                            <span className="captain-star text-amber-500 dark:text-amber-400 shrink-0 text-base" title="Team Captain">⭐</span>
+                          )}
+                          <span className={cn(
+                            "text-sm font-medium text-foreground truncate",
+                            isCaptain && "font-semibold text-amber-600 dark:text-amber-300"
+                          )}>
+                            {player.name}
+                          </span>
+                          {/* Always visible rather than revealed on hover: half
+                              of this app is used on a phone at the touchline. */}
+                          <button
+                            type="button"
+                            data-player={player.name}
+                            onClick={() => startRename(player)}
+                            aria-label={`Rename ${player.name}`}
+                            title="Rename player"
+                            className="player-rename shrink-0 p-1 rounded text-muted-foreground/70 hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </>
                       )}
-                      <span className={cn(
-                        "text-sm font-medium text-foreground truncate",
-                        isCaptain && "font-semibold text-amber-600 dark:text-amber-300"
-                      )}>
-                        {player.name}
-                      </span>
                     </div>
                   </div>
 
