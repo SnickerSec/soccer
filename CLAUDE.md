@@ -60,7 +60,10 @@ builds and fail on newer Linux releases with "does not support chromium on
 
 ## Architecture
 
-This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Express backend and vanilla JavaScript frontend.
+This is an AYSO Soccer Lineup Generator web application with a Node.js/Express
+backend and a React frontend built by Vite. `npm run build` emits `dist/`, which
+the server serves ahead of `public/`; `public/` now holds only static files that
+are copied into the build as-is.
 
 ### Project Structure
 ```
@@ -75,22 +78,30 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
 │       ├── games.js            # Game CRUD (/api/games/*)
 │       ├── settings.js         # User settings (/api/settings/*)
 │       └── invites.js          # Team invitations (/api/invites/*)
-├── public/             # Frontend static files
-│   ├── index.html      # Main UI
-│   ├── app.js          # Core application logic (SoccerLineupGenerator class)
+├── index.html          # Vite entry point
+├── src/                # React frontend
+│   ├── main.jsx        # Mounts App
+│   ├── App.jsx         # Application state: roster, settings, lineup, sync
 │   ├── constants.js    # App constants and configuration
-│   ├── styles.css      # Application styles
+│   ├── index.css       # Tailwind layers and the theme tokens
+│   ├── components/     # UI, including the shadcn primitives in components/ui
+│   └── modules/        # Framework-free logic, shared with the unit tests
+│       ├── api-client.js   # Fetch wrapper with CSRF token handling
+│       ├── storage.js      # LocalStorage utilities
+│       ├── utils.js        # General utilities (shuffle, escape, etc.)
+│       ├── season-stats.js # Season statistics calculations
+│       ├── formations.js   # Formation definitions and positions
+│       ├── lineup-engine.js# The AYSO rotation rules
+│       ├── sync.js         # Offline queue and cloud sync
+│       ├── roster-merge.js # Three-way merge for a rejected roster save
+│       └── index.js        # Module exports
+├── public/             # Copied into dist/ verbatim by the build
+│   ├── sw.js           # Service worker (precache list, offline strategies)
+│   ├── manifest.json   # PWA manifest
+│   ├── privacy.html    # Static privacy page (uses styles.css)
+│   ├── styles.css      # Stylesheet for privacy.html
 │   ├── favicon.svg     # Site favicon
-│   ├── modules/        # ES6 modules for code organization
-│   │   ├── api-client.js   # Fetch wrapper with CSRF token handling
-│   │   ├── storage.js      # LocalStorage utilities
-│   │   ├── utils.js        # General utilities (shuffle, escape, etc.)
-│   │   ├── season-stats.js # Season statistics calculations
-│   │   ├── formations.js   # Formation definitions and positions
-│   │   ├── sync.js         # Offline queue and cloud sync
-│   │   ├── roster-merge.js # Three-way merge for a rejected roster save
-│   │   └── index.js        # Module exports
-│   └── assets/         # Fonts, PDFs, images
+│   └── assets/         # Fonts, PDFs, images, icon sprite
 ├── tests/              # Jest unit tests
 │   ├── server/             # Route tests with a mocked pool
 │   ├── integration/        # Route and schema tests against a real PostgreSQL
@@ -103,7 +114,7 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
 ```
 
 ### Backend (server.js)
-- Express server serving static files from `public/`
+- Express server serving `dist/` when it exists, then `public/`
 - Health check endpoint for Railway deployment
 - PDF analysis API endpoint
 - Security middleware stack (in order):
@@ -117,18 +128,27 @@ This is an AYSO Soccer Lineup Generator web application with a simple Node.js/Ex
   8. Route modules
   9. CSRF error handler
 
-### Frontend (public/)
-- **index.html**: Main UI with player management, game settings, and lineup display
-- **app.js**: `SoccerLineupGenerator` class handling:
-  - Player roster management (import from file or manual entry)
-  - Lineup generation with AYSO rotation rules
-  - Visual field display for each quarter
-  - Export/print functionality
-- **styles.css**: Application styling
+### Frontend (src/)
+- **App.jsx**: holds the state the whole app reads — roster, captains, settings,
+  the generated lineup, game history and sync — and passes it to the tab
+  components. It also exposes `window.lineupGenerator`, which is how the e2e
+  tests put the app in a signed-in state without real Google credentials.
+- **components/**: one component per tab (roster, season, schedule, evaluation)
+  plus the dialogs, on shadcn/ui primitives and Tailwind.
+- **modules/**: the logic that is not React — the lineup engine, season stats,
+  formations, sync, the PDF builders — imported by both the app and the unit
+  tests.
+
+The pre-React app (`public/app.js`, `public/index.html`, `public/modules/`) was
+deleted once nothing loaded it. It had been shipping alongside the bundle and
+being precached by the service worker, and six of its modules had quietly
+diverged from their `src/` twins. Two sources of truth is what broke four
+exports and several tests before it was noticed, so keep logic in `src/modules/`
+and let `public/` hold static files only.
 
 ### The evaluation PDF
 
-`public/modules/evaluation-pdf.js` fills the AYSO template with the roster.
+`src/modules/evaluation-pdf.js` fills the AYSO template with the roster.
 Text is drawn with an embedded Liberation Sans rather than one of pdf-lib's
 standard fonts: those are WinAnsi-encoded and `drawText` throws on anything
 outside it, so a single player named Łukasz aborted the whole document and
@@ -170,7 +190,7 @@ discards the first.
 team rename must not invalidate an in-flight roster edit). `GET .../players`
 returns it; `PUT .../players` takes it as `expectedVersion` and answers 409 with
 the winning roster when it no longer matches. The client then merges its version
-against that one — `public/modules/roster-merge.js` — and retries once. Players
+against that one — `src/modules/roster-merge.js` — and retries once. Players
 both coaches edited differently come back in `conflicts` and are reported to the
 coach rather than settled silently.
 

@@ -10,9 +10,9 @@
 /**
  * Player statuses, as the <option> values and the CSS class suffixes.
  *
- * These mirror CONSTANTS.PLAYER_STATUS. constants.js is a plain script rather
- * than a module, so it cannot be imported here; tests/roster-render.test.js
- * reads it and fails if the two ever disagree.
+ * These mirror CONSTANTS.PLAYER_STATUS, kept as a local list because the
+ * rendering also needs a symbol and a class per status;
+ * tests/roster-render.test.js compares the two and fails if they disagree.
  */
 export const STATUSES = [
     { value: 'available', symbol: '●', className: 'status-available' },

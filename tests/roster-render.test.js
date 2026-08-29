@@ -9,25 +9,12 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
 import { STATUSES, statusClassFor, playerAriaLabel } from '../src/modules/roster-render.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { CONSTANTS } from '../src/constants.js';
 
 describe('status vocabulary', () => {
-    /**
-     * constants.js is a plain script, not a module, so it cannot be imported.
-     * Read as text instead, the way tests/service-worker.test.js reads sw.js.
-     */
     function playerStatusValues() {
-        const source = fs.readFileSync(
-            path.join(__dirname, '..', 'public', 'constants.js'), 'utf8');
-        const block = source.match(/PLAYER_STATUS:\s*\{([\s\S]*?)\}/);
-        expect(block).not.toBeNull();
-        return [...block[1].matchAll(/'([^']+)'/g)].map(m => m[1]).sort();
+        return Object.values(CONSTANTS.PLAYER_STATUS).sort();
     }
 
     test('matches CONSTANTS.PLAYER_STATUS', () => {

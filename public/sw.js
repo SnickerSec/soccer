@@ -1,48 +1,21 @@
 // Service Worker for AYSO Roster Pro - Offline Support
-const CACHE_NAME = 'ayso-roster-pro-v36';
+const CACHE_NAME = 'ayso-roster-pro-v37';
 
 // App shell: fetched on install so a first-time visitor who later goes offline
-// still gets a working app. Keep this in sync with the modules in public/modules/.
+// still gets a working app. The application code itself is the Vite bundle,
+// which is hashed per build: vite.config.js reads the built index.html and
+// injects those /assets/ paths into this array at build time. Only the static
+// files served straight out of public/ are listed by hand here.
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
     '/privacy.html',
-    '/app.js',
-    '/constants.js',
+    // The privacy page is plain HTML and still uses the hand-written stylesheet
     '/styles.css',
     '/favicon.svg',
     '/assets/icons.svg',
     '/assets/icons/apple-touch-icon-180.png',
-    '/lineup-worker.js',
-    '/manifest.json',
-    '/modules/index.js',
-    '/modules/account-menu.js',
-    '/modules/api-client.js',
-    '/modules/auth.js',
-    '/modules/cloud-storage.js',
-    '/modules/evaluation-pdf.js',
-    '/modules/export.js',
-    '/modules/field-visualization.js',
-    '/modules/evaluation-render.js',
-    '/modules/formations.js',
-    '/modules/player-summary.js',
-    '/modules/history.js',
-    '/modules/icons.js',
-    '/modules/lineup-actions.js',
-    '/modules/lineup-engine.js',
-    '/modules/lineup-render.js',
-    '/modules/notifications.js',
-    '/modules/roster-merge.js',
-    '/modules/share-link.js',
-    '/modules/rating-dialog.js',
-    '/modules/roster-render.js',
-    '/modules/schedule.js',
-    '/modules/season-render.js',
-    '/modules/season-stats.js',
-    '/modules/storage.js',
-    '/modules/sync.js',
-    '/modules/team-manager.js',
-    '/modules/utils.js'
+    '/manifest.json'
 ];
 
 // Large, rarely-changing files (PDF libraries, fonts, the evaluation template).

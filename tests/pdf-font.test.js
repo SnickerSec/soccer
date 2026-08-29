@@ -82,7 +82,7 @@ describe('coverage', () => {
     });
 
     test('covers every character in the demo roster', () => {
-        const source = fs.readFileSync(path.join(projectRoot, 'public', 'app.js'), 'utf8');
+        const source = fs.readFileSync(path.join(projectRoot, 'src', 'App.jsx'), 'utf8');
         const names = source.match(/const demoNames = \[([\s\S]*?)\]/)[1];
         expect(covers(names.replace(/[\s',]/g, ''))).toBe(true);
     });

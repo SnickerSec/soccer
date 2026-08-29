@@ -1,14 +1,18 @@
 /**
  * Lineup generation: the AYSO rotation rules the app exists to enforce.
  *
- * This is the real algorithm, imported both by lineup-worker.js (which runs it
- * off the main thread) and by the unit tests. It used to live entirely inside
- * the worker, where tests could not reach it -- so tests/lineup.test.js kept a
- * hand-copied version, which drifted badly enough that the rules being asserted
- * were not the rules being shipped.
+ * This is the real algorithm, imported by the app and by the unit tests. It
+ * used to live inside a web worker, where tests could not reach it -- so
+ * tests/lineup.test.js kept a hand-copied version, which drifted badly enough
+ * that the rules being asserted were not the rules being shipped.
  *
- * Keep it free of worker globals: progress is reported through an onProgress
- * callback rather than self.postMessage, so it runs anywhere.
+ * It runs on the main thread now. The worker was there to keep the UI
+ * responsive across the retry loop, but a full 500-attempt generation measures
+ * under 60ms for the hardest roster shapes (11 players for 11v11, where the
+ * constraints barely fit), so it costs a frame rather than a freeze.
+ *
+ * Keep it free of DOM and worker globals: progress is reported through an
+ * onProgress callback rather than self.postMessage, so it runs anywhere.
  */
 
 import { shuffleArray, shuffleWithinSimilarGroups } from './utils.js';
