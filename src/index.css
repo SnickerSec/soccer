@@ -138,3 +138,156 @@
   display: inline-flex !important;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* The printed lineup sheet                                            */
+/*                                                                     */
+/* Print used to hand the browser the whole dark-themed app, which came */
+/* out as several pages of navigation. The sheet below is what a coach  */
+/* actually carries: the four quarter cards, positions, names and the   */
+/* numbers on their backs, on one page.                                 */
+/* ------------------------------------------------------------------ */
+
+.print-sheet {
+  display: none;
+  color: #000;
+  font-size: 10pt;
+  line-height: 1.25;
+}
+
+.print-sheet-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12pt;
+  border-bottom: 2pt solid #000;
+  padding-bottom: 4pt;
+  margin-bottom: 9pt;
+}
+
+.print-team {
+  font-size: 15pt;
+  font-weight: 700;
+  margin: 0;
+}
+
+.print-sheet-header span {
+  font-size: 9pt;
+  white-space: nowrap;
+}
+
+.print-quarters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10pt;
+}
+
+.print-quarter {
+  border: 1pt solid #000;
+  border-radius: 3pt;
+  padding: 6pt 9pt 7pt;
+  /* A quarter split across the fold is a quarter the coach cannot read. */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-quarter-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11.5pt;
+  font-weight: 700;
+  margin: 0 0 4pt;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #666;
+}
+
+.print-on-field {
+  font-size: 8pt;
+  font-weight: 400;
+}
+
+.print-quarter table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.print-quarter td {
+  padding: 1.5pt 0;
+  vertical-align: baseline;
+}
+
+.print-position {
+  width: 38%;
+}
+
+.print-keeper .print-position {
+  font-weight: 700;
+}
+
+/* Right-aligned and tabular so a column of numbers reads as a column. The
+   selector carries the table's specificity, or the row padding above wins and
+   the number runs into the name: '#77Sage Mitchell'. */
+.print-quarter td.print-number {
+  width: 13%;
+  padding-right: 6pt;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.print-player {
+  font-weight: 700;
+}
+
+.print-captain {
+  font-weight: 400;
+}
+
+.print-empty {
+  margin: 0;
+  font-size: 11pt;
+}
+
+.print-sitting {
+  margin: 6pt 0 0;
+  padding-top: 4pt;
+  font-size: 9pt;
+  border-top: 0.75pt dashed #999;
+}
+
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 0.45in;
+  }
+
+  html,
+  body,
+  .app-shell {
+    /* The shell keeps painting its dark theme behind the sheet otherwise, on
+       any printer set to include background graphics. */
+    background: #fff !important;
+    color: #000 !important;
+    min-height: 0 !important;
+  }
+
+  /* Only the sheet prints. Dialogs and toasts portal to the body rather than
+     into the app shell, so both levels have to be told to stay off the page. */
+  body > *:not(#root) {
+    display: none !important;
+  }
+
+  /* The toaster is mounted beside the app, not inside it. */
+  #root > *:not(.app-shell) {
+    display: none !important;
+  }
+
+  .app-shell > *:not(.print-sheet) {
+    display: none !important;
+  }
+
+  .print-sheet {
+    display: block !important;
+  }
+}

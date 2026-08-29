@@ -16,6 +16,7 @@ import { RosterImportModal } from '@/components/RosterImportModal';
 import { InviteModal } from '@/components/InviteModal';
 import { ShareLineupDialog } from '@/components/ShareLineupDialog';
 import { Footer } from '@/components/Footer';
+import { PrintSheet } from '@/components/PrintSheet';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { CONSTANTS } from '@/constants';
@@ -1148,7 +1149,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="app-shell min-h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
       <Header
         activeTab={activeTab}
@@ -1326,6 +1327,15 @@ export default function App() {
 
       {/* Footer */}
       <Footer />
+
+      {/* What the Print button puts on paper; hidden on screen */}
+      <PrintSheet
+        lineup={lineup}
+        players={players}
+        captains={captains}
+        teamName={currentTeam?.name || 'Our Team'}
+        ageDivision={settings.ageDivision}
+      />
 
       {/* Modals & Dialogs */}
       <TeamModal

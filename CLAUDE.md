@@ -212,6 +212,24 @@ broke was reopening a synced game, which found no quarters and fell back to a
 default formation. Games saved before the fix stored those columns empty and
 cannot be recovered — they reopen empty.
 
+### The printed sheet
+
+Print used to hand the browser the whole app, which came out as several pages
+of dark-themed navigation. `src/components/PrintSheet.jsx` is what goes on
+paper instead: one page, the four quarter cards, each row a position, a jersey
+number and a name. It sits in the DOM at all times and is hidden until the
+`@media print` block in `index.css` reveals it, so Ctrl-P and the Print button
+produce the same sheet.
+
+The numbers come from the roster, not the lineup: the engine records
+`positions[position] = player.name` and nothing else, so `printableQuarters` in
+`src/modules/print-lineup.js` looks each one up by name — and works out who is
+resting the same way, since a generated quarter lists only who took the field.
+
+The sheet is `aria-hidden` and uses no headings. It is a second copy of what is
+already on screen, and an `h1` in it broke the one-h1-per-page rule that
+`tests/e2e/site-header.spec.js` guards.
+
 ### Dates on the wire
 
 `games.game_date` and `fixtures.game_date` are DATE columns, and pg parses those
