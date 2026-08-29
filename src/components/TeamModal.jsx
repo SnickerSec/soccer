@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +47,7 @@ export function TeamModal({
   currentTeam,
   teams = [],
   initialTeamId = null,
+  initialView = 'list',
   onTeamsUpdated,
   onSelectTeam,
 }) {
@@ -81,19 +82,35 @@ export function TeamModal({
     }
   };
 
+  // Only the opening of the dialog picks the view. `teams` is in the deps so a
+  // list that arrives late still resolves initialTeamId, but a refresh after
+  // saving must not throw the form away and reopen it empty.
+  const wasOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
-      if (initialTeamId) {
-        const team = teams.find((t) => t.id === initialTeamId);
-        if (team) {
-          loadTeamDetails(team);
-          return;
-        }
-      }
-      setView('list');
-      setInviteLink('');
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
     }
-  }, [isOpen, initialTeamId, teams]);
+    const justOpened = !wasOpenRef.current;
+    wasOpenRef.current = true;
+
+    if (initialTeamId) {
+      const team = teams.find((t) => t.id === initialTeamId);
+      if (team) {
+        loadTeamDetails(team);
+        return;
+      }
+    }
+    if (!justOpened) return;
+
+    setInviteLink('');
+    if (initialView === 'create') {
+      handleCreateNew();
+      return;
+    }
+    setView('list');
+  }, [isOpen, initialTeamId, initialView, teams]);
 
   const handleCreateNew = () => {
     setSelectedTeam(null);

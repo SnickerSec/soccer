@@ -170,3 +170,38 @@ test.describe('Account menu', () => {
         await expect(page.locator('#accountPanel')).toBeHidden();
     });
 });
+
+/**
+ * The same team dialog, reached from the roster instead of the account menu.
+ */
+test.describe('Create Team from the roster', () => {
+    const USER = {
+        id: 'user-1',
+        email: 'coach@example.com',
+        displayName: 'Coach Taylor',
+        avatarUrl: ''
+    };
+
+    test('the button is only there once signed in', async ({ page }) => {
+        await page.goto('/');
+        await expect(page.locator('#createTeamFromRoster')).toHaveCount(0);
+
+        await page.evaluate((user) => window.lineupGenerator.updateAuthUI(user), USER);
+        await expect(page.locator('#createTeamFromRoster')).toBeVisible();
+    });
+
+    test('it opens the dialog on the create form, not the team list', async ({ page }) => {
+        await page.goto('/');
+        await page.evaluate((user) => {
+            window.lineupGenerator.teams = [{ id: 'team-1', name: 'Tigers', role: 'owner' }];
+            window.lineupGenerator.updateAuthUI(user);
+        }, USER);
+
+        await page.click('#createTeamFromRoster');
+
+        await expect(page.locator('#teamModal')).toBeVisible();
+        await expect(page.locator('#teamModalTitle')).toHaveText('Create New Team');
+        await expect(page.locator('#teamNameInput')).toHaveValue('');
+        await expect(page.locator('#teamListView')).toHaveCount(0);
+    });
+});

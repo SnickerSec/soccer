@@ -147,6 +147,7 @@ export default function App() {
   // Modals
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [teamModalInitialTeamId, setTeamModalInitialTeamId] = useState(null);
+  const [teamModalInitialView, setTeamModalInitialView] = useState('list');
   const [isSaveGameOpen, setIsSaveGameOpen] = useState(false);
   const [isMatchdayOpen, setIsMatchdayOpen] = useState(false);
   const [isCustomFormationOpen, setIsCustomFormationOpen] = useState(false);
@@ -1202,6 +1203,12 @@ export default function App() {
             onExportRoster={handleExportRoster}
             onClearAll={handleClearAll}
             onLoadDemo={handleLoadDemo}
+            currentUser={currentUser}
+            onCreateTeam={() => {
+              setTeamModalInitialTeamId(null);
+              setTeamModalInitialView('create');
+              setIsTeamModalOpen(true);
+            }}
           />
 
           {/* Game Settings */}
@@ -1343,10 +1350,12 @@ export default function App() {
         onClose={() => {
           setIsTeamModalOpen(false);
           setTeamModalInitialTeamId(null);
+          setTeamModalInitialView('list');
         }}
         currentTeam={currentTeam}
         teams={teams}
         initialTeamId={teamModalInitialTeamId}
+        initialView={teamModalInitialView}
         onTeamsUpdated={refreshTeams}
         onSelectTeam={handleSelectTeam}
       />

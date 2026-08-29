@@ -10,6 +10,7 @@ import {
   Sparkles,
   X,
   Pencil,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RatingDialog } from './RatingDialog';
@@ -26,6 +27,8 @@ export function RosterTab({
   onExportRoster,
   onClearAll,
   onLoadDemo,
+  onCreateTeam,
+  currentUser = null,
 }) {
   const fileInputRef = useRef(null);
   const [nameInput, setNameInput] = useState('');
@@ -200,6 +203,19 @@ export function RosterTab({
                     Mark All Available
                   </button>
                 </>
+              )}
+              {currentUser && onCreateTeam && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  id="createTeamFromRoster"
+                  onClick={onCreateTeam}
+                  className="h-6 ml-1 flex items-center gap-1 px-2 text-[11px]"
+                >
+                  <Users className="h-3 w-3" />
+                  Create Team
+                </Button>
               )}
             </div>
 
