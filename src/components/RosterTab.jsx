@@ -183,7 +183,8 @@ export function RosterTab({
         {/* Roster Table Card */}
         <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 p-4 border-b bg-muted/30">
-            <div className="flex items-center gap-1.5 text-xs">
+            <div className="flex items-center gap-2.5 text-xs">
+              <h3 className="text-sm font-semibold tracking-tight" id="rosterHeading">Players</h3>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]" id="presentPlayerCount">
                 {players.filter((p) => !p.status || p.status === 'available').length} Present
               </span>
