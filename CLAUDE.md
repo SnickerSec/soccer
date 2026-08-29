@@ -241,6 +241,27 @@ crossed back over. `toDateOnly` in `server/date.js` narrows both to
 'YYYY-MM-DD', and `parseLocalDate` reads only the calendar date at the front of
 whatever it is given, so saves already in local storage still render.
 
+### Editing a saved game
+
+`sync()` replaces local history with the server's list outright, so anything a
+game edit does not send to the cloud is destroyed at the next pull rather than
+merely left behind. Notes were written to state and localStorage only, and the
+delete quoted the team's id where the game's belongs — the server answered 404
+into an empty catch, the row survived, and the next pull brought the game back.
+
+`pushGameUpdate` and `pushGameDelete` in `src/modules/sync.js` are the way to
+change a saved game: local first, then the server, then the queue if there is
+no signal. Both cases the queue has to reason about are handled there rather
+than at the call site — an edit to a game whose creation is still queued is
+folded into that entry, since there is no row to PUT to yet, and deleting such
+a game drops the creation instead of queueing a delete for an id the server
+never issued.
+
+A replay that comes back 404 counts as done for both: the game has been deleted
+elsewhere, and there is nothing left to edit or remove. `api-client.js`
+therefore puts the HTTP status on a failed response, so the queue can tell that
+apart from a 500 it must keep.
+
 ### Renaming a player
 
 Nothing carries a player id. `players` is keyed `UNIQUE(team_id, name)`, the

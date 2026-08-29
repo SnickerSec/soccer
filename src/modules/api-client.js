@@ -63,7 +63,17 @@ async function request(method, url, body = null) {
         };
     }
 
-    return response.json();
+    const data = await response.json();
+
+    // The HTTP status, kept for the callers that have to tell one failure from
+    // another: the sync queue drops a delete the server answers 404 to, since
+    // the row it was going to remove is already gone, but must keep one that
+    // failed with a 500.
+    if (!response.ok && data && typeof data === 'object' && data.status === undefined) {
+        data.status = response.status;
+    }
+
+    return data;
 }
 
 export const api = {

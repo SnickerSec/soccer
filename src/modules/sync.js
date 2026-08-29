@@ -7,7 +7,7 @@ import { isAuthenticated } from './api-client.js';
 import { getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
 import {
     getTeams, createTeam, getPlayers, replaceRoster,
-    getGames, saveGame, bulkImportGames, saveFixture
+    getGames, saveGame, updateGame, deleteGame, bulkImportGames, saveFixture
 } from './cloud-storage.js';
 import { safeGetFromStorage, safeSetToStorage, safeParseJSON } from './storage.js';
 import { mergeRosters } from './roster-merge.js';
@@ -329,20 +329,66 @@ async function writeRoster(players, { expectedVersion, base, renames }) {
 /**
  * Push a saved game to cloud
  */
+/** The game history as it stands on this device. */
+function readLocalGames() {
+    return safeParseJSON(safeGetFromStorage('ayso_lineup_history'), []);
+}
+
+function writeLocalGames(games) {
+    safeSetToStorage('ayso_lineup_history', JSON.stringify(games));
+}
+
+/**
+ * Folds an edit into a game that is still queued for creation, if it is.
+ *
+ * A game saved at the field and edited before the signal came back has never
+ * been seen by the server, so there is no row to PUT to: the edit belongs in
+ * the creation that has yet to replay. Returns whether it found one.
+ */
+function editQueuedSave(gameId, updates) {
+    const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
+    const entry = queue.find(item =>
+        item.entityType === 'games' && item.action === 'save' && item.data?.id === gameId
+    );
+    if (!entry) return false;
+
+    entry.data = { ...entry.data, ...updates };
+    safeSetToStorage('ayso_sync_queue', JSON.stringify(queue));
+    return true;
+}
+
+/**
+ * Drops a queued creation for a game that has since been deleted.
+ *
+ * Replaying it would create the game in the cloud seconds before the delete
+ * removed it again — or, if the delete could not be queued against an id the
+ * server never issued, leave it there for good.
+ */
+function dropQueuedSave(gameId) {
+    const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
+    const remaining = queue.filter(item => !(
+        item.entityType === 'games' && item.data?.id === gameId
+    ));
+    if (remaining.length === queue.length) return false;
+
+    safeSetToStorage('ayso_sync_queue', JSON.stringify(remaining));
+    return true;
+}
+
 export async function pushGame(game) {
     if (!currentTeamId) {
         return { success: false, error: 'No team selected' };
     }
 
     // Save locally first
-    const localGames = safeParseJSON(safeGetFromStorage('ayso_lineup_history'), []);
+    const localGames = readLocalGames();
     const existingIndex = localGames.findIndex(g => g.id === game.id);
     if (existingIndex >= 0) {
         localGames[existingIndex] = game;
     } else {
         localGames.unshift(game);
     }
-    safeSetToStorage('ayso_lineup_history', JSON.stringify(localGames));
+    writeLocalGames(localGames);
 
     if (!navigator.onLine || !await isAuthenticated()) {
         queueChange('games', 'save', game);
@@ -360,17 +406,113 @@ export async function pushGame(game) {
         }
 
         // Update local with cloud ID
-        const updatedGames = safeParseJSON(safeGetFromStorage('ayso_lineup_history'), []);
+        const updatedGames = readLocalGames();
         const idx = updatedGames.findIndex(g => g.id === game.id || g.name === game.name);
         if (idx >= 0) {
             updatedGames[idx] = result.data;
-            safeSetToStorage('ayso_lineup_history', JSON.stringify(updatedGames));
+            writeLocalGames(updatedGames);
         }
 
         lastSyncTime = new Date();
         updateStatus(SYNC_STATUS.SYNCED);
         return result;
     } catch (error) {
+        updateStatus(SYNC_STATUS.ERROR);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Change a saved game — its notes, its name, its date — everywhere it is kept.
+ *
+ * The edit used to be made in React state and localStorage only, which the
+ * next sync() overwrote with the server's copy: a coach's match notes survived
+ * until the app next pulled, and no one else ever saw them.
+ */
+export async function pushGameUpdate(gameId, updates) {
+    const games = readLocalGames();
+    const index = games.findIndex(g => g.id === gameId);
+    if (index >= 0) {
+        games[index] = { ...games[index], ...updates };
+        writeLocalGames(games);
+    }
+
+    if (!currentTeamId) {
+        return { success: false, error: 'No team selected' };
+    }
+
+    if (editQueuedSave(gameId, updates)) {
+        return { success: true, queued: true };
+    }
+
+    if (!navigator.onLine || !await isAuthenticated()) {
+        queueChange('games', 'update', { id: gameId, updates });
+        return { success: true, queued: true };
+    }
+
+    updateStatus(SYNC_STATUS.SYNCING);
+
+    try {
+        const result = await updateGame(gameId, updates);
+        if (!result.success) {
+            // Queued rather than dropped: the edit is already on the device,
+            // and the coach was told it was saved.
+            queueChange('games', 'update', { id: gameId, updates });
+            updateStatus(SYNC_STATUS.ERROR);
+            return result;
+        }
+
+        lastSyncTime = new Date();
+        updateStatus(SYNC_STATUS.SYNCED);
+        return result;
+    } catch (error) {
+        queueChange('games', 'update', { id: gameId, updates });
+        updateStatus(SYNC_STATUS.ERROR);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Delete a saved game from the device and the cloud.
+ *
+ * The delete only ever reached the device: the call was made with the team id
+ * where the game id belongs, so the server was asked for a game that does not
+ * exist and answered 404 into an empty catch. The row stayed, and the next
+ * sync() — which replaces local history with the server's list — brought the
+ * deleted game back.
+ */
+export async function pushGameDelete(gameId) {
+    writeLocalGames(readLocalGames().filter(g => g.id !== gameId));
+
+    if (!currentTeamId) {
+        return { success: false, error: 'No team selected' };
+    }
+
+    // Never created up there: dropping the queued creation is the whole job.
+    if (dropQueuedSave(gameId)) {
+        return { success: true, queued: false };
+    }
+
+    if (!navigator.onLine || !await isAuthenticated()) {
+        queueChange('games', 'delete', { id: gameId });
+        return { success: true, queued: true };
+    }
+
+    updateStatus(SYNC_STATUS.SYNCING);
+
+    try {
+        const result = await deleteGame(gameId);
+        if (!result.success && result.status !== 404) {
+            queueChange('games', 'delete', { id: gameId });
+            updateStatus(SYNC_STATUS.ERROR);
+            return result;
+        }
+
+        lastSyncTime = new Date();
+        updateStatus(SYNC_STATUS.SYNCED);
+        return { success: true };
+    } catch (error) {
+        queueChange('games', 'delete', { id: gameId });
         updateStatus(SYNC_STATUS.ERROR);
         return { success: false, error: error.message };
     }
@@ -477,6 +619,23 @@ export async function processQueue() {
             } else if (item.entityType === 'games' && item.action === 'save') {
                 const result = await saveGame(currentTeamId, item.data);
                 if (result.success) {
+                    processed++;
+                } else {
+                    remaining.push(item);
+                }
+            } else if (item.entityType === 'games' && item.action === 'update') {
+                const result = await updateGame(item.data.id, item.data.updates);
+                // A 404 means the game has since been deleted, by this coach on
+                // another device or by another coach. There is nothing left to
+                // edit, so the entry is done rather than retried forever.
+                if (result.success || result.status === 404) {
+                    processed++;
+                } else {
+                    remaining.push(item);
+                }
+            } else if (item.entityType === 'games' && item.action === 'delete') {
+                const result = await deleteGame(item.data.id);
+                if (result.success || result.status === 404) {
                     processed++;
                 } else {
                     remaining.push(item);

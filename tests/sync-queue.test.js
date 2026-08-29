@@ -20,6 +20,8 @@ let rosterWrites = [];
 /** What the server does with a write. Reassigned by the tests that need it to fail. */
 let rosterResult;
 let gameResult;
+let gameUpdateResult;
+let gameDeleteResult;
 let fixtureResult;
 
 jest.unstable_mockModule('../src/modules/storage.js', () => ({
@@ -69,6 +71,14 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
         calls.push(`push:saveFixture:${fixture.opponent}`);
         return fixtureResult(fixture);
     },
+    updateGame: async (gameId, updates) => {
+        calls.push(`push:updateGame:${gameId}`);
+        return gameUpdateResult(gameId, updates);
+    },
+    deleteGame: async (gameId) => {
+        calls.push(`push:deleteGame:${gameId}`);
+        return gameDeleteResult(gameId);
+    },
     bulkImportGames: async () => ({ success: true })
 }));
 
@@ -85,6 +95,8 @@ async function loadSync() {
 let initSync;
 let processQueue;
 let pushGame;
+let pushGameUpdate;
+let pushGameDelete;
 let pushFixture;
 
 /** Queue entries as pushPlayers/pushGame would have written them offline. */
@@ -104,6 +116,12 @@ const queuedRoster = (players, context = {}) =>
 
 const queuedGame = (game) =>
     ({ entityType: 'games', action: 'save', data: game, timestamp: 2 });
+
+const queuedGameUpdate = (id, updates) =>
+    ({ entityType: 'games', action: 'update', data: { id, updates }, timestamp: 2 });
+
+const queuedGameDelete = (id) =>
+    ({ entityType: 'games', action: 'delete', data: { id }, timestamp: 2 });
 
 const queuedFixture = (fixture) =>
     ({ entityType: 'fixtures', action: 'save', data: fixture, timestamp: 3 });
@@ -129,11 +147,14 @@ beforeEach(async () => {
     rosterWrites = [];
     rosterResult = (players) => ({ success: true, data: players, version: 2 });
     gameResult = (game) => ({ success: true, data: { ...game, id: 'cloud-1' } });
+    gameUpdateResult = () => ({ success: true });
+    gameDeleteResult = () => ({ success: true });
     fixtureResult = (fixture) => ({ success: true, data: { ...fixture, id: 'cloud-fix-1' } });
     // Set by a completed first sign-in; leaving it unset runs the migration path
     globalThis.localStorage = { getItem: () => 'completed', setItem: () => {} };
     globalThis.navigator = { onLine: true };
-    ({ initSync, processQueue, pushGame, pushFixture } = await loadSync());
+    ({ initSync, processQueue, pushGame, pushGameUpdate, pushGameDelete, pushFixture } =
+        await loadSync());
 });
 
 describe('initSync', () => {
@@ -270,7 +291,7 @@ describe('processQueue and the entries it cannot replay', () => {
     test('a queued action of the wrong kind is kept too', async () => {
         // The entity is one this build knows; the action is not
         const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-        queueEntries({ entityType: 'games', action: 'delete', data: { id: 'game-1' }, timestamp: 5 });
+        queueEntries({ entityType: 'games', action: 'archive', data: { id: 'game-1' }, timestamp: 5 });
 
         await processQueue();
 
@@ -288,6 +309,51 @@ describe('processQueue and the entries it cannot replay', () => {
  * have none, and have to keep writing unconditionally: refusing them would
  * strand edits that are already queued when a coach's app updates.
  */
+describe('processQueue and game edits', () => {
+    beforeEach(signInWithTeam);
+
+    test('replays a queued edit', async () => {
+        queueEntries(queuedGameUpdate('cloud-1', { notes: 'Won 3-1' }));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(calls).toEqual(['push:updateGame:cloud-1']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('replays a queued delete', async () => {
+        queueEntries(queuedGameDelete('cloud-1'));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(calls).toEqual(['push:deleteGame:cloud-1']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('drops an edit to a game that has since been deleted', async () => {
+        gameUpdateResult = () => ({ success: false, status: 404, error: 'Game not found' });
+        queueEntries(queuedGameUpdate('cloud-1', { notes: 'Won' }));
+
+        const result = await processQueue();
+
+        // Nothing left to edit, so retrying it on every drain forever is no use
+        expect(result.processed).toBe(1);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('keeps an edit the server failed on', async () => {
+        gameUpdateResult = () => ({ success: false, status: 500, error: 'boom' });
+        queueEntries(queuedGameUpdate('cloud-1', { notes: 'Won' }));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(0);
+        expect(remainingQueue()).toEqual([queuedGameUpdate('cloud-1', { notes: 'Won' })]);
+    });
+});
+
 describe('processQueue and roster versions', () => {
     beforeEach(signInWithTeam);
 
@@ -360,6 +426,136 @@ describe('pushGame', () => {
         expect(JSON.parse(store['ayso_lineup_history'])).toEqual([
             { id: 'local-1', name: 'vs Rovers' }
         ]);
+    });
+});
+
+/**
+ * Editing and deleting a saved game.
+ *
+ * Both used to stop at the device. sync() replaces local history with the
+ * server's list outright, so a note written after the match was lost at the
+ * next pull, and a deleted game came back with it.
+ */
+describe('pushGameUpdate', () => {
+    beforeEach(async () => {
+        await signInWithTeam();
+        store['ayso_lineup_history'] = JSON.stringify([
+            { id: 'cloud-1', name: 'vs Rovers', notes: '' }
+        ]);
+    });
+
+    test('writes the edit locally and sends it', async () => {
+        const result = await pushGameUpdate('cloud-1', { notes: 'Won 3-1' });
+
+        expect(result.success).toBe(true);
+        expect(calls).toEqual(['push:updateGame:cloud-1']);
+        expect(JSON.parse(store['ayso_lineup_history'])[0].notes).toBe('Won 3-1');
+    });
+
+    test('offline, the edit is kept locally and queued', async () => {
+        globalThis.navigator = { onLine: false };
+
+        const result = await pushGameUpdate('cloud-1', { notes: 'Won 3-1' });
+
+        expect(result).toEqual({ success: true, queued: true });
+        expect(calls).toEqual([]);
+        expect(JSON.parse(store['ayso_lineup_history'])[0].notes).toBe('Won 3-1');
+        expect(remainingQueue()[0]).toMatchObject({
+            entityType: 'games', action: 'update', data: { id: 'cloud-1', updates: { notes: 'Won 3-1' } }
+        });
+    });
+
+    test('an edit the server refuses is queued rather than lost', async () => {
+        gameUpdateResult = () => ({ success: false, error: 'nope' });
+
+        await pushGameUpdate('cloud-1', { notes: 'Won 3-1' });
+
+        expect(remainingQueue()[0]).toMatchObject({ action: 'update', data: { id: 'cloud-1' } });
+    });
+
+    test('an edit to a game still queued for creation goes into that entry', async () => {
+        globalThis.navigator = { onLine: false };
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+
+        await pushGameUpdate('local-1', { notes: 'Won 3-1' });
+
+        // One entry still, now carrying the note: there is no row to PUT to yet
+        expect(remainingQueue()).toEqual([
+            queuedGame({ id: 'local-1', name: 'vs Rovers', notes: 'Won 3-1' })
+        ]);
+    });
+
+    test('without a team there is nothing to send it to', async () => {
+        const fresh = await loadSync();
+        store['ayso_lineup_history'] = JSON.stringify([{ id: 'cloud-1', notes: '' }]);
+
+        const result = await fresh.pushGameUpdate('cloud-1', { notes: 'Won' });
+
+        expect(result.success).toBe(false);
+        expect(calls).toEqual([]);
+        // Still written locally: the coach was shown the note either way
+        expect(JSON.parse(store['ayso_lineup_history'])[0].notes).toBe('Won');
+    });
+});
+
+describe('pushGameDelete', () => {
+    beforeEach(async () => {
+        await signInWithTeam();
+        store['ayso_lineup_history'] = JSON.stringify([
+            { id: 'cloud-1', name: 'vs Rovers' },
+            { id: 'cloud-2', name: 'vs Tigers' }
+        ]);
+    });
+
+    test('removes it here and asks the server to remove it there', async () => {
+        const result = await pushGameDelete('cloud-1');
+
+        expect(result.success).toBe(true);
+        // Addressed to the game, where the call used to quote the team
+        expect(calls).toEqual(['push:deleteGame:cloud-1']);
+        expect(JSON.parse(store['ayso_lineup_history'])).toEqual([
+            { id: 'cloud-2', name: 'vs Tigers' }
+        ]);
+    });
+
+    test('offline, the delete is queued so the game does not come back', async () => {
+        globalThis.navigator = { onLine: false };
+
+        const result = await pushGameDelete('cloud-1');
+
+        expect(result).toEqual({ success: true, queued: true });
+        expect(remainingQueue()[0]).toMatchObject({
+            entityType: 'games', action: 'delete', data: { id: 'cloud-1' }
+        });
+    });
+
+    test('a game the server never saw takes its queued creation with it', async () => {
+        globalThis.navigator = { onLine: false };
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+
+        await pushGameDelete('local-1');
+
+        // Replaying the creation would have put it back, under an id no queued
+        // delete could have quoted
+        expect(remainingQueue()).toEqual([]);
+        expect(calls).toEqual([]);
+    });
+
+    test('a game already gone from the server is not retried', async () => {
+        gameDeleteResult = () => ({ success: false, status: 404, error: 'Game not found' });
+
+        const result = await pushGameDelete('cloud-1');
+
+        expect(result.success).toBe(true);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a delete the server failed on is queued for the next drain', async () => {
+        gameDeleteResult = () => ({ success: false, status: 500, error: 'boom' });
+
+        await pushGameDelete('cloud-1');
+
+        expect(remainingQueue()[0]).toMatchObject({ action: 'delete', data: { id: 'cloud-1' } });
     });
 });
 

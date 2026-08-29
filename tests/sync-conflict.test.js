@@ -51,6 +51,8 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
         return replies.shift() ?? { success: true, data: players, version: serverVersion + 1 };
     },
     saveGame: async () => ({ success: true }),
+    updateGame: async () => ({ success: true }),
+    deleteGame: async () => ({ success: true }),
     saveFixture: async () => ({ success: true }),
     bulkImportGames: async () => ({ success: true })
 }));

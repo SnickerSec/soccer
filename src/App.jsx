@@ -49,6 +49,8 @@ import {
   sync,
   pushPlayers,
   pushGame,
+  pushGameUpdate,
+  pushGameDelete,
   pushFixture,
   getSyncStatus,
   getCurrentTeamId,
@@ -61,7 +63,6 @@ import {
   clearInviteTokenFromUrl,
 } from '@/modules/team-manager';
 import {
-  deleteGame as deleteGameFromCloud,
   getFixtures,
   updateFixture as updateFixtureInCloud,
   deleteFixture as deleteFixtureFromCloud,
@@ -1016,7 +1017,19 @@ export default function App() {
     });
 
     if (currentUser && currentTeam) {
-      pushGame(gameEntry).catch(() => {});
+      // The server issues the id a later edit or delete has to quote, and the
+      // local 'game-<timestamp>' is no use to it. sync.js writes the cloud copy
+      // to localStorage, but the effect that persists this state would put the
+      // local one straight back, so the swap has to happen here too.
+      pushGame(gameEntry)
+        .then((result) => {
+          const saved = result?.success && result.data;
+          if (!saved || result.data.id === gameEntry.id) return;
+          setGameHistory((prev) =>
+            prev.map((g) => (g.id === gameEntry.id ? { ...g, ...result.data } : g))
+          );
+        })
+        .catch(() => {});
     }
 
     toast.success(`Saved game: "${name}"`);
@@ -1032,8 +1045,11 @@ export default function App() {
     });
 
     if (currentUser && currentTeam) {
+      // pushGameDelete quotes the game's own id — the call here passed the
+      // team's, so the row survived and the next sync brought it back — and
+      // queues the delete when there is no signal to send it over.
       try {
-        await deleteGameFromCloud(currentTeam.id, gameId);
+        await pushGameDelete(gameId);
       } catch (e) {}
     }
 
@@ -1046,6 +1062,13 @@ export default function App() {
       safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(updated));
       return updated;
     });
+
+    // Notes stayed on the device until this: the next sync replaced local
+    // history with the server's copy and took them with it.
+    if (currentUser && currentTeam) {
+      pushGameUpdate(gameId, { notes }).catch(() => {});
+    }
+
     toast.success('Game notes saved');
   };
 
