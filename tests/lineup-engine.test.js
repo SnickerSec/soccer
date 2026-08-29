@@ -11,8 +11,8 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { generateLineup, validateLineup, determineSittingSchedule } from '../public/modules/lineup-engine.js';
-import { getPositionsForFormation, isDefensivePosition } from '../public/modules/formations.js';
+import { generateLineup, validateLineup, determineSittingSchedule } from '../src/modules/lineup-engine.js';
+import { getPositionsForFormation, isDefensivePosition } from '../src/modules/formations.js';
 
 const QUARTERS = 4;
 const MAX_ATTEMPTS = 500;

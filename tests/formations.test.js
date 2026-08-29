@@ -5,8 +5,26 @@ import {
     getFormationsForFieldSize,
     isDefensivePosition,
     isOffensivePosition,
-    getFormationDescription
-} from '../public/modules/formations.js';
+    getFormationDescription,
+    getCustomFormations,
+    saveCustomFormation,
+    deleteCustomFormation
+} from '../src/modules/formations.js';
+
+/**
+ * Custom formations live in localStorage, which Node has not got. Every
+ * formation lookup consults them, so without this the module's own safe-storage
+ * fallback fires on each call and the suite tests only the built-ins.
+ */
+const store = new Map();
+globalThis.localStorage = {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(key, String(value)); },
+    removeItem: (key) => { store.delete(key); },
+    clear: () => store.clear()
+};
+
+beforeEach(() => store.clear());
 
 describe('FORMATIONS structure', () => {
     test('should have 11v11 formations', () => {
@@ -204,8 +222,136 @@ describe('getFormationDescription', () => {
         expect(desc.length).toBeGreaterThan(0);
     });
 
-    test('unknown formation should return empty string', () => {
+    /**
+     * Not the empty string: GameSettings renders this straight into the panel,
+     * and its sibling getAgeRules() answers an unknown division the same way
+     * rather than leaving a blank line under the dropdown.
+     */
+    test('an unknown formation falls back to a generic description', () => {
         const desc = getFormationDescription(7, 'unknown');
-        expect(desc).toBe('');
+        expect(desc).toBe('Tactical player distribution across the field');
+    });
+});
+
+/**
+ * The Tactical Formation Builder writes these. They are consulted by every
+ * lookup in this module, ahead of the built-ins, so a custom formation has to
+ * behave like a first-class one everywhere rather than only in the picker.
+ */
+describe('custom formations', () => {
+    const diamond = () => ({
+        name: 'Diamond',
+        fieldSize: 7,
+        positions: ['Keeper', 'Center Back', 'Left Mid', 'Right Mid', 'Center Mid', 'Striker', 'Support']
+    });
+
+    test('a saved formation reads back', () => {
+        const saved = saveCustomFormation(diamond());
+
+        expect(saved.name).toBe('Diamond');
+        expect(saved.fieldSize).toBe(7);
+        expect(getCustomFormations()).toEqual([saved]);
+    });
+
+    test('starts empty, and survives nothing being stored yet', () => {
+        expect(getCustomFormations()).toEqual([]);
+    });
+
+    /** A <select> hands back strings, so the field size is coerced on the way in. */
+    test('a field size given as a string is stored as a number', () => {
+        const saved = saveCustomFormation({ ...diamond(), fieldSize: '7' });
+
+        expect(saved.fieldSize).toBe(7);
+        expect(getFormationsForFieldSize(7)).toContain('Diamond');
+    });
+
+    test('saving the same name and size again replaces rather than duplicates', () => {
+        saveCustomFormation(diamond());
+        saveCustomFormation({ ...diamond(), positions: ['Keeper', 'Sweeper'] });
+
+        const all = getCustomFormations();
+        expect(all).toHaveLength(1);
+        expect(all[0].positions).toEqual(['Keeper', 'Sweeper']);
+    });
+
+    test('the same name at a different field size is a different formation', () => {
+        saveCustomFormation(diamond());
+        saveCustomFormation({ ...diamond(), fieldSize: 9 });
+
+        expect(getCustomFormations()).toHaveLength(2);
+        expect(getFormationsForFieldSize(7)).toContain('Diamond');
+        expect(getFormationsForFieldSize(9)).toContain('Diamond');
+    });
+
+    test('appears in the picker for its own field size only', () => {
+        saveCustomFormation(diamond());
+
+        expect(getFormationsForFieldSize(7)).toContain('Diamond');
+        expect(getFormationsForFieldSize(11)).not.toContain('Diamond');
+    });
+
+    test('is listed alongside the built-ins, without displacing them', () => {
+        const builtIn = getFormationsForFieldSize(7);
+        saveCustomFormation(diamond());
+
+        const withCustom = getFormationsForFieldSize(7);
+        expect(withCustom).toEqual(expect.arrayContaining(builtIn));
+        expect(withCustom).toHaveLength(builtIn.length + 1);
+    });
+
+    test('a custom name matching a built-in is listed once', () => {
+        const existing = getFormationsForFieldSize(7)[0];
+        saveCustomFormation({ ...diamond(), name: existing });
+
+        const names = getFormationsForFieldSize(7);
+        expect(names.filter(n => n === existing)).toHaveLength(1);
+    });
+
+    test('its positions are what the lineup is built from', () => {
+        const custom = diamond();
+        saveCustomFormation(custom);
+
+        expect(getPositionsForFormation(7, 'Diamond')).toEqual(custom.positions);
+    });
+
+    test('a custom formation wins over a built-in of the same name', () => {
+        const existing = getFormationsForFieldSize(7)[0];
+        saveCustomFormation({ ...diamond(), name: existing });
+
+        expect(getPositionsForFormation(7, existing)).toEqual(diamond().positions);
+    });
+
+    test('describes itself, and writes its own description when given none', () => {
+        saveCustomFormation(diamond());
+        expect(getFormationDescription(7, 'Diamond')).toBe('Custom Diamond formation (7v7)');
+
+        saveCustomFormation({ ...diamond(), name: 'Wide', description: 'Stretches the pitch' });
+        expect(getFormationDescription(7, 'Wide')).toBe('Stretches the pitch');
+    });
+
+    test('deleting takes out that one and leaves the rest', () => {
+        saveCustomFormation(diamond());
+        saveCustomFormation({ ...diamond(), name: 'Wide' });
+
+        deleteCustomFormation('Diamond', 7);
+
+        expect(getCustomFormations().map(f => f.name)).toEqual(['Wide']);
+        expect(getFormationsForFieldSize(7)).not.toContain('Diamond');
+    });
+
+    test('deleting matches on field size too', () => {
+        saveCustomFormation(diamond());
+        deleteCustomFormation('Diamond', 9);
+
+        expect(getCustomFormations().map(f => f.name)).toEqual(['Diamond']);
+    });
+
+    /** An empty positions list must not be handed to the lineup engine. */
+    test('a formation saved with no positions does not override the built-in', () => {
+        const existing = getFormationsForFieldSize(7)[0];
+        const builtInPositions = getPositionsForFormation(7, existing);
+        saveCustomFormation({ name: existing, fieldSize: 7, positions: [] });
+
+        expect(getPositionsForFormation(7, existing)).toEqual(builtInPositions);
     });
 });
