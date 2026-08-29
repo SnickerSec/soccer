@@ -67,7 +67,7 @@ export function TeamModal({
   const loadTeamDetails = async (team) => {
     setSelectedTeam(team);
     setTeamNameInput(team.name);
-    setTeamDivisionInput(team.division || '10U');
+    setTeamDivisionInput(team.ageDivision || '10U');
     setInviteLink('');
     setView('details');
 
@@ -112,7 +112,7 @@ export function TeamModal({
         // Update existing team
         const res = await updateTeam(selectedTeam.id, {
           name: teamNameInput.trim(),
-          division: teamDivisionInput,
+          ageDivision: teamDivisionInput,
         });
         if (res.success) {
           toast.success('Team updated successfully');
@@ -123,10 +123,7 @@ export function TeamModal({
         }
       } else {
         // Create new team
-        const res = await createTeam({
-          name: teamNameInput.trim(),
-          division: teamDivisionInput,
-        });
+        const res = await createTeam(teamNameInput.trim(), teamDivisionInput);
         if (res.success) {
           toast.success('Team created successfully');
           onTeamsUpdated();
@@ -265,7 +262,7 @@ export function TeamModal({
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                          <span>{team.division || '10U'}</span>
+                          <span>{team.ageDivision || '10U'}</span>
                           <span>•</span>
                           <span className="capitalize">{team.role || 'coach'}</span>
                         </div>
