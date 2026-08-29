@@ -13,6 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { STATUSES, statusClassFor } from '@/modules/roster-render';
 import { RatingDialog } from './RatingDialog';
 
 export function RosterTab({
@@ -400,13 +401,15 @@ export function RosterTab({
                       onChange={(e) => onUpdatePlayer(player.name, { status: e.target.value })}
                       className={cn(
                         "player-status-select flex h-8 w-28 rounded-md border border-input bg-card px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer text-foreground",
-                        `status-${status}`
+                        statusClassFor(status)
                       )}
                       aria-label={`Status for ${player.name}`}
                     >
-                      <option value="available">Available</option>
-                      <option value="injured">Injured</option>
-                      <option value="absent">Absent</option>
+                      {STATUSES.map((s) => (
+                        <option key={s.value} value={s.value}>
+                          {s.label}
+                        </option>
+                      ))}
                     </select>
 
                     {/* Remove Player */}

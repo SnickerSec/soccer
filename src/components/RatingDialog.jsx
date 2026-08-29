@@ -2,36 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Star, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  RATING_CATEGORIES,
+  MAX_STARS,
+  ratingsOf,
+  ratingsToPlayerFields,
+} from '@/modules/rating-dialog';
 
-export const RATING_CATEGORIES = [
-  { key: 'overall', label: 'Overall' },
-  { key: 'keeper', label: 'Goalkeeper' },
-  { key: 'defense', label: 'Defense' },
-  { key: 'midfield', label: 'Midfield' },
-  { key: 'offense', label: 'Offense' },
-];
-
-export const MAX_STARS = 5;
+const NO_RATINGS = ratingsOf({});
 
 export function RatingDialog({ isOpen, player, onClose, onSave }) {
-  const [ratings, setRatings] = useState({
-    overall: 0,
-    keeper: 0,
-    defense: 0,
-    midfield: 0,
-    offense: 0,
-  });
+  const [ratings, setRatings] = useState(NO_RATINGS);
 
   useEffect(() => {
     if (player) {
-      const pos = player.positionalRatings || {};
-      setRatings({
-        overall: player.overallRating || 0,
-        keeper: pos.keeper || 0,
-        defense: pos.defense || 0,
-        midfield: pos.midfield || 0,
-        offense: pos.offense || 0,
-      });
+      setRatings(ratingsOf(player));
     }
   }, [player, isOpen]);
 
@@ -45,26 +30,11 @@ export function RatingDialog({ isOpen, player, onClose, onSave }) {
   };
 
   const handleClearAll = () => {
-    setRatings({
-      overall: 0,
-      keeper: 0,
-      defense: 0,
-      midfield: 0,
-      offense: 0,
-    });
+    setRatings(NO_RATINGS);
   };
 
   const handleSave = () => {
-    const positionalRatings = {};
-    for (const cat of ['keeper', 'defense', 'midfield', 'offense']) {
-      if (ratings[cat]) {
-        positionalRatings[cat] = ratings[cat];
-      }
-    }
-    onSave({
-      overallRating: ratings.overall || null,
-      positionalRatings,
-    });
+    onSave(ratingsToPlayerFields(ratings));
     onClose();
   };
 

@@ -19,6 +19,7 @@ import { Footer } from '@/components/Footer';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { CONSTANTS } from '@/constants';
+import { UndoHistory } from '@/modules/history';
 import {
   safeGetFromStorage,
   safeSetToStorage,
@@ -160,8 +161,7 @@ export default function App() {
   const [shareUrl, setShareUrl] = useState(null);
 
   // Undo / Redo History
-  const undoStackRef = useRef([]);
-  const redoStackRef = useRef([]);
+  const historyRef = useRef(new UndoHistory({ limit: CONSTANTS.MAX_UNDO_STACK_SIZE }));
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -179,61 +179,45 @@ export default function App() {
   // own so they travel with the roster push that already carries the new name.
   const pendingRenamesRef = useRef([]);
 
+  // What undo and redo move between. UndoHistory holds the stacks and clones
+  // what it is given, so a later edit cannot reach back into a snapshot.
+  const snapshot = useCallback(
+    () => ({ players, captains, settings }),
+    [players, captains, settings]
+  );
+
+  const restore = (state) => {
+    setPlayers(state.players);
+    setCaptains(state.captains);
+    setSettings(state.settings);
+  };
+
+  const syncHistoryFlags = () => {
+    setCanUndo(historyRef.current.canUndo);
+    setCanRedo(historyRef.current.canRedo);
+  };
+
   // Track state for undo
   const saveSnapshot = useCallback(() => {
-    const snapshot = {
-      players: JSON.parse(JSON.stringify(players)),
-      captains: [...captains],
-      settings: { ...settings },
-    };
-    undoStackRef.current.push(snapshot);
-    if (undoStackRef.current.length > CONSTANTS.MAX_UNDO_STACK_SIZE) {
-      undoStackRef.current.shift();
-    }
-    redoStackRef.current = [];
-    setCanUndo(true);
-    setCanRedo(false);
-  }, [players, captains, settings]);
+    historyRef.current.record(snapshot());
+    syncHistoryFlags();
+  }, [snapshot]);
 
   const handleUndo = useCallback(() => {
-    if (undoStackRef.current.length === 0) return;
-    const current = {
-      players: JSON.parse(JSON.stringify(players)),
-      captains: [...captains],
-      settings: { ...settings },
-    };
-    redoStackRef.current.push(current);
-
-    const previous = undoStackRef.current.pop();
-    if (previous) {
-      setPlayers(previous.players);
-      setCaptains(previous.captains);
-      setSettings(previous.settings);
-    }
-    setCanUndo(undoStackRef.current.length > 0);
-    setCanRedo(true);
+    const previous = historyRef.current.undo(snapshot());
+    if (!previous) return;
+    restore(previous);
+    syncHistoryFlags();
     toast.info('Undo applied');
-  }, [players, captains, settings]);
+  }, [snapshot]);
 
   const handleRedo = useCallback(() => {
-    if (redoStackRef.current.length === 0) return;
-    const current = {
-      players: JSON.parse(JSON.stringify(players)),
-      captains: [...captains],
-      settings: { ...settings },
-    };
-    undoStackRef.current.push(current);
-
-    const next = redoStackRef.current.pop();
-    if (next) {
-      setPlayers(next.players);
-      setCaptains(next.captains);
-      setSettings(next.settings);
-    }
-    setCanUndo(true);
-    setCanRedo(redoStackRef.current.length > 0);
+    const next = historyRef.current.redo(snapshot());
+    if (!next) return;
+    restore(next);
+    syncHistoryFlags();
     toast.info('Redo applied');
-  }, [players, captains, settings]);
+  }, [snapshot]);
 
   // Persist players to storage & cloud sync
   useEffect(() => {

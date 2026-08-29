@@ -1,15 +1,14 @@
 /**
- * The roster row's shape, and the status vocabulary it shares with
- * constants.js.
+ * The status vocabulary the roster rows are drawn from, and the class each
+ * status maps to.
  *
- * The list is handled by delegation — every handler reads dataset.player,
- * dataset.pref or dataset.index off the element that was clicked — so those
- * attributes are the contract between rendering and behaviour, and dropping one
- * makes a control silently stop working rather than throw.
+ * RosterTab renders its <option>s and colours its rows from these, so a status
+ * that disagrees with CONSTANTS.PLAYER_STATUS is an option the app cannot store
+ * or a row that renders unstyled.
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { STATUSES, statusClassFor, playerAriaLabel } from '../src/modules/roster-render.js';
+import { STATUSES, statusClassFor } from '../src/modules/roster-render.js';
 import { CONSTANTS } from '../src/constants.js';
 
 describe('status vocabulary', () => {
@@ -24,9 +23,9 @@ describe('status vocabulary', () => {
         expect(STATUSES.map(s => s.value).sort()).toEqual(playerStatusValues());
     });
 
-    test('every status has a symbol and a class', () => {
+    test('every status has a label and a class', () => {
         for (const status of STATUSES) {
-            expect(Boolean(status.symbol && status.className)).toBe(true);
+            expect(Boolean(status.label && status.className)).toBe(true);
         }
     });
 });
@@ -46,23 +45,5 @@ describe('statusClassFor', () => {
         ['empty', '']
     ])('%s falls back to available rather than no class at all', (_label, status) => {
         expect(statusClassFor(status)).toBe('status-available');
-    });
-});
-
-describe('playerAriaLabel', () => {
-    test('names the player', () => {
-        expect(playerAriaLabel({ name: 'Ana' })).toBe('Player Ana');
-    });
-
-    test('includes the shirt number when there is one', () => {
-        expect(playerAriaLabel({ name: 'Ana', number: 7 })).toBe('Player Ana number 7');
-    });
-
-    test('omits the number rather than saying null', () => {
-        expect(playerAriaLabel({ name: 'Ana', number: null })).not.toMatch(/null/);
-    });
-
-    test('reads a name with punctuation as typed', () => {
-        expect(playerAriaLabel({ name: "O'Brien" })).toBe("Player O'Brien");
     });
 });

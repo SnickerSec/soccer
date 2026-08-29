@@ -12,6 +12,7 @@ import {
   Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { syncStatusPresentation } from '@/modules/account-menu';
 
 export function Header({
   activeTab = 'roster',
@@ -33,23 +34,7 @@ export function Header({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const panelRef = useRef(null);
 
-  const normalizedStatus = ['syncing', 'synced', 'error', 'offline'].includes(syncStatus)
-    ? syncStatus
-    : 'offline';
-
-  const getSyncText = () => {
-    switch (normalizedStatus) {
-      case 'syncing':
-        return 'Syncing...';
-      case 'synced':
-        return 'Synced';
-      case 'error':
-        return 'Sync Error';
-      case 'offline':
-      default:
-        return 'Offline';
-    }
-  };
+  const sync = syncStatusPresentation(syncStatus);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -301,15 +286,15 @@ export function Header({
                     id="syncStatus"
                     role="status"
                     aria-live="polite"
-                    className={cn("sync-status flex items-center gap-1.5 text-xs", normalizedStatus)}
+                    className={cn("sync-status flex items-center gap-1.5 text-xs", sync.state)}
                   >
                     <span className="sync-icon flex items-center justify-center">
                       <svg className="icon w-3.5 h-3.5" aria-hidden="true">
-                        <use href={`/assets/icons.svg#icon-sync-${normalizedStatus}`} />
+                        <use href={`/assets/icons.svg#${sync.icon}`} />
                       </svg>
                     </span>
                     <span className="sync-text font-medium text-xs">
-                      {getSyncText()}
+                      {sync.label}
                     </span>
                   </div>
                 </div>

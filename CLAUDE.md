@@ -93,8 +93,7 @@ are copied into the build as-is.
 │       ├── formations.js   # Formation definitions and positions
 │       ├── lineup-engine.js# The AYSO rotation rules
 │       ├── sync.js         # Offline queue and cloud sync
-│       ├── roster-merge.js # Three-way merge for a rejected roster save
-│       └── index.js        # Module exports
+│       └── roster-merge.js # Three-way merge for a rejected roster save
 ├── public/             # Copied into dist/ verbatim by the build
 │   ├── sw.js           # Service worker (precache list, offline strategies)
 │   ├── manifest.json   # PWA manifest
