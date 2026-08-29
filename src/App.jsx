@@ -1155,10 +1155,7 @@ export default function App() {
 
   const handleLaunchMatchdayForFixture = (fixture) => {
     if (!lineup) {
-      const generated = generateLineup(players, settings);
-      if (generated && generated.quarters) {
-        setLineup(generated);
-      }
+      handleGenerateLineup();
     }
     setMatchdayFixture(fixture);
     setIsMatchdayOpen(true);
