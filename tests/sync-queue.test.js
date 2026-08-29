@@ -20,6 +20,7 @@ let rosterWrites = [];
 /** What the server does with a write. Reassigned by the tests that need it to fail. */
 let rosterResult;
 let gameResult;
+let fixtureResult;
 
 jest.unstable_mockModule('../src/modules/storage.js', () => ({
     safeGetFromStorage: (key) => (key in store ? store[key] : null),
@@ -64,6 +65,10 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
         calls.push(`push:saveGame:${game.name}`);
         return gameResult(game);
     },
+    saveFixture: async (teamId, fixture) => {
+        calls.push(`push:saveFixture:${fixture.opponent}`);
+        return fixtureResult(fixture);
+    },
     bulkImportGames: async () => ({ success: true })
 }));
 
@@ -80,6 +85,7 @@ async function loadSync() {
 let initSync;
 let processQueue;
 let pushGame;
+let pushFixture;
 
 /** Queue entries as pushPlayers/pushGame would have written them offline. */
 function queueOfflineRosterEdit(players) {
@@ -98,6 +104,9 @@ const queuedRoster = (players, context = {}) =>
 
 const queuedGame = (game) =>
     ({ entityType: 'games', action: 'save', data: game, timestamp: 2 });
+
+const queuedFixture = (fixture) =>
+    ({ entityType: 'fixtures', action: 'save', data: fixture, timestamp: 3 });
 
 const remainingQueue = () => JSON.parse(store['ayso_sync_queue']);
 
@@ -120,10 +129,11 @@ beforeEach(async () => {
     rosterWrites = [];
     rosterResult = (players) => ({ success: true, data: players, version: 2 });
     gameResult = (game) => ({ success: true, data: { ...game, id: 'cloud-1' } });
+    fixtureResult = (fixture) => ({ success: true, data: { ...fixture, id: 'cloud-fix-1' } });
     // Set by a completed first sign-in; leaving it unset runs the migration path
     globalThis.localStorage = { getItem: () => 'completed', setItem: () => {} };
     globalThis.navigator = { onLine: true };
-    ({ initSync, processQueue, pushGame } = await loadSync());
+    ({ initSync, processQueue, pushGame, pushFixture } = await loadSync());
 });
 
 describe('initSync', () => {
@@ -243,17 +253,29 @@ describe('processQueue and the entries it cannot replay', () => {
     });
 
     test('an entry this build has no branch for is kept, not silently dropped', async () => {
-        // A fixture queued by a newer build, or a type added to queueChange and
-        // forgotten here: falling through both branches used to discard it
+        // Queued by a newer build, or a type added to queueChange and forgotten
+        // here: falling through every branch used to discard it
         const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-        queueEntries({ entityType: 'fixtures', action: 'save', data: { opponent: 'Rovers' }, timestamp: 3 });
+        queueEntries({ entityType: 'settings', action: 'save', data: { theme: 'dark' }, timestamp: 4 });
 
         const result = await processQueue();
 
         expect(result.processed).toBe(0);
         expect(calls).toEqual([]);
         expect(remainingQueue()).toHaveLength(1);
-        expect(remainingQueue()[0].data).toEqual({ opponent: 'Rovers' });
+        expect(remainingQueue()[0].data).toEqual({ theme: 'dark' });
+        warn.mockRestore();
+    });
+
+    test('a queued action of the wrong kind is kept too', async () => {
+        // The entity is one this build knows; the action is not
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        queueEntries({ entityType: 'games', action: 'delete', data: { id: 'game-1' }, timestamp: 5 });
+
+        await processQueue();
+
+        expect(calls).toEqual([]);
+        expect(remainingQueue()).toHaveLength(1);
         warn.mockRestore();
     });
 });
@@ -338,5 +360,71 @@ describe('pushGame', () => {
         expect(JSON.parse(store['ayso_lineup_history'])).toEqual([
             { id: 'local-1', name: 'vs Rovers' }
         ]);
+    });
+});
+
+/**
+ * A match added on the touchline.
+ *
+ * The schedule is held in state and written to localStorage on every change,
+ * so a fixture created offline was never lost to the device. It was lost to
+ * everyone else: the write just failed, and nothing remembered to try again.
+ */
+describe('pushFixture', () => {
+    beforeEach(signInWithTeam);
+
+    test('offline, the match is queued rather than dropped', async () => {
+        globalThis.navigator = { onLine: false };
+
+        const result = await pushFixture({ id: 'local-1', opponent: 'Rovers' });
+
+        expect(result).toEqual({ success: true, queued: true });
+        expect(calls).toEqual([]);
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({
+                entityType: 'fixtures',
+                action: 'save',
+                data: { id: 'local-1', opponent: 'Rovers' }
+            })
+        ]);
+    });
+
+    test('online, it goes straight out', async () => {
+        const result = await pushFixture({ id: 'local-1', opponent: 'Rovers' });
+
+        expect(result.success).toBe(true);
+        expect(result.data.id).toBe('cloud-fix-1');
+        expect(calls).toEqual(['push:saveFixture:Rovers']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('the queued match reaches the server on the next drain', async () => {
+        globalThis.navigator = { onLine: false };
+        await pushFixture({ id: 'local-1', opponent: 'Rovers' });
+
+        globalThis.navigator = { onLine: true };
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(calls).toEqual(['push:saveFixture:Rovers']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a refused match stays queued, like a roster or a game', async () => {
+        fixtureResult = () => ({ success: false, error: 'Server error' });
+        queueEntries(queuedFixture({ opponent: 'Rovers' }));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(0);
+        expect(remainingQueue()).toHaveLength(1);
+    });
+
+    test('without a team there is nothing to push to', async () => {
+        const { pushFixture: freshPushFixture } = await loadSync();
+
+        const result = await freshPushFixture({ opponent: 'Rovers' });
+
+        expect(result).toEqual({ success: false, error: 'No team selected' });
     });
 });

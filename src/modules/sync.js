@@ -7,7 +7,7 @@ import { isAuthenticated } from './api-client.js';
 import { getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
 import {
     getTeams, createTeam, getPlayers, replaceRoster,
-    getGames, saveGame, bulkImportGames
+    getGames, saveGame, bulkImportGames, saveFixture
 } from './cloud-storage.js';
 import { safeGetFromStorage, safeSetToStorage, safeParseJSON } from './storage.js';
 import { mergeRosters } from './roster-merge.js';
@@ -377,6 +377,47 @@ export async function pushGame(game) {
 }
 
 /**
+ * Push a fixture to cloud, or queue it until there is a connection.
+ *
+ * Unlike pushGame there is no local write here: App holds the schedule in
+ * state and persists it to localStorage on every change, so the match is
+ * already safe on the device by the time this is called. What was missing was
+ * the other half — with no signal the write simply failed, and a match added
+ * on the touchline never reached the coaches who were not there.
+ *
+ * Only creating is queued, matching games: an edit or a delete made offline
+ * still applies locally and is lost to the cloud.
+ */
+export async function pushFixture(fixture) {
+    if (!currentTeamId) {
+        return { success: false, error: 'No team selected' };
+    }
+
+    if (!navigator.onLine || !await isAuthenticated()) {
+        queueChange('fixtures', 'save', fixture);
+        return { success: true, queued: true };
+    }
+
+    updateStatus(SYNC_STATUS.SYNCING);
+
+    try {
+        const result = await saveFixture(currentTeamId, fixture);
+
+        if (!result.success) {
+            updateStatus(SYNC_STATUS.ERROR);
+            return result;
+        }
+
+        lastSyncTime = new Date();
+        updateStatus(SYNC_STATUS.SYNCED);
+        return result;
+    } catch (error) {
+        updateStatus(SYNC_STATUS.ERROR);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
  * Queue a change for later sync (when offline)
  */
 function queueChange(entityType, action, data, context = {}) {
@@ -435,6 +476,16 @@ export async function processQueue() {
                 }
             } else if (item.entityType === 'games' && item.action === 'save') {
                 const result = await saveGame(currentTeamId, item.data);
+                if (result.success) {
+                    processed++;
+                } else {
+                    remaining.push(item);
+                }
+            } else if (item.entityType === 'fixtures' && item.action === 'save') {
+                // The server assigns the id, so the replayed fixture comes back
+                // as a new row; the local copy is replaced by the cloud list
+                // the next time the schedule is loaded, as a game's is.
+                const result = await saveFixture(currentTeamId, item.data);
                 if (result.success) {
                     processed++;
                 } else {

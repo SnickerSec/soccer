@@ -48,6 +48,7 @@ import {
   sync,
   pushPlayers,
   pushGame,
+  pushFixture,
   getSyncStatus,
   getCurrentTeamId,
   setCurrentTeam,
@@ -61,7 +62,6 @@ import {
 import {
   deleteGame as deleteGameFromCloud,
   getFixtures,
-  saveFixture as saveFixtureToCloud,
   updateFixture as updateFixtureInCloud,
   deleteFixture as deleteFixtureFromCloud,
 } from '@/modules/cloud-storage';
@@ -1101,7 +1101,9 @@ export default function App() {
       setFixtures((prev) => [...prev, newFixture]);
       if (currentUser && currentTeam) {
         try {
-          const res = await saveFixtureToCloud(currentTeam.id, newFixture);
+          // Through the sync engine rather than straight to the API: with no
+          // signal this queues the match instead of dropping it
+          const res = await pushFixture(newFixture);
           if (res.success && res.data?.id) {
             setFixtures((prev) =>
               prev.map((f) => (f.id === newFixture.id ? res.data : f))
