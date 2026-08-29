@@ -4,7 +4,7 @@ import {
     shuffleArray,
     shuffleWithinSimilarGroups,
     deepClone
-} from '../public/modules/utils.js';
+} from '../src/modules/utils.js';
 
 describe('escapeHtml', () => {
     test('should escape < and >', () => {

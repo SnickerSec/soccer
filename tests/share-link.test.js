@@ -11,7 +11,7 @@
 import { describe, test, expect, beforeAll } from '@jest/globals';
 import {
     encodeShareData, decodeShareData, buildShareUrl
-} from '../public/modules/share-link.js';
+} from '../src/modules/share-link.js';
 
 // btoa/atob exist in browsers and in Node 16+, but not in every environment
 // this suite might run in.

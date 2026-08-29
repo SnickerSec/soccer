@@ -10,7 +10,7 @@
 import { describe, test, expect } from '@jest/globals';
 import {
     ratingsOf, ratingsToPlayerFields, RATING_CATEGORIES, MAX_STARS
-} from '../public/modules/rating-dialog.js';
+} from '../src/modules/rating-dialog.js';
 
 describe('ratingsOf', () => {
     test('reads what a player has set', () => {

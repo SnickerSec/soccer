@@ -11,7 +11,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { syncStatusPresentation } from '../public/modules/account-menu.js';
+import { syncStatusPresentation } from '../src/modules/account-menu.js';
 
 describe('syncStatusPresentation', () => {
     test.each([

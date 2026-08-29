@@ -7,7 +7,7 @@
  */
 
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import { UndoHistory } from '../public/modules/history.js';
+import { UndoHistory } from '../src/modules/history.js';
 
 /** A stand-in for the roster/lineup triple the app actually stores. */
 const state = (label) => ({ players: [{ name: label }], captains: [], lineup: [] });

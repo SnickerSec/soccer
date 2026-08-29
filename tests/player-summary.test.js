@@ -10,7 +10,7 @@ import { describe, test, expect } from '@jest/globals';
 import {
     SUMMARY_HEADERS, summaryCells, playerLabel, captainLabel,
     balanceLabel, positionsLabel
-} from '../public/modules/player-summary.js';
+} from '../src/modules/player-summary.js';
 
 const player = (overrides = {}) => ({
     name: 'Ana',

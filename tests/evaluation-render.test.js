@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { EVALUATION_RATINGS, isSelectedRating } from '../public/modules/evaluation-render.js';
+import { EVALUATION_RATINGS, isSelectedRating } from '../src/modules/evaluation-render.js';
 
 describe('EVALUATION_RATINGS', () => {
     test('opens with the unrated option', () => {

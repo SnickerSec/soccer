@@ -11,7 +11,7 @@ import {
     generateSeasonIcs,
     calculateVolunteerStats,
     exportScheduleCsv,
-} from '../public/modules/schedule.js';
+} from '../src/modules/schedule.js';
 
 describe('formatMatchDate and formatTimeString', () => {
     test('formats valid date string', () => {

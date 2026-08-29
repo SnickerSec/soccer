@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { mergeRosters } from '../public/modules/roster-merge.js';
+import { mergeRosters } from '../src/modules/roster-merge.js';
 
 /** A player with the fields the merge compares, all defaulted. */
 function player(name, overrides = {}) {

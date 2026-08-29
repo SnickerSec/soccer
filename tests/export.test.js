@@ -10,7 +10,7 @@
 import { describe, test, expect } from '@jest/globals';
 import {
     csvField, csvRow, lineupCsv, lineupClipboardText, lineupText, rosterText
-} from '../public/modules/export.js';
+} from '../src/modules/export.js';
 
 const player = (name, extra = {}) => ({
     name,

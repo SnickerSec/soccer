@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { announcementFor, notificationContainer } from '../public/modules/notifications.js';
+import { announcementFor, notificationContainer } from '../src/modules/notifications.js';
 
 describe('announcementFor', () => {
     test('an error interrupts, because it needs acting on', () => {

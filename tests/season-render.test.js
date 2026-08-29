@@ -5,7 +5,7 @@ import {
     buildPlayerStatsHtml,
     buildSeasonStatsCsv,
     rankPlayersByGames
-} from '../public/modules/season-render.js';
+} from '../src/modules/season-render.js';
 
 /** A stats entry with sensible zeros, overridden per test. */
 function playerStats(overrides = {}) {
