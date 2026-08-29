@@ -4,6 +4,7 @@
 
 import { describe, test, expect } from '@jest/globals';
 import {
+    parseLocalDate,
     formatMatchDate,
     formatTimeString,
     formatParentMemo,
@@ -13,7 +14,38 @@ import {
     exportScheduleCsv,
 } from '../src/modules/schedule.js';
 
+describe('parseLocalDate', () => {
+    test('reads a plain calendar date as that local day', () => {
+        const date = parseLocalDate('2026-09-12');
+
+        expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 8, 12]);
+    });
+
+    test('reads the date out of an ISO timestamp rather than choking on it', () => {
+        // What the server used to answer with, and what old local saves hold:
+        // splitting on '-' took '12T00:00:00.000Z' for the day and gave NaN.
+        const date = parseLocalDate('2026-09-12T00:00:00.000Z');
+
+        expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 8, 12]);
+    });
+
+    test('does not shift the day for a timestamp late in the UTC evening', () => {
+        expect(parseLocalDate('2026-09-12T23:30:00.000Z').getDate()).toBe(12);
+    });
+
+    test('still accepts a single-digit month and day', () => {
+        const date = parseLocalDate('2026-9-2');
+
+        expect([date.getMonth(), date.getDate()]).toEqual([8, 2]);
+    });
+});
+
 describe('formatMatchDate and formatTimeString', () => {
+    test('formats a fixture date that arrived as a timestamp', () => {
+        expect(formatMatchDate('2026-09-12T00:00:00.000Z')).toContain('Sep 12');
+    });
+
+
     test('formats valid date string', () => {
         const formatted = formatMatchDate('2026-09-12');
         expect(formatted).toContain('Sep 12');

@@ -56,6 +56,39 @@ test.describe('Live Matchday Mode', () => {
 });
 
 /**
+ * Ending a match saves it to the season tracker.
+ *
+ * The dialog passed the game name as a bare string to a handler that
+ * destructures { name, date }, so the saved game had neither: the history entry
+ * was nameless and undated, and the cloud rejected it for a missing name.
+ */
+test.describe('Ending a match', () => {
+    test('saves a named, dated game to the history', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#generateLineup');
+
+        await page.locator('#openMatchday').click();
+        const dialog = page.locator('[role="dialog"]');
+        await expect(dialog).toBeVisible();
+
+        await dialog.getByRole('button', { name: /Save Game Record/i }).click();
+        await expect(dialog).not.toBeVisible();
+
+        await page.click('#season-tab-btn');
+        const historyText = await page.locator('#gameHistoryList').textContent();
+        expect(historyText).toContain('vs Opponent (0-0)');
+        expect(historyText).not.toContain('Invalid Date');
+
+        // Today, in the coach's own words: 'Mar 14, 2026'
+        const today = new Date().toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric'
+        });
+        expect(historyText).toContain(today);
+    });
+});
+
+/**
  * Launching matchday from a fixture, before any lineup exists.
  *
  * The schedule's Live button used to call the generator with the wrong

@@ -22,18 +22,21 @@ import {
   Eye,
 } from 'lucide-react';
 import { calculatePlayerStats, getLineupRecommendations } from '@/modules/season-stats';
+import { parseLocalDate } from '@/modules/schedule';
 import { PlayerHeatmapCard } from './PlayerHeatmapCard';
 import { cn } from '@/lib/utils';
 
+/**
+ * A saved game's date, however it was written down: 'YYYY-MM-DD' from the save
+ * dialog, an ISO timestamp from a game that has been through the cloud, or a
+ * locale string from an old local save. Anything unreadable is shown as it was
+ * stored rather than as "Invalid Date".
+ */
 function formatDisplayDate(dateStr) {
   if (!dateStr) return 'Recent';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    const [year, month, day] = parts.map(Number);
-    const date = new Date(year, month - 1, day);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  }
-  return dateStr;
+  const date = parseLocalDate(dateStr);
+  if (Number.isNaN(date.getTime())) return String(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export function SeasonTab({

@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth, requireTeamAccess, getTeamRole, roleSatisfies } from '../middleware.js';
+import { toDateOnly } from '../date.js';
 
 const router = Router();
 
@@ -20,7 +21,7 @@ function mapGame(g) {
     return {
         id: g.id,
         name: g.name,
-        date: g.game_date,
+        date: toDateOnly(g.game_date),
         notes: g.notes,
         settings: g.settings,
         lineup: g.lineup,

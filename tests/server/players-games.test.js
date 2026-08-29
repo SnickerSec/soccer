@@ -151,6 +151,31 @@ describe('team-scoped game routes', () => {
         expect(res.status).toBe(200);
     });
 
+    test('answers a game date as a calendar date, not a timestamp', async () => {
+        query.mockReset();
+        query.mockResolvedValueOnce(rows({ role: 'viewer' }));
+        // pg parses a DATE column into a Date at local midnight, which res.json
+        // would otherwise serialise as '2026-03-14T…Z' — unparseable to the
+        // client, which showed it in Game History as "Invalid Date".
+        query.mockResolvedValueOnce(rows({
+            id: 'game-1', name: 'vs Tigers', game_date: new Date(2026, 2, 14)
+        }));
+
+        const res = await request(buildApp(gameRoutes, ALICE)).get('/api/teams/team-1/games');
+
+        expect(res.body.data[0].date).toBe('2026-03-14');
+    });
+
+    test('leaves a game saved without a date null', async () => {
+        query.mockReset();
+        query.mockResolvedValueOnce(rows({ role: 'viewer' }));
+        query.mockResolvedValueOnce(rows({ id: 'game-1', name: 'vs Tigers', game_date: null }));
+
+        const res = await request(buildApp(gameRoutes, ALICE)).get('/api/teams/team-1/games');
+
+        expect(res.body.data[0].date).toBeNull();
+    });
+
     test('a viewer cannot save a game', async () => {
         memberOfTeamAs('viewer');
 

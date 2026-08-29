@@ -70,6 +70,17 @@ describeDb('game routes against PostgreSQL', () => {
         expect(game.d).toBe('2026-03-14');
     });
 
+    test('lists that date back as a calendar date, not a timestamp', async () => {
+        await request(app).post(`/api/teams/${team.id}/games`).send(aGame({ date: '2026-03-14T12:00:00.000Z' }));
+
+        const res = await request(app).get(`/api/teams/${team.id}/games`);
+
+        // pg hands a DATE back as a Date at local midnight, which res.json
+        // would write out as a timestamp: unparseable to the client, which
+        // showed it in Game History as "Invalid Date".
+        expect(res.body.data[0].date).toBe('2026-03-14');
+    });
+
     test('a game with no name is refused instead of hitting NOT NULL', async () => {
         const res = await request(app).post(`/api/teams/${team.id}/games`).send(aGame({ name: undefined }));
 

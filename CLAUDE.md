@@ -212,6 +212,17 @@ broke was reopening a synced game, which found no quarters and fell back to a
 default formation. Games saved before the fix stored those columns empty and
 cannot be recovered — they reopen empty.
 
+### Dates on the wire
+
+`games.game_date` and `fixtures.game_date` are DATE columns, and pg parses those
+into a JS Date at local midnight, which `res.json` then writes out as a UTC
+timestamp. The client stores and formats plain calendar dates, so that string
+reached Game History as a date it could not read and rendered as "Invalid
+Date" — and on a server east of UTC it was the day before, midnight having
+crossed back over. `toDateOnly` in `server/date.js` narrows both to
+'YYYY-MM-DD', and `parseLocalDate` reads only the calendar date at the front of
+whatever it is given, so saves already in local storage still render.
+
 ### Renaming a player
 
 Nothing carries a player id. `players` is keyed `UNIQUE(team_id, name)`, the

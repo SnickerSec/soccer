@@ -79,6 +79,21 @@ describe('team-scoped fixture routes', () => {
         });
     });
 
+    test('answers a fixture date as a calendar date, not a timestamp', async () => {
+        query.mockResolvedValueOnce(rows({ role: 'viewer' }));
+        // As pg hands a DATE column back: a Date at local midnight, which
+        // serialises to a UTC timestamp and lands on the previous day east of
+        // UTC.
+        query.mockResolvedValueOnce(rows({
+            id: 'fix-1', game_date: new Date(2026, 8, 12), opponent: 'Thunder FC'
+        }));
+
+        const res = await request(buildApp(fixtureRoutes, ALICE))
+            .get('/api/teams/team-1/fixtures');
+
+        expect(res.body.data[0].gameDate).toBe('2026-09-12');
+    });
+
     test('creating a fixture requires coach role', async () => {
         memberOfTeamAs('viewer');
 

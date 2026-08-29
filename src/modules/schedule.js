@@ -8,12 +8,18 @@ import { csvRow } from './export.js';
 
 /**
  * Parses YYYY-MM-DD string into a local Date object without timezone offset shift.
+ *
+ * Only the calendar date at the front is read, so an ISO timestamp parses as
+ * the day it names rather than shifting across midnight — or, when the split
+ * here took 'T00:00:00.000Z' for a day number, as an Invalid Date. The server
+ * no longer sends one, but saves made before it stopped are still in local
+ * storage.
  */
 export function parseLocalDate(dateStr) {
     if (!dateStr) return new Date();
-    const parts = String(dateStr).split('-');
-    if (parts.length === 3) {
-        const [y, m, d] = parts.map(Number);
+    const match = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(dateStr));
+    if (match) {
+        const [, y, m, d] = match.map(Number);
         return new Date(y, m - 1, d);
     }
     return new Date(dateStr);

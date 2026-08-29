@@ -194,9 +194,14 @@ export function MatchdayDialog({
   };
 
   const handleFinishMatch = () => {
-    const defaultGameName = `vs ${opponentName || 'Opponent'} (${homeScore}-${awayScore})`;
+    // An object, not the bare name: the handler destructures { name, date }, so
+    // a string saved the match with no name at all — which the cloud then
+    // rejected — and no date, leaving Game History showing it as "Recent".
     if (onSaveGame) {
-      onSaveGame(defaultGameName);
+      onSaveGame({
+        name: `vs ${opponentName || 'Opponent'} (${homeScore}-${awayScore})`,
+        date: fixture?.gameDate || new Date().toISOString().split('T')[0],
+      });
     }
     toast.success('Match completed and game saved!');
     onClose();

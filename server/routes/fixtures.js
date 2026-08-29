@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth, requireTeamAccess, getTeamRole, roleSatisfies } from '../middleware.js';
+import { toDateOnly } from '../date.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ export function mapFixture(f) {
     return {
         id: f.id,
         teamId: f.team_id,
-        gameDate: f.game_date,
+        gameDate: toDateOnly(f.game_date),
         gameTime: f.game_time || '',
         opponent: f.opponent,
         location: f.location || '',
