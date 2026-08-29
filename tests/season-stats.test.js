@@ -2,7 +2,7 @@
 import {
     calculatePlayerStats,
     getLineupRecommendations
-} from '../public/modules/season-stats.js';
+} from '../src/modules/season-stats.js';
 
 // Test data
 const mockPlayers = [

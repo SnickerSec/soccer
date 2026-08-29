@@ -9,7 +9,8 @@
 
 import { describe, test, expect } from '@jest/globals';
 import {
-    csvField, csvRow, lineupCsv, lineupClipboardText, lineupText, rosterText
+    csvField, csvRow, lineupCsv, lineupClipboardText, lineupText, rosterText,
+    downloadTextFile, seasonStatsCsv
 } from '../src/modules/export.js';
 
 const player = (name, extra = {}) => ({
@@ -200,5 +201,159 @@ describe('rosterText', () => {
 
     test('a name with punctuation goes out as typed', () => {
         expect(rosterText([player("O'Brien")])).toBe("O'Brien\n");
+    });
+});
+
+/**
+ * Handing the browser a file to save.
+ *
+ * Untested until now, which is how all four callers came to pass their
+ * arguments the other way round — the export downloaded a file named after its
+ * own contents. Nothing threw, and nobody reads a download's filename closely
+ * enough to notice until they go looking for the file.
+ */
+describe('downloadTextFile', () => {
+    /** Runs a download against stub DOM, returning what it did. */
+    function captureDownload(run) {
+        const link = { href: '', download: '', clicked: false, click() { this.clicked = true; } };
+        const revoked = [];
+        const realDocument = globalThis.document;
+        const realURL = globalThis.URL;
+        let blob = null;
+        let type = null;
+
+        globalThis.document = { createElement: () => link };
+        globalThis.URL = {
+            createObjectURL: (b) => { blob = b; type = b.type; return 'blob:stub'; },
+            revokeObjectURL: (url) => revoked.push(url)
+        };
+
+        try {
+            run();
+        } finally {
+            globalThis.document = realDocument;
+            globalThis.URL = realURL;
+        }
+
+        return { link, blob, type, revoked };
+    }
+
+    test('names the file, and puts the text inside it', async () => {
+        const { link, blob } = captureDownload(() =>
+            downloadTextFile('Tigers-Roster.csv', 'Player,Number\nAna,7\n')
+        );
+
+        expect(link.download).toBe('Tigers-Roster.csv');
+        expect(await blob.text()).toBe('Player,Number\nAna,7\n');
+    });
+
+    test('dispatches the click that actually saves it', () => {
+        const { link } = captureDownload(() => downloadTextFile('a.txt', 'body'));
+
+        expect(link.clicked).toBe(true);
+        expect(link.href).toBe('blob:stub');
+    });
+
+    test('defaults to plain text, and takes a type when given one', () => {
+        expect(captureDownload(() => downloadTextFile('a.txt', 'body')).type)
+            .toBe('text/plain');
+        expect(captureDownload(() => downloadTextFile('a.csv', 'body', 'text/csv')).type)
+            .toBe('text/csv');
+    });
+
+    /** One object URL per export leaked for the life of the page before this. */
+    test('revokes the object URL once the click has gone out', () => {
+        const { revoked } = captureDownload(() => downloadTextFile('a.txt', 'body'));
+
+        expect(revoked).toEqual(['blob:stub']);
+    });
+});
+
+/**
+ * The season totals as a CSV.
+ *
+ * The inline version this replaced read fields calculatePlayerStats has never
+ * returned — quartersPlayed, keeperQuarters, sittingQuarters — so every column
+ * but "Games Played" was 0 no matter what the season held.
+ */
+describe('seasonStatsCsv', () => {
+    const stats = {
+        'Ana Ruiz': {
+            gamesPlayed: 3,
+            totalQuarters: 9,
+            totalSitting: 3,
+            positions: { Keeper: 2, 'Left Back': 3, 'Center Mid': 2, Striker: 2 }
+        }
+    };
+
+    /** Every cell is quoted, as csvField does throughout this module. */
+    const cells = (csv, row) =>
+        csv.split('\n')[row].split(',').map(cell => cell.replace(/^"|"$/g, ''));
+
+    test('heads the columns it fills', () => {
+        expect(cells(seasonStatsCsv(stats), 0)).toEqual([
+            'Player', 'Games Played', 'Quarters Played',
+            'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'
+        ]);
+    });
+
+    test('reads the fields calculatePlayerStats actually returns', () => {
+        const [name, games, quarters, , , , , sitting] = cells(seasonStatsCsv(stats), 1);
+
+        expect(name).toBe('Ana Ruiz');
+        expect(games).toBe('3');
+        expect(quarters).toBe('9');
+        expect(sitting).toBe('3');
+    });
+
+    /** Bucketed the way the lineup engine classifies a position. */
+    test('splits the positions played into keeper, defence, midfield and attack', () => {
+        const [, , , keeper, defense, midfield, offense] = cells(seasonStatsCsv(stats), 1);
+
+        expect(keeper).toBe('2');
+        expect(defense).toBe('3');
+        expect(midfield).toBe('2');
+        expect(offense).toBe('2');
+    });
+
+    test('a player who has played nothing reports zeros, not blanks', () => {
+        const [name, ...rest] = cells(seasonStatsCsv({ 'Bo Nkemi': {} }), 1);
+
+        expect(name).toBe('Bo Nkemi');
+        expect(rest).toEqual(['0', '0', '0', '0', '0', '0', '0']);
+    });
+
+    test('counts an unfamiliar position as attacking rather than dropping it', () => {
+        const [, , , keeper, defense, midfield, offense] =
+            cells(seasonStatsCsv({ Ana: { positions: { Sweeper: 1, Winger: 2 } } }), 1);
+
+        expect([keeper, defense, midfield]).toEqual(['0', '0', '0']);
+        expect(offense).toBe('3');
+    });
+
+    test('quotes a name that would otherwise break the columns', () => {
+        const csv = seasonStatsCsv({ 'Ruiz, Ana': { gamesPlayed: 1, positions: {} } });
+
+        expect(csv.split('\n')[1]).toBe('"Ruiz, Ana","1","0","0","0","0","0","0"');
+    });
+
+    test('doubles a quote inside a name, so the row keeps its columns', () => {
+        const csv = seasonStatsCsv({ 'Bob "Bobby" Smith': { positions: {} } });
+
+        expect(csv.split('\n')[1]).toContain('"Bob ""Bobby"" Smith"');
+    });
+
+    test('an empty season is a header and nothing else', () => {
+        expect(seasonStatsCsv({}).split('\n')).toHaveLength(1);
+        expect(seasonStatsCsv(null).split('\n')).toHaveLength(1);
+    });
+
+    test('one row per player', () => {
+        const csv = seasonStatsCsv({
+            'Ana Ruiz': { gamesPlayed: 2, positions: {} },
+            'Bo Nkemi': { gamesPlayed: 1, positions: {} }
+        });
+
+        expect(csv.split('\n')).toHaveLength(3);
     });
 });

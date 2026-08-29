@@ -70,6 +70,7 @@ import {
   lineupClipboardText,
   lineupText,
   rosterText,
+  seasonStatsCsv,
   exportFilename,
   seasonStatsFilename,
 } from '@/modules/export';
@@ -694,7 +695,7 @@ export default function App() {
 
   const handleExportRoster = () => {
     const content = rosterText(players);
-    downloadTextFile(content, exportFilename(currentTeam?.name || 'Roster', 'txt'));
+    downloadTextFile(exportFilename(currentTeam?.name || 'Roster', 'txt'), content);
     toast.success('Downloaded roster file');
   };
 
@@ -829,12 +830,27 @@ export default function App() {
   };
 
   // Lineup Action Handlers
+
+  /**
+   * The per-player records the export helpers read.
+   *
+   * They want the generated stats — quartersPlayed, quartersSitting,
+   * positionsPlayed — not the plain roster, and they mark captains off
+   * `isCaptain`, which the engine's copies do not carry.
+   */
+  const exportPlayers = () =>
+    (lineup?.playerStats || players).map((p) => ({
+      ...p,
+      isCaptain: captains.includes(p.name),
+    }));
+
   const handleCopyLineup = () => {
     if (!lineup) return;
-    const text = lineupClipboardText(lineup, {
-      teamName: currentTeam?.name,
-      captains,
-    });
+    const text = lineupClipboardText(
+      lineup.quarters,
+      exportPlayers(),
+      lineup.formation || settings.formation
+    );
     navigator.clipboard.writeText(text);
     toast.success('Lineup copied to clipboard!');
   };
@@ -857,18 +873,19 @@ export default function App() {
 
   const handleExportCSV = () => {
     if (!lineup) return;
-    const csv = lineupCsv(lineup);
-    downloadTextFile(csv, exportFilename(currentTeam?.name || 'Lineup', 'csv'));
+    const csv = lineupCsv(lineup.quarters, exportPlayers());
+    downloadTextFile(exportFilename(currentTeam?.name || 'Lineup', 'csv'), csv, 'text/csv');
     toast.success('Downloaded CSV lineup');
   };
 
   const handleExportText = () => {
     if (!lineup) return;
-    const text = lineupText(lineup, {
-      teamName: currentTeam?.name,
-      captains,
-    });
-    downloadTextFile(text, exportFilename(currentTeam?.name || 'Lineup', 'txt'));
+    const positions = getPositionsForFormation(
+      lineup.fieldPlayers || settings.fieldPlayers,
+      lineup.formation || settings.formation
+    );
+    const text = lineupText(lineup.quarters, positions, exportPlayers());
+    downloadTextFile(exportFilename(currentTeam?.name || 'Lineup', 'txt'), text);
     toast.success('Downloaded text lineup');
   };
 
@@ -1047,12 +1064,14 @@ export default function App() {
   };
 
   const handleExportSeasonStats = () => {
-    const stats = calculatePlayerStats(gameHistory);
-    let csv = 'Player,Games Played,Quarters Played,Keeper,Defense,Midfield,Offense,Sitting\n';
-    Object.entries(stats).forEach(([name, s]) => {
-      csv += `"${name}",${s.gamesPlayed || 0},${s.quartersPlayed || 0},${s.keeperQuarters || 0},${s.defenseQuarters || 0},${s.midfieldQuarters || 0},${s.offenseQuarters || 0},${s.sittingQuarters || 0}\n`;
-    });
-    downloadTextFile(csv, seasonStatsFilename(currentTeam?.name || 'Season'));
+    // players first: calculatePlayerStats keys its rows off the roster, and
+    // handing it the game history alone produced a CSV of game names and zeros.
+    const stats = calculatePlayerStats(players, gameHistory);
+    downloadTextFile(
+      seasonStatsFilename(currentTeam?.name || 'Season'),
+      seasonStatsCsv(stats),
+      'text/csv'
+    );
     toast.success('Downloaded season statistics CSV');
   };
 

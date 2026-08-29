@@ -170,3 +170,55 @@ export function rosterText(players) {
 
 export const exportFilename = (kind, extension) => `${kind}_${today()}.${extension}`;
 export const seasonStatsFilename = () => `season-stats-${today()}.csv`;
+
+/**
+ * Buckets a position the way the lineup engine does, so the season CSV counts
+ * the same way the rotation it reports on decided.
+ */
+function positionBucket(position) {
+    if (position === 'Keeper') return 'keeper';
+    if (position.includes('Back')) return 'defense';
+    if (position.includes('Mid') || position === 'Midfield') return 'midfield';
+    return 'offense';
+}
+
+/**
+ * The season totals as a CSV, one row per player.
+ *
+ * Takes the stats object calculatePlayerStats returns — keyed by player name,
+ * with per-position counts under `positions`. The inline version this replaced
+ * read fields that object has never had (`quartersPlayed`, `keeperQuarters`,
+ * `sittingQuarters` and so on), so every column but the first was 0 even when
+ * it was handed the right data.
+ *
+ * @param {Record<string, object>} stats from calculatePlayerStats
+ * @returns {string} CSV text
+ */
+export function seasonStatsCsv(stats) {
+    const header = [
+        'Player', 'Games Played', 'Quarters Played',
+        'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'
+    ];
+
+    const lines = [csvRow(header)];
+
+    for (const [name, s] of Object.entries(stats || {})) {
+        const byBucket = { keeper: 0, defense: 0, midfield: 0, offense: 0 };
+        for (const [position, count] of Object.entries(s.positions || {})) {
+            byBucket[positionBucket(position)] += count;
+        }
+
+        lines.push(csvRow([
+            name,
+            s.gamesPlayed || 0,
+            s.totalQuarters || 0,
+            byBucket.keeper,
+            byBucket.defense,
+            byBucket.midfield,
+            byBucket.offense,
+            s.totalSitting || 0
+        ]));
+    }
+
+    return lines.join('\n');
+}
