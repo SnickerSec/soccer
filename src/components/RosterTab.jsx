@@ -180,32 +180,27 @@ export function RosterTab({
         {/* Roster Table Card */}
         <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 p-4 border-b bg-muted/30">
-            <div className="flex items-center gap-2.5">
-              <h3 className="text-sm font-semibold tracking-tight">
-                Current Players (<span id="playerCount">{players.length}</span>)
-              </h3>
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]" id="presentPlayerCount">
-                  {players.filter((p) => !p.status || p.status === 'available').length} Present
-                </span>
-                {players.some((p) => p.status === 'absent' || p.status === 'injured') && (
-                  <>
-                    <span className="px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-semibold text-[11px]" id="absentPlayerCount">
-                      {players.filter((p) => p.status === 'absent' || p.status === 'injured').length} Absent
-                    </span>
-                    <button
-                      type="button"
-                      id="markAllAvailable"
-                      onClick={() => {
-                        players.forEach((p) => onUpdatePlayer(p.name, { status: 'available' }));
-                      }}
-                      className="text-[11px] font-semibold text-primary hover:underline ml-1 cursor-pointer"
-                    >
-                      Mark All Available
-                    </button>
-                  </>
-                )}
-              </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]" id="presentPlayerCount">
+                {players.filter((p) => !p.status || p.status === 'available').length} Present
+              </span>
+              {players.some((p) => p.status === 'absent' || p.status === 'injured') && (
+                <>
+                  <span className="px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-semibold text-[11px]" id="absentPlayerCount">
+                    {players.filter((p) => p.status === 'absent' || p.status === 'injured').length} Absent
+                  </span>
+                  <button
+                    type="button"
+                    id="markAllAvailable"
+                    onClick={() => {
+                      players.forEach((p) => onUpdatePlayer(p.name, { status: 'available' }));
+                    }}
+                    className="text-[11px] font-semibold text-primary hover:underline ml-1 cursor-pointer"
+                  >
+                    Mark All Available
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">

@@ -7,7 +7,7 @@ test.describe('PDF library loading', () => {
         page.on('request', req => requested.push(req.url()));
 
         await page.goto('/');
-        await expect(page.locator('#playerCount')).toBeVisible();
+        await expect(page.locator('#presentPlayerCount')).toBeVisible();
 
         const vendorRequests = requested.filter(u => u.includes('/vendor/'));
         expect(vendorRequests).toEqual([]);
@@ -32,7 +32,7 @@ test.describe('PDF library loading', () => {
 
         await page.goto('/');
         await page.click('#demoButton');
-        await expect(page.locator('#playerCount')).not.toHaveText('0');
+        await expect(page.locator('#presentPlayerCount')).not.toHaveText('0 Present');
 
         await page.click('#evaluation-tab-btn');
         await page.fill('#coachName', 'Test Coach');

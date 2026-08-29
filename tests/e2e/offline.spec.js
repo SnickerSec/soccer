@@ -24,12 +24,12 @@ test.describe('Offline support', () => {
 
         // The page renders and the app boots
         await expect(page.locator('h1')).toHaveText('AYSO Roster Pro');
-        await expect(page.locator('#playerCount')).toBeVisible();
+        await expect(page.locator('#presentPlayerCount')).toBeVisible();
 
         // Core interaction still works
         await page.fill('#playerName', 'Offline Player');
         await page.click('#addPlayer');
-        await expect(page.locator('#playerCount')).toHaveText('1');
+        await expect(page.locator('#presentPlayerCount')).toHaveText('1 Present');
 
         await context.setOffline(false);
     });

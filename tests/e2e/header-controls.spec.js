@@ -35,14 +35,14 @@ test.describe('Header controls', () => {
 
         await page.fill('#playerName', 'Test Player');
         await page.click('#addPlayer');
-        await expect(page.locator('#playerCount')).toHaveText('1');
+        await expect(page.locator('#presentPlayerCount')).toHaveText('1 Present');
         await expect(page.locator('#undoBtn')).toBeEnabled();
 
         await page.click('#undoBtn');
-        await expect(page.locator('#playerCount')).toHaveText('0');
+        await expect(page.locator('#presentPlayerCount')).toHaveText('0 Present');
         await expect(page.locator('#redoBtn')).toBeEnabled();
 
         await page.click('#redoBtn');
-        await expect(page.locator('#playerCount')).toHaveText('1');
+        await expect(page.locator('#presentPlayerCount')).toHaveText('1 Present');
     });
 });
