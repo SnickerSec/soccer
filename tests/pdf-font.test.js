@@ -23,7 +23,7 @@ const projectRoot = path.join(__dirname, '..');
 /** The URL the module fetches, read out of the source. */
 function bodyFontUrl() {
     const source = fs.readFileSync(
-        path.join(projectRoot, 'public', 'modules', 'evaluation-pdf.js'), 'utf8');
+        path.join(projectRoot, 'src', 'modules', 'evaluation-pdf.js'), 'utf8');
     const match = source.match(/const BODY_FONT_URL = '([^']+)'/);
     expect(match).not.toBeNull();
     return match[1];

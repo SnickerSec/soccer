@@ -18,7 +18,7 @@ let serverRoster = [];
 let serverVersion = 1;
 let store = {};
 
-jest.unstable_mockModule('../public/modules/storage.js', () => ({
+jest.unstable_mockModule('../src/modules/storage.js', () => ({
     safeGetFromStorage: (key) => (key in store ? store[key] : null),
     safeSetToStorage: (key, value) => { store[key] = value; },
     safeParseJSON: (raw, fallback) => {
@@ -31,23 +31,23 @@ jest.unstable_mockModule('../public/modules/storage.js', () => ({
     clearTeamScopedData: () => {}
 }));
 
-jest.unstable_mockModule('../public/modules/api-client.js', () => ({
+jest.unstable_mockModule('../src/modules/api-client.js', () => ({
     isAuthenticated: async () => true
 }));
 
-jest.unstable_mockModule('../public/modules/auth.js', () => ({
+jest.unstable_mockModule('../src/modules/auth.js', () => ({
     getCurrentUser: async () => ({ id: 'user-1' }),
     getUserSettings: async () => ({ default_team_id: 'team-1' }),
     updateUserSettings: async () => ({ success: true })
 }));
 
-jest.unstable_mockModule('../public/modules/cloud-storage.js', () => ({
+jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
     getTeams: async () => ({ success: true, data: [] }),
     createTeam: async () => ({ success: true, data: { id: 'team-1' } }),
     getPlayers: async () => ({ success: true, data: serverRoster, version: serverVersion }),
     getGames: async () => ({ success: true, data: [] }),
-    replaceRoster: async (teamId, players, expectedVersion) => {
-        writes.push({ players, expectedVersion });
+    replaceRoster: async (teamId, players, expectedVersion, renames) => {
+        writes.push({ players, expectedVersion, renames });
         return replies.shift() ?? { success: true, data: players, version: serverVersion + 1 };
     },
     saveGame: async () => ({ success: true }),
@@ -56,7 +56,7 @@ jest.unstable_mockModule('../public/modules/cloud-storage.js', () => ({
 
 async function loadSync() {
     jest.resetModules();
-    return import('../public/modules/sync.js');
+    return import('../src/modules/sync.js');
 }
 
 let initSync;
@@ -220,7 +220,7 @@ describe('an offline edit replayed from the queue', () => {
         await pushPlayers([player('Ana'), player('Ben')]);
 
         globalThis.navigator = { onLine: true };
-        const { processQueue } = await import('../public/modules/sync.js');
+        const { processQueue } = await import('../src/modules/sync.js');
         await processQueue();
 
         // Writing with no version would overwrite everything the other coach
@@ -239,7 +239,7 @@ describe('an offline edit replayed from the queue', () => {
             data: [player('Ana'), player('Cleo')]
         });
 
-        const { processQueue } = await import('../public/modules/sync.js');
+        const { processQueue } = await import('../src/modules/sync.js');
         const result = await processQueue();
 
         expect(names(writes[1].players)).toEqual(['Ana', 'Ben', 'Cleo']);
@@ -253,10 +253,97 @@ describe('an offline edit replayed from the queue', () => {
             { entityType: 'players', action: 'bulk_update', data: [player('Ana')], timestamp: 1 }
         ]);
 
-        const { processQueue } = await import('../public/modules/sync.js');
+        const { processQueue } = await import('../src/modules/sync.js');
         const result = await processQueue();
 
         expect(writes[0].expectedVersion).toBeUndefined();
         expect(result.processed).toBe(1);
+    });
+});
+
+/**
+ * A rename travels with the roster that carries the new name, so the server can
+ * move the player's saved games in the same transaction that saves the roster.
+ * What matters through a conflict is that the rename is neither lost nor
+ * applied twice: the rejected attempt was rolled back, so the retry has to
+ * carry it again — unless the merge handed the old name back, in which case
+ * saving it would enter the player under both names at once.
+ */
+describe('a rename riding along with the roster', () => {
+    const renames = [{ from: 'Ana', to: 'Anastasia' }];
+
+    function serverRejectsWith(remote, version = 9) {
+        replies.push({
+            success: false, conflict: true, version, data: remote,
+            error: 'The roster changed since you loaded it'
+        });
+    }
+
+    test('is sent with the write it belongs to', async () => {
+        await signedInWithRoster();
+
+        await pushPlayers([player('Anastasia')], { renames });
+
+        expect(writes[0].renames).toEqual(renames);
+    });
+
+    test('a save that renames nobody sends no renames', async () => {
+        await signedInWithRoster();
+
+        await pushPlayers([player('Ana'), player('Ben')]);
+
+        expect(writes[0].renames).toBeUndefined();
+    });
+
+    /** The rejected attempt rolled back, so nothing was renamed yet. */
+    test('is sent again on the retry, since the first attempt was rolled back', async () => {
+        await signedInWithRoster();
+        serverRejectsWith([player('Ana'), player('Cleo')]);
+
+        await pushPlayers([player('Anastasia')], { renames });
+
+        expect(writes).toHaveLength(2);
+        expect(writes[1].renames).toEqual(renames);
+        expect(names(writes[1].players)).toEqual(['Anastasia', 'Cleo']);
+    });
+
+    /**
+     * The other coach edited the same player, so the merge keeps their version
+     * and the old name comes back. Sending the rename now would save the player
+     * twice and move a history the old entry still owns.
+     */
+    test('is abandoned when the merge hands the old name back', async () => {
+        await signedInWithRoster();
+        serverRejectsWith([player('Ana', { number: 9 })]);
+
+        const result = await pushPlayers([player('Anastasia')], { renames });
+
+        expect(writes[1].renames).toEqual([]);
+        expect(names(writes[1].players)).toEqual(['Ana']);
+        expect(result.conflicts).toContain('Ana');
+    });
+
+    test('names an abandoned rename once, not twice', async () => {
+        await signedInWithRoster();
+        serverRejectsWith([player('Ana', { number: 9 })]);
+
+        const result = await pushPlayers([player('Anastasia')], { renames });
+
+        expect(result.conflicts.filter(name => name === 'Ana')).toHaveLength(1);
+    });
+
+    test('queues with the roster when offline, and replays with it', async () => {
+        await signedInWithRoster();
+        globalThis.navigator = { onLine: false };
+
+        const queued = await pushPlayers([player('Anastasia')], { renames });
+        expect(queued.queued).toBe(true);
+        expect(writes).toHaveLength(0);
+
+        globalThis.navigator = { onLine: true };
+        const { processQueue } = await import('../src/modules/sync.js');
+        await processQueue();
+
+        expect(writes[0].renames).toEqual(renames);
     });
 });

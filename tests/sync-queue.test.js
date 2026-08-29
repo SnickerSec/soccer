@@ -16,7 +16,7 @@ import { jest, describe, test, expect, beforeEach } from '@jest/globals';
 let calls = [];
 let store = {};
 
-jest.unstable_mockModule('../public/modules/storage.js', () => ({
+jest.unstable_mockModule('../src/modules/storage.js', () => ({
     safeGetFromStorage: (key) => (key in store ? store[key] : null),
     safeSetToStorage: (key, value) => { store[key] = value; },
     safeParseJSON: (raw, fallback) => {
@@ -29,17 +29,17 @@ jest.unstable_mockModule('../public/modules/storage.js', () => ({
     clearTeamScopedData: () => {}
 }));
 
-jest.unstable_mockModule('../public/modules/api-client.js', () => ({
+jest.unstable_mockModule('../src/modules/api-client.js', () => ({
     isAuthenticated: async () => true
 }));
 
-jest.unstable_mockModule('../public/modules/auth.js', () => ({
+jest.unstable_mockModule('../src/modules/auth.js', () => ({
     getCurrentUser: async () => ({ id: 'user-1', email: 'coach@example.com' }),
     getUserSettings: async () => ({ default_team_id: 'team-1' }),
     updateUserSettings: async () => ({ success: true })
 }));
 
-jest.unstable_mockModule('../public/modules/cloud-storage.js', () => ({
+jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
     getTeams: async () => ({ success: true, data: [] }),
     createTeam: async () => ({ success: true, data: { id: 'team-1' } }),
     getPlayers: async () => {
@@ -68,7 +68,7 @@ jest.unstable_mockModule('../public/modules/cloud-storage.js', () => ({
  */
 async function loadSync() {
     jest.resetModules();
-    return import('../public/modules/sync.js');
+    return import('../src/modules/sync.js');
 }
 
 let initSync;
