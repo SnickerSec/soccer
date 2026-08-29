@@ -118,11 +118,63 @@ export async function deletePlayer(playerId) {
 // ============================================
 
 /**
+ * A saved game has two shapes, and this is where they meet.
+ *
+ * The client holds one flat: `quarters` for the per-quarter lineup, with the
+ * division, formation and field size beside it. The games table has a `lineup`
+ * column and a `settings` JSONB, and the route reads exactly those (see
+ * gameValues in server/routes/games.js).
+ *
+ * Nothing mapped between the two, so `game.lineup` was always undefined on the
+ * way out and every cloud-saved game stored `lineup: []` and `settings: {}`.
+ * The loss only showed on the way back: season stats read `players`, which did
+ * survive, but reopening a synced game found no quarters to draw and fell back
+ * to a default formation. Games saved before this fix have nothing to restore
+ * — the columns were written empty — so they reopen empty, as they did before.
+ */
+function toWireGame(game) {
+    const { quarters, ageDivision, division, formation, fieldPlayers, ...rest } = game;
+
+    return {
+        ...rest,
+        lineup: quarters ?? game.lineup ?? [],
+        settings: {
+            ...(game.settings || {}),
+            ageDivision: ageDivision ?? division,
+            formation,
+            fieldPlayers
+        }
+    };
+}
+
+/** The same mapping in reverse, so the app only ever sees the flat shape. */
+function fromWireGame(game) {
+    if (!game || typeof game !== 'object') return game;
+
+    const settings = game.settings || {};
+    const { lineup, ...rest } = game;
+    const ageDivision = game.ageDivision ?? settings.ageDivision;
+
+    return {
+        ...rest,
+        quarters: game.quarters ?? lineup ?? [],
+        ageDivision,
+        division: game.division ?? ageDivision,
+        formation: game.formation ?? settings.formation,
+        fieldPlayers: game.fieldPlayers ?? settings.fieldPlayers
+    };
+}
+
+/**
  * Get all games for a team
  */
 export async function getGames(teamId) {
     try {
-        return await api.get(`/api/teams/${teamId}/games`);
+        const result = await api.get(`/api/teams/${teamId}/games`);
+        if (!result.success || !Array.isArray(result.data)) {
+            return result;
+        }
+        return { ...result, data: result.data.map(fromWireGame) };
     } catch (error) {
         return { success: false, error: error.message };
     }
@@ -133,7 +185,11 @@ export async function getGames(teamId) {
  */
 export async function saveGame(teamId, game) {
     try {
-        return await api.post(`/api/teams/${teamId}/games`, game);
+        const result = await api.post(`/api/teams/${teamId}/games`, toWireGame(game));
+        if (!result.success || !result.data) {
+            return result;
+        }
+        return { ...result, data: fromWireGame(result.data) };
     } catch (error) {
         return { success: false, error: error.message };
     }
@@ -166,7 +222,9 @@ export async function deleteGame(gameId) {
  */
 export async function bulkImportGames(teamId, games) {
     try {
-        return await api.post(`/api/teams/${teamId}/games/bulk`, { games });
+        return await api.post(`/api/teams/${teamId}/games/bulk`, {
+            games: (games || []).map(toWireGame)
+        });
     } catch (error) {
         return { success: false, error: error.message };
     }

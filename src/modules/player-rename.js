@@ -7,11 +7,12 @@
  * whether or not there is a network, and a signed-out coach with no cloud team
  * at all still gets a rename that keeps their history.
  *
- * A saved game holds names in three places, and in two shapes. A game saved on
- * this device keys its per-quarter lineup as `quarters`; one pulled from the
- * cloud arrives as `lineup` (see mapGame in server/routes/games.js). Both are
- * handled here rather than normalised, because normalising would rewrite games
- * this rename has no business touching.
+ * A saved game holds names in three places, and the per-quarter lineup under
+ * either of two keys. The app uses `quarters` throughout — cloud-storage.js
+ * maps the column's `lineup` back to it on the way in — but games written to
+ * local storage before that mapping existed still carry `lineup`, so both are
+ * handled here. Neither is normalised away, because normalising would rewrite
+ * games this rename has no business touching.
  */
 
 const MAX_NAME_LENGTH = 255;

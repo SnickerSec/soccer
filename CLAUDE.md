@@ -179,6 +179,20 @@ offline queue entry recorded by an older build does; new entries carry the
 version and base roster they were made against, and replay through the same
 merge.
 
+### The two shapes of a saved game
+
+The client holds a game flat — `quarters` for the per-quarter lineup, with the
+division, formation and field size beside it. The `games` table has a `lineup`
+column and a `settings` JSONB, and the route persists exactly those.
+
+`toWireGame` / `fromWireGame` in `src/modules/cloud-storage.js` map between the
+two, and are the only place that should. Before they existed nothing did, so
+`game.lineup` was undefined on every save and the column stored `[]`. It was
+easy to miss because season stats read `player_snapshot`, which survived; what
+broke was reopening a synced game, which found no quarters and fell back to a
+default formation. Games saved before the fix stored those columns empty and
+cannot be recovered — they reopen empty.
+
 ### Renaming a player
 
 Nothing carries a player id. `players` is keyed `UNIQUE(team_id, name)`, the

@@ -7,9 +7,10 @@
  * of it. These tests are about the name moving everywhere it is stored, and
  * about nothing else moving with it.
  *
- * A saved game reaches this code in two shapes: saved on this device it keys
- * its per-quarter lineup as `quarters`, pulled from the cloud it arrives as
- * `lineup`. Both are covered.
+ * A saved game reaches this code with its per-quarter lineup under either key:
+ * `quarters`, which is what the app uses, or `lineup`, which is what games
+ * written to local storage before cloud-storage.js mapped the column still
+ * carry. Both are covered.
  */
 
 import { describe, test, expect } from '@jest/globals';
