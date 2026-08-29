@@ -1987,10 +1987,8 @@ class SoccerLineupGenerator {
 
     updatePlayerList() {
         const list = document.getElementById('playerList');
-        const count = document.getElementById('playerCount');
         const exportBtn = document.getElementById('exportPlayers');
 
-        count.textContent = this.players.length;
         exportBtn.style.display = this.players.length > 0 ? 'block' : 'none';
 
         list.textContent = '';
