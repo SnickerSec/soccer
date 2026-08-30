@@ -34,7 +34,7 @@ import {
   formationHasMidfieldLine,
 } from '@/modules/formations';
 import { generateLineup, validateLineup } from '@/modules/lineup-engine';
-import { calculatePlayerStats } from '@/modules/season-stats';
+import { calculatePlayerStats, currentQuarters, currentPlayerPositions } from '@/modules/season-stats';
 import {
   validateRename,
   renameInGames,
@@ -1453,11 +1453,14 @@ export default function App() {
               // decision about how the team plays from here on.
               updateSettings({ ageDivision, fieldPlayers, formation }, { push: false });
               setLineup({
-                quarters: game.quarters,
+                // Under the names this formation uses now: a 3-3 saved before
+                // its middle line was renamed stores Left/Center/Right Mid,
+                // and the forward rows would all read TBD.
+                quarters: currentQuarters(game),
                 formation,
                 fieldPlayers,
                 warnings: [],
-                playerStats: game.players || players,
+                playerStats: game.players ? currentPlayerPositions(game) : players,
                 generatedAt: Date.now(),
               });
               setActiveTab('roster');

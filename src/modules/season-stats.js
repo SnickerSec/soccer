@@ -38,6 +38,55 @@ export function currentPositionName(position, game = {}) {
 }
 
 /**
+ * A saved game's quarters with each position under its current name.
+ *
+ * Reopening a game from Game History fills the screen by looking up the
+ * formation's positions in what the game stored. An old 3-3 stored Left Mid,
+ * Center Mid and Right Mid, so the three forward rows found no such key and
+ * every one of them read TBD — the game looked as though nobody had played up
+ * front, when in fact those three had.
+ *
+ * @param {object} game a saved game
+ * @returns {Array} its quarters, keyed by the names the formation uses now
+ */
+export function currentQuarters(game) {
+    const quarters = Array.isArray(game?.quarters) ? game.quarters : [];
+    if (game?.formation !== '3-3') return quarters;
+
+    return quarters.map((q) => ({
+        ...q,
+        positions: Object.fromEntries(
+            Object.entries(q.positions || {}).map(
+                ([position, name]) => [currentPositionName(position, game), name]
+            )
+        ),
+    }));
+}
+
+/**
+ * A saved game's per-player rows with each position under its current name.
+ *
+ * The Player Summary under a reopened lineup lists the positions each player
+ * held, straight out of the saved game — so an old 3-3 read "Q2: Left Mid"
+ * beneath quarter cards that had just been corrected to say Left Forward.
+ *
+ * @param {object} game a saved game
+ * @returns {Array} its players, with positionsPlayed renamed
+ */
+export function currentPlayerPositions(game) {
+    const players = Array.isArray(game?.players) ? game.players : [];
+    if (game?.formation !== '3-3') return players;
+
+    return players.map((player) => ({
+        ...player,
+        positionsPlayed: (player.positionsPlayed || []).map((entry) => ({
+            ...entry,
+            position: currentPositionName(entry.position, game),
+        })),
+    }));
+}
+
+/**
  * Calculate aggregate stats for all players across saved games
  */
 export function calculatePlayerStats(players = [], savedGames = []) {
@@ -97,8 +146,15 @@ export function calculatePlayerStats(players = [], savedGames = []) {
                     const posName = currentPositionName(pos.position, game);
                     s.positions[posName] = (s.positions[posName] || 0) + 1;
                     if (posName === 'Keeper') {
+                        // Keeper is its own zone everywhere this feeds — the
+                        // heatmap draws it as a third band, the statistics
+                        // table gives it its own column — so counting it as a
+                        // defensive quarter as well reported it twice. A
+                        // player with one keeper, one back and one forward
+                        // quarter came out as 2 Backs (67%) plus 1 GK (33%),
+                        // percentages summing past 100 and a season total one
+                        // quarter longer than they had played.
                         gameKeeperCount++;
-                        gameDefCount++;
                     } else if (posName.includes('Back')) {
                         gameDefCount++;
                     } else if (posName.includes('Mid') || posName === 'Midfield') {

@@ -2,7 +2,9 @@
 import {
     calculatePlayerStats,
     getLineupRecommendations,
-    currentPositionName
+    currentPositionName,
+    currentQuarters,
+    currentPlayerPositions
 } from '../src/modules/season-stats.js';
 
 // Test data
@@ -142,11 +144,15 @@ describe('calculatePlayerStats', () => {
 
     test('should calculate offensive, defensive and midfield quarters', () => {
         const stats = calculatePlayerStats(mockPlayers, mockSavedGames);
+        // Alice kept goal, played Striker and played Left Mid. She never
+        // played a back, so her defensive count is 0: the 1 this asserted
+        // before was her keeper quarter being counted a second time.
         expect(stats['Alice'].offensiveQuarters).toBe(1);
         expect(stats['Alice'].midfieldQuarters).toBe(1);
-        expect(stats['Alice'].defensiveQuarters).toBe(1);
+        expect(stats['Alice'].defensiveQuarters).toBe(0);
         expect(stats['Alice'].offenseQuarters).toBe(1);
-        expect(stats['Alice'].defenseQuarters).toBe(1);
+        expect(stats['Alice'].defenseQuarters).toBe(0);
+        expect(stats['Alice'].goalkeeperQuarters).toBe(1);
 
         expect(stats['Bob'].offensiveQuarters).toBe(0);
         expect(stats['Bob'].midfieldQuarters).toBe(0);
@@ -370,5 +376,149 @@ describe('the 3-3 that used to have a midfield', () => {
             Striker: 1,
             'Left Back': 1,
         });
+    });
+});
+
+describe('a keeper quarter is counted once', () => {
+    // One keeper, one back, one forward across three played quarters.
+    const game = {
+        formation: '3-3',
+        fieldPlayers: 7,
+        players: [{
+            name: 'Ana Ruiz',
+            status: 'available',
+            quartersPlayed: [1, 2, 3],
+            quartersSitting: [4],
+            positionsPlayed: [
+                { quarter: 1, position: 'Keeper' },
+                { quarter: 2, position: 'Left Back' },
+                { quarter: 3, position: 'Striker' },
+            ],
+        }],
+    };
+
+    test('the keeper quarter does not also count as a back', () => {
+        const ana = calculatePlayerStats([{ name: 'Ana Ruiz' }], [game])['Ana Ruiz'];
+
+        expect(ana.goalkeeperQuarters).toBe(1);
+        expect(ana.defensiveQuarters).toBe(1);
+        expect(ana.offensiveQuarters).toBe(1);
+    });
+
+    test('the zones add up to the quarters actually played', () => {
+        const ana = calculatePlayerStats([{ name: 'Ana Ruiz' }], [game])['Ana Ruiz'];
+        const zones = ana.goalkeeperQuarters + ana.defensiveQuarters
+            + ana.midfieldQuarters + ana.offensiveQuarters;
+
+        expect(zones).toBe(ana.totalQuarters);
+        expect(zones).toBe(3);
+    });
+
+    test('a keeper-only game adds nothing to the defensive count', () => {
+        // AYSO caps keeper at one quarter a game and the engine enforces it,
+        // so goalkeeperQuarters counts the games a player kept goal in.
+        const keeperGame = {
+            formation: '2-3-1',
+            fieldPlayers: 7,
+            players: [{
+                name: 'Ben Cole', status: 'available',
+                quartersPlayed: [1, 2], quartersSitting: [],
+                positionsPlayed: [
+                    { quarter: 1, position: 'Keeper' },
+                    { quarter: 2, position: 'Right Wing' },
+                ],
+            }],
+        };
+        const ben = calculatePlayerStats([{ name: 'Ben Cole' }], [keeperGame])['Ben Cole'];
+
+        expect(ben.goalkeeperQuarters).toBe(1);
+        expect(ben.defensiveQuarters).toBe(0);
+        expect(ben.offensiveQuarters).toBe(1);
+    });
+});
+
+describe('currentQuarters', () => {
+    const oldThreeThree = {
+        formation: '3-3',
+        fieldPlayers: 7,
+        quarters: [{
+            quarter: 1,
+            positions: {
+                Keeper: 'Elias', 'Left Back': 'Brady', 'Center Back': 'Henry',
+                'Right Back': 'Ephraim', 'Left Mid': 'Kamu', 'Center Mid': 'Amos',
+                'Right Mid': 'Brees',
+            },
+            sitting: ['Jordan'],
+        }],
+    };
+
+    test('reopening an old 3-3 fills the forward rows instead of showing TBD', () => {
+        const [q] = currentQuarters(oldThreeThree);
+
+        expect(q.positions['Left Forward']).toBe('Kamu');
+        expect(q.positions['Striker']).toBe('Amos');
+        expect(q.positions['Right Forward']).toBe('Brees');
+        expect(q.positions['Left Mid']).toBeUndefined();
+    });
+
+    test('the backs, the keeper and who was sitting are untouched', () => {
+        const [q] = currentQuarters(oldThreeThree);
+
+        expect(q.positions['Keeper']).toBe('Elias');
+        expect(q.positions['Left Back']).toBe('Brady');
+        expect(q.sitting).toEqual(['Jordan']);
+        expect(q.quarter).toBe(1);
+    });
+
+    test('a formation that was never renamed is returned as it was stored', () => {
+        const game = {
+            formation: '2-3-1',
+            quarters: [{ quarter: 1, positions: { 'Center Mid': 'Kamu' }, sitting: [] }],
+        };
+
+        expect(currentQuarters(game)[0].positions).toEqual({ 'Center Mid': 'Kamu' });
+    });
+
+    test('a game with no quarters gives an empty list rather than throwing', () => {
+        expect(currentQuarters({ formation: '3-3' })).toEqual([]);
+        expect(currentQuarters(undefined)).toEqual([]);
+    });
+});
+
+describe('currentPlayerPositions', () => {
+    const game = {
+        formation: '3-3',
+        fieldPlayers: 7,
+        players: [{
+            name: 'Brady',
+            status: 'available',
+            quartersPlayed: [1, 2],
+            positionsPlayed: [
+                { quarter: 1, position: 'Left Back' },
+                { quarter: 2, position: 'Left Mid' },
+            ],
+        }],
+    };
+
+    test('the summary lists the positions the quarter cards show', () => {
+        const [brady] = currentPlayerPositions(game);
+
+        expect(brady.positionsPlayed).toEqual([
+            { quarter: 1, position: 'Left Back' },
+            { quarter: 2, position: 'Left Forward' },
+        ]);
+    });
+
+    test('everything else about the player is carried through', () => {
+        const [brady] = currentPlayerPositions(game);
+
+        expect(brady.name).toBe('Brady');
+        expect(brady.quartersPlayed).toEqual([1, 2]);
+    });
+
+    test('a game with no players, or another formation, is left as it is', () => {
+        expect(currentPlayerPositions({ formation: '3-3' })).toEqual([]);
+        const midfielders = { formation: '2-3-1', players: game.players };
+        expect(currentPlayerPositions(midfielders)).toBe(game.players);
     });
 });
