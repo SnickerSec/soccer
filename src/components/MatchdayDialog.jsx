@@ -461,10 +461,18 @@ export function MatchdayDialog({
                     return (
                       <div
                         key={pos}
+                        role="button"
+                        tabIndex={0}
                         onClick={() =>
                           setSelectedFieldPlayer(isSelected ? null : pName)
                         }
-                        className={`flex items-center justify-between p-1.5 rounded-md text-xs cursor-pointer transition-colors border ${
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedFieldPlayer(isSelected ? null : pName);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-1.5 rounded-md text-xs cursor-pointer transition-colors border outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                           isSelected
                             ? 'bg-primary/15 border-primary text-primary font-semibold'
                             : 'hover:bg-muted/40 border-transparent'

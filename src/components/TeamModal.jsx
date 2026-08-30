@@ -262,10 +262,19 @@ export function TeamModal({
                       className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/40 transition-colors"
                     >
                       <div
-                        className="flex-1 cursor-pointer"
+                        className="flex-1 cursor-pointer rounded outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => {
                           onSelectTeam(team.id);
                           onClose();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onSelectTeam(team.id);
+                            onClose();
+                          }
                         }}
                       >
                         <div className="flex items-center gap-2">

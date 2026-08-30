@@ -141,8 +141,16 @@ export function RosterImportModal({
               return (
                 <div
                   key={idx}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => togglePlayer(idx)}
-                  className={`flex items-center justify-between p-2.5 text-xs cursor-pointer transition-colors ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      togglePlayer(idx);
+                    }
+                  }}
+                  className={`flex items-center justify-between p-2.5 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     isChecked ? 'bg-primary/5 hover:bg-primary/10' : 'opacity-60 hover:bg-muted/30'
                   }`}
                 >

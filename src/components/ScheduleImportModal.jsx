@@ -146,12 +146,20 @@ export function ScheduleImportModal({
               return (
                 <div
                   key={fixture.id || idx}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => toggleFixture(idx)}
-                  className={`p-3 flex items-start gap-3 text-xs cursor-pointer transition-colors ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleFixture(idx);
+                    }
+                  }}
+                  className={`p-3 flex items-start gap-3 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     isSelected ? 'bg-primary/5' : 'opacity-60 bg-muted/10'
                   } hover:bg-muted/30`}
                 >
-                  <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                  <div className="pt-0.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => toggleFixture(idx)}
