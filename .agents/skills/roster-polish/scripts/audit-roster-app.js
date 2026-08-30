@@ -275,6 +275,15 @@ function laneMobile() {
             'The PWA is installable (manifest.json) so the header and any bottom-anchored bar sit under the notch and home indicator. Pad body/header with max(1rem, env(safe-area-inset-top)) etc.');
     }
 
+    /* Once index.css clamps every control at the phone breakpoint, a scan of
+       JSX class names can no longer answer this question: `h-7` on a Button is
+       still there in the source and still says 28px, but min-height wins at
+       runtime. Reading class names would report 46 problems that do not exist.
+       So when the clamp is present the checks below stand down and point at
+       the spec that measures the rendered box instead. */
+    const clampedCss = /min-height:\s*44px/.test(css) && /max-width:\s*767px/.test(css);
+    const clampSpec = 'tests/e2e/mobile-tap-targets.spec.js';
+
     const small = [];
     for (const file of SCREEN_FILES) {
         const text = read(file);
@@ -290,10 +299,15 @@ function laneMobile() {
             }
         }
     }
-    if (small.length) {
+    if (small.length && !clampedCss) {
         report('mobile', 'touch-target', 'WARN',
             `${small.length} tap target(s) under the 44px iOS / 48dp Android minimum`, small,
-            'This app is used one-handed, outdoors, at a game. Raise to h-11 on small screens (min-h-11 sm:min-h-9) rather than everywhere, so desktop density survives.');
+            'This app is used one-handed, outdoors, at a game. Clamp with min-height at the phone breakpoint rather than editing every call site, so desktop density survives.');
+    } else if (small.length) {
+        report('mobile', 'touch-target', exists(clampSpec) ? 'OK' : 'PARTIAL',
+            `index.css clamps controls to 44px below 767px; ${small.length} call site(s) still declare a smaller height in JSX`,
+            small,
+            `Not a defect while the clamp holds — but the source reads as 28px where it renders 44px, so trust ${clampSpec} over the class names. ${exists(clampSpec) ? 'That spec exists and measures the rendered box.' : 'That spec is MISSING: nothing is proving the clamp still works.'}`);
     }
 
     const zoomers = [];
@@ -308,7 +322,13 @@ function laneMobile() {
             if (tooSmall) zoomers.push({ file, line: lineOf(text, m.index), snippet: `<${m[1]} … ${px ? px[0] : /text-(xs|sm)/.exec(tag)[0]}` });
         }
     }
-    if (zoomers.length) {
+    const clampedFont = /font-size:\s*16px\s*!important/.test(css) && /max-width:\s*767px/.test(css);
+    if (zoomers.length && clampedFont) {
+        report('mobile', 'ios-input-zoom', exists(clampSpec) ? 'OK' : 'PARTIAL',
+            `index.css raises inputs to 16px below 767px; ${zoomers.length} call site(s) still declare text-xs/text-sm`,
+            zoomers,
+            `Same caveat as the tap targets: the class names no longer describe what renders. ${clampSpec} is what checks it.`);
+    } else if (zoomers.length) {
         report('mobile', 'ios-input-zoom', 'WARN',
             `${zoomers.length} text input(s) below 16px font-size`, zoomers,
             'Mobile Safari zooms the whole page when a field under 16px is focused, and does not zoom back out. Use text-base on inputs at the mobile breakpoint.');

@@ -1,5 +1,5 @@
 // Service Worker for AYSO Roster Pro - Offline Support
-const CACHE_NAME = 'ayso-roster-pro-v37';
+const CACHE_NAME = 'ayso-roster-pro-v38';
 
 // App shell: fetched on install so a first-time visitor who later goes offline
 // still gets a working app. The application code itself is the Vite bundle,

@@ -211,21 +211,25 @@ export function MatchdayDialog({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-4 sm:p-6 overflow-hidden bg-card text-foreground">
         {/* Header */}
-        <DialogHeader className="pb-3 border-b flex flex-row items-center justify-between">
-          <div>
-            <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-amber-500" />
+        {/* Wraps to its own rows on a phone. Held in one rigid row it overflowed
+            once the controls were clamped to 44px: the whistle button was pushed
+            off the right edge and the close button landed on the opponent field.
+            pr-12 is the room the absolutely-positioned close button needs. */}
+        <DialogHeader className="pb-3 pr-12 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <DialogTitle className="text-lg sm:text-xl font-bold flex flex-wrap items-center gap-2">
+              <Trophy className="h-5 w-5 shrink-0 text-amber-500" />
               Live Matchday: <span className="text-primary">{teamName}</span> vs{' '}
               <Input
                 value={opponentName}
                 onChange={(e) => setOpponentName(e.target.value)}
-                className="h-7 w-28 text-xs font-semibold inline-block p-1"
+                className="h-7 w-32 sm:w-28 text-xs font-semibold inline-block p-1"
                 placeholder="Opponent"
               />
             </DialogTitle>
           </div>
 
-          <div className="flex items-center gap-2 pr-6">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               type="button"
               variant="outline"

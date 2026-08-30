@@ -129,6 +129,85 @@
   }
 }
 
+/* Touch ergonomics.
+ *
+ * The app is used one-handed, outdoors, during a game, but the desktop layout
+ * is deliberately dense — so the sizes are clamped at the phone breakpoint
+ * rather than raised everywhere.
+ *
+ * min-height/min-width are the tool because they need no specificity fight: an
+ * element with an explicit Tailwind `h-6` still computes to the larger minimum.
+ * That matters here, where the undersized controls are spread over 141 call
+ * sites and a per-site edit would be a diff nobody could review.
+ *
+ * Measured before this existed, at 390x844: 0 of 141 controls on the lineup
+ * screen and 0 of 158 on Live Matchday reached 44px, and 43 of them were under
+ * 24px — including the score steppers tapped while a game is running.
+ *
+ * `screen and` keeps it out of the printed sheet, which is paper and has no
+ * tap targets. Inline links are deliberately not included: a link inside a
+ * sentence is not a tap target, and padding it to 44px would break the prose.
+ */
+@media screen and (max-width: 767px) {
+  button,
+  [role="button"],
+  select,
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]) {
+    min-height: 44px;
+  }
+
+  /* Clamped on one axis only, an icon-only button comes out a 44x24 oval.
+     The second selector is the dialog close button, which pairs its icon with
+     a visually-hidden label — a 16px X in the corner of every dialog, and the
+     way out of Live Matchday. */
+  button:has(> svg:only-child),
+  [role="button"]:has(> svg:only-child),
+  button:has(> svg + .sr-only:last-child) {
+    min-width: 44px;
+  }
+
+  /* 16px is the threshold below which mobile Safari zooms the page on focus —
+     and it does not zoom back out, leaving the coach panning a magnified app
+     for the rest of the game. */
+  input,
+  select,
+  textarea {
+    /* !important because Tailwind's `text-xs` is a class selector and outranks
+       a bare element one however late this rule comes — the same reason the
+       header rules above carry it. */
+    font-size: 16px !important;
+  }
+}
+
+/* Safe areas.
+ *
+ * index.html asks for a black-translucent status bar, which in an installed
+ * PWA means the web view extends underneath it. viewport-fit=cover is what
+ * makes env(safe-area-inset-*) return anything other than 0, and the padding
+ * here is what actually reserves the room — the two halves are useless apart,
+ * which is how this shipped: the meta tag without either of them.
+ *
+ * The insets are applied where nothing else sets that side's padding, so this
+ * is additive rather than a fight with Tailwind. Off a notched device every
+ * inset is 0 and none of this changes a pixel.
+ */
+@supports (padding: env(safe-area-inset-top)) {
+  .app-shell {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .site-header {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* max() keeps the footer's existing py-8 wherever the inset is smaller. */
+  .app-shell > footer {
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

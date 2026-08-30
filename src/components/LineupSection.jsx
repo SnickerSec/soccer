@@ -689,24 +689,32 @@ export function LineupSection({
                   return (
                     <tr key={player.name} className="hover:bg-muted/30 transition-colors">
                       <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          className="rest-checkbox h-3.5 w-3.5 rounded border-primary cursor-pointer accent-primary"
-                          title="Check to ensure this player rests at least 1 quarter"
-                          aria-label={`Must rest at least one quarter for ${player.name}`}
-                          checked={Boolean(player.mustRest)}
-                          onChange={() => onToggleMustRest && onToggleMustRest(player.name)}
-                        />
+                        {/* The label, not the box, is the tap target. A bare
+                            14px checkbox is unhittable on a phone and the cell
+                            padding around it is not clickable, so the coach was
+                            aiming at a 14x14 square to set a rotation rule. */}
+                        <label className="flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rest-checkbox h-3.5 w-3.5 rounded border-primary cursor-pointer accent-primary"
+                            title="Check to ensure this player rests at least 1 quarter"
+                            aria-label={`Must rest at least one quarter for ${player.name}`}
+                            checked={Boolean(player.mustRest)}
+                            onChange={() => onToggleMustRest && onToggleMustRest(player.name)}
+                          />
+                        </label>
                       </td>
                       <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          className="no-keeper-checkbox h-3.5 w-3.5 rounded border-primary cursor-pointer accent-primary"
-                          title="Check to prevent this player from playing keeper"
-                          aria-label={`Never play keeper for ${player.name}`}
-                          checked={Boolean(player.noKeeper)}
-                          onChange={() => onToggleNoKeeper && onToggleNoKeeper(player.name)}
-                        />
+                        <label className="flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="no-keeper-checkbox h-3.5 w-3.5 rounded border-primary cursor-pointer accent-primary"
+                            title="Check to prevent this player from playing keeper"
+                            aria-label={`Never play keeper for ${player.name}`}
+                            checked={Boolean(player.noKeeper)}
+                            onChange={() => onToggleNoKeeper && onToggleNoKeeper(player.name)}
+                          />
+                        </label>
                       </td>
                       {cells.map((text, cIdx) => (
                         <td key={cIdx} className="px-3 py-2 whitespace-nowrap">
