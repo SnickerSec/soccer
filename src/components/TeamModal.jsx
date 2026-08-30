@@ -466,6 +466,8 @@ export function TeamModal({
                       id="copyInviteLink"
                       onClick={handleCopyInvite}
                       className="h-8 px-2 text-xs"
+                      aria-label="Copy invite link"
+                      title="Copy invite link"
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </Button>

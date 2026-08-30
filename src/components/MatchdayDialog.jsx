@@ -272,6 +272,8 @@ export function MatchdayDialog({
                     size="sm"
                     className="h-6 w-6 p-0 rounded-full"
                     onClick={() => setHomeScore(Math.max(0, homeScore - 1))}
+                    aria-label={`Decrease ${teamName} score`}
+                    title={`Decrease ${teamName} score`}
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
@@ -284,6 +286,8 @@ export function MatchdayDialog({
                     size="sm"
                     className="h-6 w-6 p-0 rounded-full"
                     onClick={() => setHomeScore(homeScore + 1)}
+                    aria-label={`Increase ${teamName} score`}
+                    title={`Increase ${teamName} score`}
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
@@ -303,6 +307,8 @@ export function MatchdayDialog({
                     size="sm"
                     className="h-6 w-6 p-0 rounded-full"
                     onClick={() => setAwayScore(Math.max(0, awayScore - 1))}
+                    aria-label={`Decrease ${opponentName} score`}
+                    title={`Decrease ${opponentName} score`}
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
@@ -315,6 +321,8 @@ export function MatchdayDialog({
                     size="sm"
                     className="h-6 w-6 p-0 rounded-full"
                     onClick={() => setAwayScore(awayScore + 1)}
+                    aria-label={`Increase ${opponentName} score`}
+                    title={`Increase ${opponentName} score`}
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
