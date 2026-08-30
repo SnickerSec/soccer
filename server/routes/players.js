@@ -193,29 +193,45 @@ async function applyRenames(client, teamId, renames) {
 
     // Games hold names inside JSONB and a TEXT[], so they are rewritten in
     // JavaScript rather than in SQL. Only the rows that actually mention the
-    // player are written back.
+    // player are written back, batched in a single update.
     const games = await client.query(
         'SELECT id, player_snapshot, lineup, captains FROM games WHERE team_id = $1',
         [teamId]
     );
 
-    for (const row of games.rows) {
-        const rewritten = rewriteGameNames(row, map);
-        if (!rewritten.changed) continue;
-
+    const changedGames = collectChangedGames(games.rows, map);
+    if (changedGames.length > 0) {
         await client.query(
-            `UPDATE games SET player_snapshot = $1, lineup = $2, captains = $3
-             WHERE id = $4`,
-            [
-                JSON.stringify(rewritten.playerSnapshot),
-                JSON.stringify(rewritten.lineup),
-                rewritten.captains,
-                row.id
-            ]
+            `UPDATE games SET
+                player_snapshot = batch.player_snapshot,
+                lineup = batch.lineup,
+                captains = batch.captains
+             FROM jsonb_to_recordset($1::jsonb) AS batch(id uuid, player_snapshot jsonb, lineup jsonb, captains text[])
+             WHERE games.id = batch.id`,
+            [JSON.stringify(changedGames)]
         );
     }
 
     return null;
+}
+
+/**
+ * Collects updated game rows for those games whose player snapshot, lineup,
+ * or captains were affected by the renames.
+ */
+function collectChangedGames(rows, map) {
+    return rows
+        .map((row) => {
+            const rewritten = rewriteGameNames(row, map);
+            if (!rewritten.changed) return null;
+            return {
+                id: row.id,
+                player_snapshot: rewritten.playerSnapshot,
+                lineup: rewritten.lineup,
+                captains: rewritten.captains
+            };
+        })
+        .filter(Boolean);
 }
 
 /**

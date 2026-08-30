@@ -253,7 +253,7 @@ describe('PUT /api/teams/:teamId/players with renames', () => {
         expect(client.released.count).toBe(1);
     });
 
-    test('rewrites only the games the player appears in', async () => {
+    test('rewrites only the games the player appears in, batched in a single update', async () => {
         memberOfTeamAs('coach');
         const client = stubClient([
             rows(),
@@ -280,8 +280,43 @@ describe('PUT /api/teams/:teamId/players with renames', () => {
 
         const gameWrites = client.statements.filter(s => s.sql.startsWith('UPDATE games'));
         expect(gameWrites).toHaveLength(1);
-        expect(gameWrites[0].params[3]).toBe('g1');
-        expect(JSON.parse(gameWrites[0].params[0])).toEqual([{ name: 'Alexander Kim' }]);
+        const batch = JSON.parse(gameWrites[0].params[0]);
+        expect(batch).toHaveLength(1);
+        expect(batch[0].id).toBe('g1');
+        expect(batch[0].player_snapshot).toEqual([{ name: 'Alexander Kim' }]);
+    });
+
+    test('batches updates across multiple matching games in a single statement', async () => {
+        memberOfTeamAs('coach');
+        const client = stubClient([
+            rows(),
+            lockedAt(),
+            rows(),
+            rows(),
+            rows(
+                { id: 'g1', player_snapshot: [{ name: 'Alex Kim' }], lineup: [], captains: [] },
+                { id: 'g2', player_snapshot: [{ name: 'Alex Kim' }, { name: 'Ben Ortiz' }], lineup: [], captains: ['Alex Kim'] }
+            ),
+            rows(),                                    // UPDATE games — g1 and g2 in 1 statement
+            rows(),
+            rows({ id: 'p1', name: 'Alexander Kim' }),
+            rows({ roster_version: 4 })
+        ]);
+
+        const res = await put({
+            players: [{ name: 'Alexander Kim' }],
+            expectedVersion: 3,
+            renames: [{ from: 'Alex Kim', to: 'Alexander Kim' }]
+        });
+
+        expect(res.status).toBe(200);
+
+        const gameWrites = client.statements.filter(s => s.sql.startsWith('UPDATE games'));
+        expect(gameWrites).toHaveLength(1);
+        const batch = JSON.parse(gameWrites[0].params[0]);
+        expect(batch).toHaveLength(2);
+        expect(batch.map(g => g.id)).toEqual(['g1', 'g2']);
+        expect(batch[1].captains).toEqual(['Alexander Kim']);
     });
 
     /**
