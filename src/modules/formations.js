@@ -41,7 +41,7 @@ export const FORMATIONS = {
         '2-3-1': ['Keeper', 'Left Back', 'Right Back', 'Left Wing', 'Right Wing', 'Center Mid', 'Striker'],
         '3-2-1': ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'],
         '2-2-2': ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Left Striker', 'Right Striker'],
-        '3-3': ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid', 'Right Mid'],
+        '3-3': ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Forward', 'Striker', 'Right Forward'],
         default: '2-3-1'
     },
 
@@ -50,7 +50,7 @@ export const FORMATIONS = {
         '2-3-1': ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'],
         '3-2-1': ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Striker'],
         '2-2-2': ['Keeper', 'Left Back', 'Right Back', 'Left Mid', 'Right Mid', 'Striker'],
-        '3-3': ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Mid', 'Center Mid'],
+        '3-3': ['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Forward', 'Right Forward'],
         default: '2-3-1'
     },
 
@@ -164,7 +164,7 @@ export function getFormationDescription(playersOnField, formation) {
         '2-3-1': 'Balanced attack with wing play',
         '3-2-1': 'Defensive with counter-attack focus',
         '2-2-2': 'Two striker formation for aggressive play',
-        '3-3': 'No dedicated striker, possession-based',
+        '3-3': 'Direct play with 3 defenders and 3 forwards (no midfield)',
         // 5v5
         '2-2': 'Small-sided formation with 2 defenders and attacking players',
         // 9v9

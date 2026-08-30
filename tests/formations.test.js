@@ -79,6 +79,28 @@ describe('getPositionsForFormation', () => {
         expect(positions).toHaveLength(5);
     });
 
+    test('7v7 3-3 should return 3 backs and 3 forwards with no midfielders', () => {
+        const positions = getPositionsForFormation(7, '3-3');
+        expect(positions).toHaveLength(7);
+        expect(positions).toContain('Keeper');
+        expect(positions).toEqual(['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Forward', 'Striker', 'Right Forward']);
+
+        const defPositions = positions.filter(p => isDefensivePosition(p));
+        const midPositions = positions.filter(p => p.includes('Mid') || p === 'Midfield');
+        const offPositions = positions.filter(p => isOffensivePosition(p));
+
+        expect(defPositions).toHaveLength(4); // Keeper + 3 Backs
+        expect(midPositions).toHaveLength(0); // No midfielders
+        expect(offPositions).toHaveLength(3); // 3 Forwards (Left Forward, Striker, Right Forward)
+    });
+
+    test('6v6 3-3 should return 3 backs and 2 forwards with no midfielders', () => {
+        const positions = getPositionsForFormation(6, '3-3');
+        expect(positions).toHaveLength(6);
+        expect(positions).toContain('Keeper');
+        expect(positions).toEqual(['Keeper', 'Left Back', 'Center Back', 'Right Back', 'Left Forward', 'Right Forward']);
+    });
+
     test('unknown field size should fallback to 7v7', () => {
         const positions = getPositionsForFormation(99, 'unknown');
         expect(positions).toHaveLength(7);
