@@ -69,6 +69,7 @@ export function TeamModal({
   const [inviteRole, setInviteRole] = useState('coach');
   const [inviteLink, setInviteLink] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   const ownerCount = members.filter((m) => m.role === 'owner').length;
   const isOwner = selectedTeam?.role === 'owner';
