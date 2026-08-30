@@ -1,7 +1,8 @@
 // Tests for season stats functions
 import {
     calculatePlayerStats,
-    getLineupRecommendations
+    getLineupRecommendations,
+    currentPositionName
 } from '../src/modules/season-stats.js';
 
 // Test data
@@ -309,5 +310,65 @@ describe('getLineupRecommendations', () => {
         expect(recommendations.shouldSit.length).toBeLessThanOrEqual(3);
         expect(recommendations.shouldKeep.length).toBeLessThanOrEqual(3);
         expect(recommendations.shouldCaptain.length).toBeLessThanOrEqual(3);
+    });
+});
+
+describe('the 3-3 that used to have a midfield', () => {
+    // Left/Center/Right Mid were the 3-3's middle line before it was redefined
+    // as Left Forward / Striker / Right Forward. The same three slots.
+    const oldStyleGame = {
+        name: 'vs Shaffer',
+        formation: '3-3',
+        fieldPlayers: 7,
+        players: [{
+            name: 'Ana Ruiz',
+            status: 'available',
+            quartersPlayed: [1, 2, 3],
+            quartersSitting: [4],
+            positionsPlayed: [
+                { quarter: 1, position: 'Left Mid' },
+                { quarter: 2, position: 'Center Mid' },
+                { quarter: 3, position: 'Left Back' },
+            ],
+        }],
+    };
+
+    test('renames the middle line to what those slots became', () => {
+        expect(currentPositionName('Left Mid', { formation: '3-3', fieldPlayers: 7 })).toBe('Left Forward');
+        expect(currentPositionName('Center Mid', { formation: '3-3', fieldPlayers: 7 })).toBe('Striker');
+        expect(currentPositionName('Right Mid', { formation: '3-3', fieldPlayers: 7 })).toBe('Right Forward');
+    });
+
+    test('the 6v6 3-3 had no Right Mid, so its Center Mid became the Right Forward', () => {
+        expect(currentPositionName('Center Mid', { formation: '3-3', fieldPlayers: 6 })).toBe('Right Forward');
+    });
+
+    test('a midfielder in a formation that has a midfield is left alone', () => {
+        expect(currentPositionName('Center Mid', { formation: '2-3-1', fieldPlayers: 7 })).toBe('Center Mid');
+        expect(currentPositionName('Left Mid', { formation: '4-3-3', fieldPlayers: 11 })).toBe('Left Mid');
+    });
+
+    test('positions that were never renamed pass through', () => {
+        expect(currentPositionName('Left Back', { formation: '3-3', fieldPlayers: 7 })).toBe('Left Back');
+        expect(currentPositionName('Keeper', { formation: '3-3', fieldPlayers: 7 })).toBe('Keeper');
+    });
+
+    test('those quarters count as attack, not as a midfield the formation lacks', () => {
+        const stats = calculatePlayerStats([{ name: 'Ana Ruiz' }], [oldStyleGame]);
+        const ana = stats['Ana Ruiz'];
+
+        expect(ana.midfieldQuarters).toBe(0);
+        expect(ana.offensiveQuarters).toBe(2);
+        expect(ana.defensiveQuarters).toBe(1);
+    });
+
+    test('and are filed under their current names in the position breakdown', () => {
+        const stats = calculatePlayerStats([{ name: 'Ana Ruiz' }], [oldStyleGame]);
+
+        expect(stats['Ana Ruiz'].positions).toEqual({
+            'Left Forward': 1,
+            Striker: 1,
+            'Left Back': 1,
+        });
     });
 });

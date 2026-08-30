@@ -1,6 +1,43 @@
 // Season statistics calculations
 
 /**
+ * The 3-3 used to be three backs behind a midfield three. It was redefined as
+ * three backs and three forwards, and the middle line was renamed with it:
+ *
+ *   Left Mid -> Left Forward,  Center Mid -> Striker,  Right Mid -> Right Forward
+ *
+ * Games saved before that carry the old names, so a coach reading the Season
+ * tab found quarters filed under a midfield the formation no longer has — the
+ * same three players, in the same three slots, counted as a line that had been
+ * renamed out from under them. They are read here as what those slots became.
+ *
+ * The 6v6 3-3 lost its Right Mid, so its Center Mid became the Right Forward.
+ * A game that never recorded fieldPlayers falls back to the 7v7 map: the exact
+ * name may then be Striker where it should be Right Forward, but both are
+ * forwards, so every count and zone this feeds is right either way.
+ *
+ * Only 3-3 is remapped. A Center Mid in a 2-3-1 is still a midfielder.
+ */
+const RENAMED_3_3_POSITIONS = {
+    7: { 'Left Mid': 'Left Forward', 'Center Mid': 'Striker', 'Right Mid': 'Right Forward' },
+    6: { 'Left Mid': 'Left Forward', 'Center Mid': 'Right Forward' },
+};
+
+/**
+ * A position under the name its formation gives it today.
+ *
+ * @param {string} position as recorded in the saved game
+ * @param {object} game the saved game it came from
+ * @returns {string} the current name, or the original where nothing was renamed
+ */
+export function currentPositionName(position, game = {}) {
+    if (game.formation !== '3-3') return position;
+
+    const map = RENAMED_3_3_POSITIONS[Number(game.fieldPlayers)] || RENAMED_3_3_POSITIONS[7];
+    return map[position] || position;
+}
+
+/**
  * Calculate aggregate stats for all players across saved games
  */
 export function calculatePlayerStats(players = [], savedGames = []) {
@@ -57,7 +94,7 @@ export function calculatePlayerStats(players = [], savedGames = []) {
 
             if (Array.isArray(player.positionsPlayed) && player.positionsPlayed.length > 0) {
                 player.positionsPlayed.forEach(pos => {
-                    const posName = pos.position;
+                    const posName = currentPositionName(pos.position, game);
                     s.positions[posName] = (s.positions[posName] || 0) + 1;
                     if (posName === 'Keeper') {
                         gameKeeperCount++;
