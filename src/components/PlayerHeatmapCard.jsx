@@ -13,7 +13,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }) {
+export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHistory = [] }) {
+  const is33Formation = formation === '3-3' || (gameHistory.length > 0 && gameHistory.every((g) => g.formation === '3-3'));
+  const hasMidfieldStats = Object.values(stats).some((s) => (s.midfieldQuarters || 0) > 0);
+  const showMidfield = hasMidfieldStats || !is33Formation;
+
   const playerNames = Object.keys(stats).length > 0
     ? Object.keys(stats)
     : players.map((p) => p.name);
@@ -76,7 +80,9 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
       return {
         score: 'Well-Balanced (95%)',
         status: 'success',
-        tip: `${selectedPlayer} has an even balance between defense (${defPct}%) and attack (${offPct}%) across games.`,
+        tip: is33Formation
+          ? `${selectedPlayer} has an even balance between backs (${defPct}%) and forwards (${offPct}%) in the 3-3 formation.`
+          : `${selectedPlayer} has an even balance between defense (${defPct}%) and attack (${offPct}%) across games.`,
       };
     }
 
@@ -84,7 +90,9 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
       return {
         score: 'Defense Heavy',
         status: 'warning',
-        tip: `${selectedPlayer} has spent ${defPct}% of their time in defense. Consider giving them forward or midfield minutes.`,
+        tip: is33Formation
+          ? `${selectedPlayer} has spent ${defPct}% of their time at back. Consider giving them forward minutes in the 3-3.`
+          : `${selectedPlayer} has spent ${defPct}% of their time in defense. Consider giving them forward or midfield minutes.`,
       };
     }
 
@@ -92,7 +100,9 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
       return {
         score: 'Attack Heavy',
         status: 'warning',
-        tip: `${selectedPlayer} has spent ${offPct}% of their time in offense. Consider giving them defensive or midfield rotation.`,
+        tip: is33Formation
+          ? `${selectedPlayer} has spent ${offPct}% of their time at forward. Consider rotating them to back in the 3-3.`
+          : `${selectedPlayer} has spent ${offPct}% of their time in offense. Consider giving them defensive or midfield rotation.`,
       };
     }
 
@@ -183,7 +193,7 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border-2 border-white/20 pointer-events-none" />
             </div>
 
-            {/* 4 Heatmap Zones (Top to Bottom: Forward -> Midfield -> Defense -> Keeper) */}
+            {/* Heatmap Zones (Top to Bottom: Forward/Attack -> [Midfield] -> Defense/Backs -> Keeper) */}
             <div className="relative z-10 space-y-2 py-1">
               {/* Forward / Offense Zone */}
               <div
@@ -194,7 +204,9 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
               >
                 <div className="flex items-center gap-2">
                   <Target className="h-4 w-4" />
-                  <span className="text-xs font-bold">Forward & Attack Zone</span>
+                  <span className="text-xs font-bold">
+                    {is33Formation && !showMidfield ? 'Forwards & Attack Zone (3-3)' : 'Forward & Attack Zone'}
+                  </span>
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-black">{pStat.offenseQuarters || 0} Qtrs</span>
@@ -202,22 +214,24 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
                 </div>
               </div>
 
-              {/* Midfield Zone */}
-              <div
-                className={cn(
-                  "p-2.5 rounded-lg border flex items-center justify-between transition-all backdrop-blur-sm",
-                  getZoneColor(pStat.midfieldQuarters)
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  <span className="text-xs font-bold">Midfield Zone</span>
+              {/* Midfield Zone (hidden when 3-3 with no midfield stats) */}
+              {showMidfield && (
+                <div
+                  className={cn(
+                    "p-2.5 rounded-lg border flex items-center justify-between transition-all backdrop-blur-sm",
+                    getZoneColor(pStat.midfieldQuarters)
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    <span className="text-xs font-bold">Midfield Zone</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black">{pStat.midfieldQuarters || 0} Qtrs</span>
+                    <span className="text-[10px] block opacity-80">({midPct}%)</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-black">{pStat.midfieldQuarters || 0} Qtrs</span>
-                  <span className="text-[10px] block opacity-80">({midPct}%)</span>
-                </div>
-              </div>
+              )}
 
               {/* Defensive Zone */}
               <div
@@ -228,7 +242,9 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
               >
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4" />
-                  <span className="text-xs font-bold">Defense Zone</span>
+                  <span className="text-xs font-bold">
+                    {is33Formation && !showMidfield ? 'Backs & Defense Zone (3-3)' : 'Defense Zone'}
+                  </span>
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-black">{pStat.defenseQuarters || 0} Qtrs</span>
@@ -269,7 +285,7 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
                   <div
                     style={{ width: `${offPct}%` }}
                     className="bg-amber-500 h-full"
-                    title={`Offense: ${offPct}%`}
+                    title={`${is33Formation && !showMidfield ? 'Forwards' : 'Offense'}: ${offPct}%`}
                   />
                 )}
                 {midPct > 0 && (
@@ -283,7 +299,7 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
                   <div
                     style={{ width: `${defPct}%` }}
                     className="bg-emerald-500 h-full"
-                    title={`Defense: ${defPct}%`}
+                    title={`${is33Formation && !showMidfield ? 'Backs' : 'Defense'}: ${defPct}%`}
                   />
                 )}
                 {gkPct > 0 && (
@@ -298,13 +314,15 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
               {/* Legend */}
               <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-amber-500" /> Offense ({offPct}%)
+                  <span className="h-2 w-2 rounded-full bg-amber-500" /> {is33Formation && !showMidfield ? 'Forwards' : 'Offense'} ({offPct}%)
                 </span>
+                {showMidfield && (
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full bg-blue-500" /> Midfield ({midPct}%)
+                  </span>
+                )}
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" /> Midfield ({midPct}%)
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" /> Defense ({defPct}%)
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" /> {is33Formation && !showMidfield ? 'Backs' : 'Defense'} ({defPct}%)
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-purple-500" /> GK ({gkPct}%)

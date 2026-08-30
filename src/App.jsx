@@ -1437,6 +1437,7 @@ export default function App() {
           className={cn(activeTab === 'season' ? "active block" : "hidden")}
         >
           <SeasonTab
+            formation={settings?.formation}
             gameHistory={gameHistory}
             players={players}
             onExportStats={handleExportSeasonStats}

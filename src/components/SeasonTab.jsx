@@ -40,6 +40,7 @@ function formatDisplayDate(dateStr) {
 }
 
 export function SeasonTab({
+  formation,
   gameHistory = [],
   players = [],
   onExportStats,
@@ -50,6 +51,10 @@ export function SeasonTab({
 }) {
   const stats = calculatePlayerStats(players, gameHistory);
   const recommendations = getLineupRecommendations(players, gameHistory, stats);
+
+  const is33Formation = formation === '3-3' || (gameHistory.length > 0 && gameHistory.every((g) => g.formation === '3-3'));
+  const hasMidfieldStats = Object.values(stats).some((s) => (s.midfieldQuarters || 0) > 0);
+  const showMidfield = hasMidfieldStats || !is33Formation;
 
   const totalRosterSpots = Object.values(stats).reduce((acc, s) => acc + (s.gamesOnRoster || 0), 0);
   const totalAttended = Object.values(stats).reduce((acc, s) => acc + (s.gamesAttended || 0), 0);
@@ -155,7 +160,9 @@ export function SeasonTab({
             )}
             {recommendations.needsOffense?.length > 0 && (
               <div>
-                <span className="font-semibold text-foreground">Needs Offense Time: </span>
+                <span className="font-semibold text-foreground">
+                  {is33Formation && !hasMidfieldStats ? 'Needs Forward Time (Offense): ' : 'Needs Offense Time: '}
+                </span>
                 <span className="text-muted-foreground">
                   {recommendations.needsOffense.map((p) => p.name).join(', ')}
                 </span>
@@ -163,7 +170,9 @@ export function SeasonTab({
             )}
             {recommendations.needsDefense?.length > 0 && (
               <div>
-                <span className="font-semibold text-foreground">Needs Defense Time: </span>
+                <span className="font-semibold text-foreground">
+                  {is33Formation && !hasMidfieldStats ? 'Needs Back Time (Defense): ' : 'Needs Defense Time: '}
+                </span>
                 <span className="text-muted-foreground">
                   {recommendations.needsDefense.map((p) => p.name).join(', ')}
                 </span>
@@ -253,6 +262,7 @@ export function SeasonTab({
 
       {/* Player Development & Position Heatmap */}
       <PlayerHeatmapCard
+        formation={formation}
         players={players}
         stats={stats}
         gameHistory={gameHistory}
@@ -278,9 +288,9 @@ export function SeasonTab({
                     <TableHead className="text-center">Games</TableHead>
                     <TableHead className="text-center">Quarters</TableHead>
                     <TableHead className="text-center">GK</TableHead>
-                    <TableHead className="text-center">Defense</TableHead>
-                    <TableHead className="text-center">Midfield</TableHead>
-                    <TableHead className="text-center">Offense</TableHead>
+                    <TableHead className="text-center">{is33Formation && !hasMidfieldStats ? 'Backs' : 'Defense'}</TableHead>
+                    {showMidfield && <TableHead className="text-center">Midfield</TableHead>}
+                    <TableHead className="text-center">{is33Formation && !hasMidfieldStats ? 'Forwards' : 'Offense'}</TableHead>
                     <TableHead className="text-center">Sit</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -317,7 +327,7 @@ export function SeasonTab({
                         {playerStat.keeperQuarters || 0}
                       </TableCell>
                       <TableCell className="text-center text-xs">{playerStat.defenseQuarters || 0}</TableCell>
-                      <TableCell className="text-center text-xs">{playerStat.midfieldQuarters || 0}</TableCell>
+                      {showMidfield && <TableCell className="text-center text-xs">{playerStat.midfieldQuarters || 0}</TableCell>}
                       <TableCell className="text-center text-xs">{playerStat.offenseQuarters || 0}</TableCell>
                       <TableCell className="text-center text-xs text-muted-foreground">
                         {playerStat.sittingQuarters || 0}

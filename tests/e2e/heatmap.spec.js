@@ -40,4 +40,41 @@ test.describe('Player Development & Position Heatmaps', () => {
 
         expect(errors).toEqual([]);
     });
+
+    test('3-3 formation renders forwards and backs with no midfield zone on Season tab', async ({ page }) => {
+        const errors = [];
+        page.on('pageerror', e => errors.push(e.message));
+
+        await page.goto('/');
+        await page.click('#demoButton');
+
+        // Select 3-3 formation
+        await page.selectOption('#formation', '3-3');
+        await page.click('#generateLineup');
+
+        // Save a 3-3 game
+        await page.click('#saveGame');
+        await page.locator('#saveGameName').fill('3-3 Match');
+        await page.locator('#confirmSaveGame').click();
+
+        // Switch to Season tab
+        await page.click('button[role="tab"]:has-text("Season")');
+
+        const heatmapCard = page.locator('#playerDevelopmentHeatmap');
+        await expect(heatmapCard).toBeVisible();
+
+        // 3-3 has Forwards & Attack Zone and Backs & Defense Zone, but NO Midfield Zone
+        await expect(heatmapCard.getByText('Forwards & Attack Zone (3-3)')).toBeVisible();
+        await expect(heatmapCard.getByText('Backs & Defense Zone (3-3)')).toBeVisible();
+        await expect(heatmapCard.getByText('Goalkeeper')).toBeVisible();
+        await expect(heatmapCard.getByText('Midfield Zone')).toBeHidden();
+
+        // Player statistics table has Backs and Forwards columns instead of Defense/Midfield/Offense
+        const table = page.locator('#playerStatsTable');
+        await expect(table.getByRole('columnheader', { name: 'Backs' })).toBeVisible();
+        await expect(table.getByRole('columnheader', { name: 'Forwards' })).toBeVisible();
+        await expect(table.getByRole('columnheader', { name: 'Midfield' })).toBeHidden();
+
+        expect(errors).toEqual([]);
+    });
 });
