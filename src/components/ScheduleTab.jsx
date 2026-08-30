@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import {
   CalendarCheck,
   CalendarPlus,
   FileSpreadsheet,
+  UploadCloud,
   Users,
   Edit2,
   Trash2,
@@ -49,9 +50,11 @@ export function ScheduleTab({
   onDeleteFixture,
   onGenerateLineupForFixture,
   onLaunchMatchdayForFixture,
+  onImportScheduleFile,
 }) {
   const [filter, setFilter] = useState('all'); // 'all' | 'upcoming' | 'completed'
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
+  const fileInputRef = useRef(null);
 
   const volunteerStats = calculateVolunteerStats(fixtures, players);
 
@@ -124,6 +127,20 @@ export function ScheduleTab({
     const cleanTeam = teamName.toLowerCase().replace(/[^a-z0-9]/g, '-');
     downloadTextFile(`${cleanTeam}-schedule.csv`, csvContent, 'text/csv;charset=utf-8');
     toast.success('📊 Schedule CSV downloaded!');
+  };
+
+  const handleUploadScheduleClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (onImportScheduleFile) {
+      onImportScheduleFile(file);
+    }
+    // Clear input so the same file can be uploaded again if needed
+    e.target.value = '';
   };
 
   return (
@@ -373,6 +390,24 @@ export function ScheduleTab({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".ics,.ical,.csv,.tsv,.txt,text/calendar,text/csv"
+            className="hidden"
+            id="scheduleFileInput"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUploadScheduleClick}
+            className="text-xs h-8 flex items-center gap-1.5"
+            title="Import season schedule from iCalendar (.ics) or CSV spreadsheet"
+            id="importScheduleBtn"
+          >
+            <UploadCloud className="h-3.5 w-3.5 text-primary" /> Import Schedule
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -480,9 +515,19 @@ export function ScheduleTab({
             <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
               Add your upcoming AYSO season games to manage kickoff times, locations, jersey colors, and snack duty rotations.
             </p>
-            <Button size="sm" onClick={onAddFixture} className="text-xs">
-              <Plus className="h-4 w-4 mr-1" /> Schedule First Match
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button size="sm" onClick={onAddFixture} className="text-xs">
+                <Plus className="h-4 w-4 mr-1" /> Schedule First Match
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleUploadScheduleClick}
+                className="text-xs"
+              >
+                <UploadCloud className="h-4 w-4 mr-1" /> Import Calendar (.ics / CSV)
+              </Button>
+            </div>
           </Card>
         ) : (
           filteredFixtures.map((fixture) => {

@@ -13,6 +13,7 @@ import { MatchdayDialog } from '@/components/MatchdayDialog';
 import { FixtureModal } from '@/components/FixtureModal';
 import { CustomFormationModal } from '@/components/CustomFormationModal';
 import { RosterImportModal } from '@/components/RosterImportModal';
+import { ScheduleImportModal } from '@/components/ScheduleImportModal';
 import { InviteModal } from '@/components/InviteModal';
 import { ShareLineupDialog } from '@/components/ShareLineupDialog';
 import { Footer } from '@/components/Footer';
@@ -81,6 +82,7 @@ import {
 import { normalizeSettings, sameSettings } from '@/modules/team-settings';
 import { generateMatchCardPdf } from '@/modules/match-card-pdf';
 import { extractPlayersFromFile } from '@/modules/roster-importer';
+import { extractFixturesFromFile } from '@/modules/schedule-importer';
 import { buildShareUrl, decodeShareData } from '@/modules/share-link';
 import { toast } from 'sonner';
 
@@ -169,6 +171,7 @@ export default function App() {
   const [editingFixture, setEditingFixture] = useState(null);
   const [matchdayFixture, setMatchdayFixture] = useState(null);
   const [rosterImportData, setRosterImportData] = useState(null);
+  const [scheduleImportData, setScheduleImportData] = useState(null);
   const [notesModalGame, setNotesModalGame] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
@@ -1252,6 +1255,63 @@ export default function App() {
     setIsMatchdayOpen(true);
   };
 
+  const handleImportScheduleFile = async (file) => {
+    try {
+      const parsed = await extractFixturesFromFile(file, currentTeam?.name || '');
+      if (!parsed.fixtures || parsed.fixtures.length === 0) {
+        toast.error('No matches found in this calendar file.');
+        return;
+      }
+      setScheduleImportData(parsed);
+    } catch (err) {
+      console.error('Schedule import error:', err);
+      toast.error(`Could not read schedule file: ${err.message}`);
+    }
+  };
+
+  const handleConfirmScheduleImport = async (importedFixtures, mode = 'merge') => {
+    let finalFixtures = [];
+    if (mode === 'replace') {
+      finalFixtures = [...importedFixtures];
+    } else {
+      const isDuplicate = (incoming, existing) => {
+        const d1 = incoming.gameDate || '';
+        const d2 = existing.gameDate || '';
+        const t1 = incoming.gameTime || '';
+        const t2 = existing.gameTime || '';
+        const o1 = (incoming.opponent || '').toLowerCase().trim();
+        const o2 = (existing.opponent || '').toLowerCase().trim();
+        return d1 === d2 && t1 === t2 && o1 === o2;
+      };
+
+      const uniqueNew = importedFixtures.filter(
+        (imported) => !fixtures.some((existing) => isDuplicate(imported, existing))
+      );
+
+      finalFixtures = [...fixtures, ...uniqueNew];
+    }
+
+    finalFixtures.sort((a, b) => {
+      const dA = a.gameDate || '';
+      const dB = b.gameDate || '';
+      if (dA !== dB) return dA.localeCompare(dB);
+      return (a.gameTime || '').localeCompare(b.gameTime || '');
+    });
+
+    setFixtures(finalFixtures);
+    safeSetToStorage(CONSTANTS.STORAGE_KEYS.SCHEDULE, JSON.stringify(finalFixtures));
+
+    if (currentUser && currentTeam) {
+      for (const fix of importedFixtures) {
+        try {
+          await pushFixture(fix);
+        } catch (e) {
+          console.error('Failed to sync imported fixture:', e);
+        }
+      }
+    }
+  };
+
   return (
     <div className="app-shell min-h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
@@ -1367,6 +1427,7 @@ export default function App() {
             onDeleteFixture={handleDeleteFixture}
             onGenerateLineupForFixture={handleGenerateLineupForFixture}
             onLaunchMatchdayForFixture={handleLaunchMatchdayForFixture}
+            onImportScheduleFile={handleImportScheduleFile}
           />
         </div>
 
@@ -1489,6 +1550,13 @@ export default function App() {
         onClose={() => setRosterImportData(null)}
         parsedData={rosterImportData}
         onConfirmImport={handleConfirmRosterImport}
+      />
+
+      <ScheduleImportModal
+        isOpen={Boolean(scheduleImportData)}
+        onClose={() => setScheduleImportData(null)}
+        parsedData={scheduleImportData}
+        onConfirmImport={handleConfirmScheduleImport}
       />
 
       <GameNotesModal
