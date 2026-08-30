@@ -153,6 +153,82 @@ describe('calculatePlayerStats', () => {
         expect(stats['Bob'].defenseQuarters).toBe(4);
     });
 
+    test('should calculate 3-3 formation (3 backs, 3 forwards, no midfield) stats properly', () => {
+        const team33 = [
+            { id: '1', name: 'Defender Dan', status: 'available' },
+            { id: '2', name: 'Forward Fran', status: 'available' },
+            { id: '3', name: 'Balanced Ben', status: 'available' }
+        ];
+
+        const games33 = [
+            {
+                id: 'game-33-1',
+                name: 'Game vs Tigers',
+                formation: '3-3',
+                players: [
+                    {
+                        name: 'Defender Dan',
+                        status: 'available',
+                        quartersPlayed: [1, 2, 3, 4],
+                        quartersSitting: [],
+                        positionsPlayed: [
+                            { quarter: 1, position: 'Left Back' },
+                            { quarter: 2, position: 'Center Back' },
+                            { quarter: 3, position: 'Right Back' },
+                            { quarter: 4, position: 'Left Back' }
+                        ]
+                    },
+                    {
+                        name: 'Forward Fran',
+                        status: 'available',
+                        quartersPlayed: [1, 2, 3, 4],
+                        quartersSitting: [],
+                        positionsPlayed: [
+                            { quarter: 1, position: 'Left Forward' },
+                            { quarter: 2, position: 'Striker' },
+                            { quarter: 3, position: 'Right Forward' },
+                            { quarter: 4, position: 'Striker' }
+                        ]
+                    },
+                    {
+                        name: 'Balanced Ben',
+                        status: 'available',
+                        quartersPlayed: [1, 2, 3, 4],
+                        quartersSitting: [],
+                        positionsPlayed: [
+                            { quarter: 1, position: 'Left Back' },
+                            { quarter: 2, position: 'Right Back' },
+                            { quarter: 3, position: 'Left Forward' },
+                            { quarter: 4, position: 'Right Forward' }
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        const stats = calculatePlayerStats(team33, games33);
+
+        // Defender Dan: 4 defense, 0 offense, 0 midfield
+        expect(stats['Defender Dan'].defensiveQuarters).toBe(4);
+        expect(stats['Defender Dan'].offensiveQuarters).toBe(0);
+        expect(stats['Defender Dan'].midfieldQuarters).toBe(0);
+
+        // Forward Fran: 0 defense, 4 offense, 0 midfield
+        expect(stats['Forward Fran'].defensiveQuarters).toBe(0);
+        expect(stats['Forward Fran'].offensiveQuarters).toBe(4);
+        expect(stats['Forward Fran'].midfieldQuarters).toBe(0);
+
+        // Balanced Ben: 2 defense, 2 offense, 0 midfield
+        expect(stats['Balanced Ben'].defensiveQuarters).toBe(2);
+        expect(stats['Balanced Ben'].offensiveQuarters).toBe(2);
+        expect(stats['Balanced Ben'].midfieldQuarters).toBe(0);
+
+        // Recommendations
+        const recs = getLineupRecommendations(team33, games33, stats);
+        expect(recs.needsOffense.map(p => p.name)).toContain('Defender Dan');
+        expect(recs.needsDefense.map(p => p.name)).toContain('Forward Fran');
+    });
+
     test('should track recent game status for cross-game rotation', () => {
         const stats = calculatePlayerStats(mockPlayers, mockSavedGames);
         // Alice sat Q4 in mockSavedGames[0] and was keeper

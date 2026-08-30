@@ -68,11 +68,23 @@ export function PlayerHeatmapCard({ players = [], stats = {}, gameHistory = [] }
       };
     }
 
+    // In 2-line direct formations (e.g. 3-3 with backs and forwards, no midfield)
+    const isBothEnds = pStat.defenseQuarters > 0 && pStat.offenseQuarters > 0;
+    const imbalance = Math.abs(defPct - offPct);
+
+    if (isBothEnds && imbalance <= 30) {
+      return {
+        score: 'Well-Balanced (95%)',
+        status: 'success',
+        tip: `${selectedPlayer} has an even balance between defense (${defPct}%) and attack (${offPct}%) across games.`,
+      };
+    }
+
     if (defPct >= 65) {
       return {
         score: 'Defense Heavy',
         status: 'warning',
-        tip: `${selectedPlayer} has spent ${defPct}% of their time in defense. Consider giving them midfield or attacking minutes.`,
+        tip: `${selectedPlayer} has spent ${defPct}% of their time in defense. Consider giving them forward or midfield minutes.`,
       };
     }
 
