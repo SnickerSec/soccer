@@ -289,3 +289,29 @@ export async function bulkImportFixtures(teamId, fixtures) {
     }
 }
 
+
+// ============================================
+// TEAM SETTINGS
+// ============================================
+
+/**
+ * Get how a team plays — division, field size, formation, quarters.
+ */
+export async function getTeamSettings(teamId) {
+    try {
+        return await api.get(`/api/teams/${teamId}/settings`);
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Save how a team plays. Merged server-side, so this may send only what moved.
+ */
+export async function saveTeamSettings(teamId, settings) {
+    try {
+        return await api.put(`/api/teams/${teamId}/settings`, settings);
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}

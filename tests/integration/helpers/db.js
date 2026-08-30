@@ -60,6 +60,7 @@ export const playerRoutes = hasDb ? (await import('../../../server/routes/player
 export const gameRoutes = hasDb ? (await import('../../../server/routes/games.js')).default : null;
 export const teamRoutes = hasDb ? (await import('../../../server/routes/teams.js')).default : null;
 export const inviteRoutes = hasDb ? (await import('../../../server/routes/invites.js')).default : null;
+export const settingsRoutes = hasDb ? (await import('../../../server/routes/settings.js')).default : null;
 
 /**
  * Brings the test database up to date by running the migrations — the same

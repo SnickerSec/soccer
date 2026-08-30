@@ -29,7 +29,7 @@ const describeDb = hasDb ? describe : describe.skip;
 /** The columns each route reads or writes by name. */
 const REQUIRED_COLUMNS = {
     profiles: ['id', 'google_id', 'email', 'display_name', 'avatar_url'],
-    teams: ['id', 'name', 'age_division', 'created_by', 'created_at', 'roster_version'],
+    teams: ['id', 'name', 'age_division', 'created_by', 'created_at', 'roster_version', 'settings'],
     team_members: ['id', 'team_id', 'user_id', 'role', 'invited_by', 'joined_at',
         'invite_token', 'invite_expires_at'],
     players: ['id', 'team_id', 'name', 'number', 'is_captain', 'must_rest', 'no_keeper',

@@ -43,7 +43,10 @@ import {
   signInWithGoogle,
   signOut,
   getCurrentUser,
+  getUserSettings,
+  updateUserSettings,
 } from '@/modules/auth';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   initSync,
   sync,
@@ -54,6 +57,7 @@ import {
   pushFixture,
   pushFixtureUpdate,
   pushFixtureDelete,
+  pushSettings,
   getSyncStatus,
   getCurrentTeamId,
   setCurrentTeam,
@@ -74,6 +78,7 @@ import {
   exportFilename,
   seasonStatsFilename,
 } from '@/modules/export';
+import { normalizeSettings, sameSettings } from '@/modules/team-settings';
 import { generateMatchCardPdf } from '@/modules/match-card-pdf';
 import { extractPlayersFromFile } from '@/modules/roster-importer';
 import { buildShareUrl, decodeShareData } from '@/modules/share-link';
@@ -92,6 +97,19 @@ function readStoredFixtures() {
     []
   );
   return Array.isArray(saved) ? saved : [];
+}
+
+/**
+ * How the team plays, as localStorage has it — and, since sync() writes the
+ * team's copy there, how a pull reaches the screen.
+ *
+ * Normalized on the way out: what is stored may have been written by another
+ * coach's device, and may name a custom formation only they have.
+ */
+function readStoredSettings() {
+  return normalizeSettings(
+    safeParseJSON(safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SETTINGS), {})
+  );
 }
 
 export default function App() {
@@ -116,20 +134,7 @@ export default function App() {
   });
 
   // Settings
-  const [settings, setSettings] = useState(() => {
-    const saved = safeParseJSON(
-      safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SETTINGS),
-      null
-    );
-    return (
-      saved || {
-        ageDivision: '10U',
-        fieldPlayers: 7,
-        formation: '2-3-1',
-        quarters: 4,
-      }
-    );
-  });
+  const [settings, setSettings] = useState(readStoredSettings);
 
   // Lineup
   const [lineup, setLineup] = useState(null);
@@ -182,6 +187,8 @@ export default function App() {
   teamsRef.current = teams;
   const currentTeamRef = useRef(currentTeam);
   currentTeamRef.current = currentTeam;
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
   const testAuthUserRef = useRef(null);
   // Renames waiting to be told to the server. Held rather than sent on their
   // own so they travel with the roster push that already carries the new name.
@@ -283,6 +290,40 @@ export default function App() {
     safeSetToStorage(CONSTANTS.STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }, [settings]);
 
+  /** Take up what a pull or a team switch left in localStorage. */
+  const adoptSettings = useCallback(() => {
+    const stored = readStoredSettings();
+    settingsRef.current = stored;
+    setSettings(stored);
+  }, []);
+
+  /**
+   * Change how the team plays.
+   *
+   * Everything that moves the division, the field size or the formation comes
+   * through here, so the change reaches the other coaches instead of only this
+   * device. It is deliberately not an effect on `settings`: those fire on a
+   * pull and on a team switch too, which would push the team its own settings
+   * back — or, worse, hand the team being switched to the settings of the one
+   * being left.
+   *
+   * `push: false` is for the caller that is not changing the team at all:
+   * reopening a saved game sets the screen up the way that game was played,
+   * which is nobody else's business.
+   */
+  const updateSettings = useCallback((patch, { push = true } = {}) => {
+    const previous = settingsRef.current;
+    const next = normalizeSettings({ ...previous, ...patch });
+    settingsRef.current = next;
+    setSettings(next);
+
+    const canWrite = currentTeamRef.current?.role !== 'viewer';
+    if (push && canWrite && currentUserRef.current && currentTeamRef.current
+        && !sameSettings(previous, next)) {
+      pushSettings(next).catch(() => {});
+    }
+  }, []);
+
   // Persist game history
   useEffect(() => {
     safeSetToStorage(
@@ -354,6 +395,34 @@ export default function App() {
     }
   }, []);
 
+  // The coach's theme, which user_settings has held all along and nothing ever
+  // read back. It is adopted only on a device with no preference of its own —
+  // a phone being signed into for the first time — and pushed whenever it
+  // changes after that, so the next new device starts where this one left off.
+  const { theme, setTheme, hasStoredPreference } = useTheme();
+  const themeAdoptedRef = useRef(false);
+  const syncedThemeRef = useRef(null);
+
+  const adoptRemoteTheme = useCallback(async () => {
+    const remote = await getUserSettings();
+    // What the server already holds, so the push below does not send it
+    // straight back on every sign-in.
+    syncedThemeRef.current = remote?.theme || null;
+    if (!hasStoredPreference && (remote?.theme === 'dark' || remote?.theme === 'light')) {
+      setTheme(remote.theme);
+    }
+    themeAdoptedRef.current = true;
+  }, [hasStoredPreference, setTheme]);
+
+  useEffect(() => {
+    // Not before the adoption has run, or the dark this device defaults to
+    // would overwrite the light the coach chose on the other one.
+    if (!currentUser || !themeAdoptedRef.current) return;
+    if (syncedThemeRef.current === theme) return;
+    syncedThemeRef.current = theme;
+    updateUserSettings({ theme }).catch(() => {});
+  }, [theme, currentUser]);
+
   useEffect(() => {
     const setupAuth = async () => {
       try {
@@ -370,19 +439,23 @@ export default function App() {
             // just replaced the stored schedule with the server's.
             if (meta?.pulled) {
               setFixtures(readStoredFixtures());
+              adoptSettings();
             }
           });
-          // initSync drains the queue and pulls; the schedule it wrote is
-          // newer than the one this component read when it mounted.
+          // initSync drains the queue and pulls; the schedule and the
+          // settings it wrote are newer than the ones this component read when
+          // it mounted.
           setFixtures(readStoredFixtures());
+          adoptSettings();
           await refreshTeams();
+          await adoptRemoteTheme();
         }
       } catch (err) {
         console.error('Auth/Sync init error:', err);
       }
     };
     setupAuth();
-  }, [refreshTeams]);
+  }, [refreshTeams, adoptSettings, adoptRemoteTheme]);
 
   // Expose lineupGenerator on window for tests and integration
   useEffect(() => {
@@ -513,6 +586,9 @@ export default function App() {
     // least one match in it, so a team whose last match another coach deleted
     // kept showing the one this device remembered.
     setFixtures(readStoredFixtures());
+    // Each team keeps its own division, field size and formation, so the
+    // switch brings this one's rather than leaving the last one's on screen.
+    adoptSettings();
     toast.success(`Switched to ${selected?.name || 'team'}`);
   };
 
@@ -1232,29 +1308,21 @@ export default function App() {
               const mapping = CONSTANTS.AGE_DIVISIONS[ageDivision];
               const fieldPlayers = mapping ? mapping.fieldSize : 7;
               const forms = getFormationsForFieldSize(fieldPlayers);
-              const newSettings = {
-                ...settingsRef.current,
+              updateSettings({
                 ageDivision,
                 fieldPlayers,
                 formation: forms[0] || '2-3-1',
-              };
-              settingsRef.current = newSettings;
-              setSettings(newSettings);
+              });
             }}
             onFieldPlayersChange={(fieldPlayers) => {
               const forms = getFormationsForFieldSize(fieldPlayers);
-              const newSettings = {
-                ...settingsRef.current,
+              updateSettings({
                 fieldPlayers,
                 formation: forms[0] || '2-3-1',
-              };
-              settingsRef.current = newSettings;
-              setSettings(newSettings);
+              });
             }}
             onFormationChange={(formation) => {
-              const newSettings = { ...settingsRef.current, formation };
-              settingsRef.current = newSettings;
-              setSettings(newSettings);
+              updateSettings({ formation });
             }}
             onGenerateLineup={handleGenerateLineup}
             isGenerating={isGenerating}
@@ -1318,15 +1386,9 @@ export default function App() {
               const ageDivision = game.ageDivision || game.division || '10U';
               const fieldPlayers = game.fieldPlayers || (CONSTANTS.AGE_DIVISIONS[ageDivision] ? CONSTANTS.AGE_DIVISIONS[ageDivision].fieldSize : 7);
               const formation = game.formation || '2-3-1';
-              const newSettings = {
-                ...settingsRef.current,
-                ageDivision,
-                fieldPlayers,
-                formation,
-              };
-              settingsRef.current = newSettings;
-              setSettings(newSettings);
-              safeSetToStorage(CONSTANTS.STORAGE_KEYS.SETTINGS, JSON.stringify(newSettings));
+              // The screen alone: this is how that game was played, not a
+              // decision about how the team plays from here on.
+              updateSettings({ ageDivision, fieldPlayers, formation }, { push: false });
               setLineup({
                 quarters: game.quarters,
                 formation,
@@ -1418,13 +1480,7 @@ export default function App() {
         onClose={() => setIsCustomFormationOpen(false)}
         initialFieldSize={settings.fieldPlayers || 7}
         onFormationCreated={(formName, sz) => {
-          const newSettings = {
-            ...settingsRef.current,
-            fieldPlayers: sz,
-            formation: formName,
-          };
-          settingsRef.current = newSettings;
-          setSettings(newSettings);
+          updateSettings({ fieldPlayers: sz, formation: formName });
         }}
       />
 

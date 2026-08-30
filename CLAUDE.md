@@ -27,6 +27,13 @@ Migration` and `-- Down Migration` sections. Write the change, not the whole
 schema — each migration runs exactly once, so guards like `IF NOT EXISTS` are
 only needed in the baseline.
 
+Rename the stub to the 14-digit `YYYYMMDDHHMMSS_name.sql` the existing
+migrations use. The generator emits a 17-digit prefix, and node-pg-migrate
+reads 17 digits as a date but 14 as a plain number — so a generated file sorts
+*before* every migration already in here, and the next `npm run migrate` aborts
+with "Not run migration ... is preceding already run migration". No filename
+format the generator offers matches, so this is done by hand.
+
 The baseline, `20260822000000_baseline.sql`, is the schema as it stood when
 migrations were introduced. Every statement in it is guarded, because it had to
 be a no-op against a production database that already had all of it. It is
@@ -93,7 +100,8 @@ are copied into the build as-is.
 │       ├── formations.js   # Formation definitions and positions
 │       ├── lineup-engine.js# The AYSO rotation rules
 │       ├── sync.js         # Offline queue and cloud sync
-│       └── roster-merge.js # Three-way merge for a rejected roster save
+│       ├── roster-merge.js # Three-way merge for a rejected roster save
+│       └── team-settings.js# Division, field size, formation: shape and defaults
 ├── public/             # Copied into dist/ verbatim by the build
 │   ├── sw.js           # Service worker (precache list, offline strategies)
 │   ├── manifest.json   # PWA manifest
@@ -296,6 +304,69 @@ Sync listeners are told `pulled: true` when local storage has just been
 replaced by the server's copy, which is App's cue to read the schedule back.
 A push reports `synced` too, and re-reading on one of those would race the
 state being pushed.
+
+### How the team plays
+
+The division, how many take the field, the formation and the number of quarters
+lived in this device's `ayso_settings` and nowhere else. A coach who set a team
+up as 12U on the laptop opened the app on their phone at the field and was
+handed 10U and a 7v7 formation, and the assistant coach never saw either.
+`user_settings.default_settings` looked like the fix but was not: the migration
+wrote it once at first sign-in and nothing ever read it back.
+
+They belong to the team, not the coach — two coaches sharing a side want the
+same answer, and a coach running two sides wants a different one for each — so
+they live in `teams.settings`, a JSONB, behind `GET`/`PUT
+/api/teams/:teamId/settings`. Reading takes `viewer`; writing takes `coach`,
+who already writes the roster and the games these settings shape. The division
+stays in the `age_division` column it already had, because the team list and
+team creation read it there and a second copy in the JSONB would be a second
+answer to the same question; `mapTeamSettings` is what puts the two back
+together. A write merges (`settings || $2::jsonb`) rather than replacing, so a
+build that knows about fewer fields does not drop the rest, and it deliberately
+leaves `roster_version` alone — changing a formation must not reject a roster
+edit another coach is in the middle of.
+
+`pushSettings` in `src/modules/sync.js` is the way to change them: local first,
+then the server, then the queue with no signal, like a game or a match. There
+is no merge and no version — four fields the whole team shares, last write
+wins. What the queue does differently is fold: one entry per team, replaced
+rather than appended, since five taps at the field are one write and nothing
+would merge them anyway. That entry carries its `teamId`, which the game and
+fixture entries do not need to: every team always has settings, so a replay
+addressed to whichever team happened to be open would not fail — it would
+quietly hand one side the other's formation. A replay refused 403 (a viewer) or
+404 (a deleted team) counts as done, since neither improves by being retried at
+every drain.
+
+`sync()` pulls them with the roster and the schedule, and the server's copy
+replaces the local one, so `migrateLocalDataToCloud` uploads settings a coach
+moved off the defaults before signing in — `sameSettings` is what decides
+whether there is anything worth sending.
+
+Everything reads them through `normalizeSettings` in
+`src/modules/team-settings.js`, because they now arrive from other devices and
+older builds: a formation for the wrong field size, or a field size nothing can
+be fielded with, degrades to something playable rather than reaching the lineup
+engine or a `<select>` with no such option. Custom formations are the case
+worth knowing about — they live in the device that made them and do not travel,
+so a team set to one reads back elsewhere as the default for its field size.
+
+In App this is `updateSettings`, and it is deliberately not an effect on
+`settings`: an effect fires on a pull and on a team switch too, which would
+push the team its own settings back, or hand the team being switched *to* the
+settings of the one being left. Reopening a saved game passes `push: false` —
+that sets the screen up the way that game was played, which is nobody else's
+business.
+
+The coach's theme is the one thing here that stays per-user. It is adopted from
+`user_settings.theme` only on a device with no preference of its own — a phone
+being signed into for the first time — and pushed whenever it changes after
+that. A device set to light for the sun at the touchline should not be dragged
+into dark because the laptop is. `PUT /api/settings` used to substitute
+defaults for whatever the body left out, so recording which team was last
+opened — which happens on every team switch — put a coach who works in light
+back into dark; every column keeps its stored value now.
 
 ### Renaming a player
 

@@ -27,6 +27,11 @@ let fixtureUpdateResult;
 let fixtureDeleteResult;
 /** What the server's schedule holds, for the pull sync() now makes. */
 let serverFixtures;
+/** How the server says the team plays, and what it does with a write. */
+let serverSettings;
+let settingsResult;
+/** What each settings write was given, and which team it was addressed to. */
+let settingsWrites = [];
 
 jest.unstable_mockModule('../src/modules/storage.js', () => ({
     safeGetFromStorage: (key) => (key in store ? store[key] : null),
@@ -99,6 +104,15 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
     bulkImportFixtures: async (teamId, fixtures) => {
         calls.push(`push:bulkImportFixtures:${fixtures.map(f => f.opponent).join(',')}`);
         return { success: true, data: fixtures };
+    },
+    getTeamSettings: async () => {
+        calls.push('pull:getTeamSettings');
+        return serverSettings();
+    },
+    saveTeamSettings: async (teamId, settings) => {
+        calls.push(`push:saveTeamSettings:${teamId}`);
+        settingsWrites.push({ teamId, settings });
+        return settingsResult(settings);
     }
 }));
 
@@ -120,6 +134,7 @@ let pushGameDelete;
 let pushFixture;
 let pushFixtureUpdate;
 let pushFixtureDelete;
+let pushSettings;
 let sync;
 
 /** Queue entries as pushPlayers/pushGame would have written them offline. */
@@ -155,6 +170,12 @@ const queuedFixtureUpdate = (id, updates) =>
 const queuedFixtureDelete = (id) =>
     ({ entityType: 'fixtures', action: 'delete', data: { id }, timestamp: 3 });
 
+const queuedSettings = (settings, teamId) =>
+    ({ entityType: 'settings', action: 'update', teamId, data: settings, timestamp: 4 });
+
+/** How this device has the team set up. */
+const localSettings = () => JSON.parse(store['ayso_settings'] || '{}');
+
 /** The schedule as this device has it. */
 const localFixtures = () => JSON.parse(store['ayso_schedule_fixtures'] || '[]');
 
@@ -174,6 +195,7 @@ async function signInWithTeam() {
     await initSync();
     calls = [];
     rosterWrites = [];
+    settingsWrites = [];
     store['ayso_sync_queue'] = JSON.stringify([]);
 }
 
@@ -189,12 +211,15 @@ beforeEach(async () => {
     fixtureUpdateResult = () => ({ success: true });
     fixtureDeleteResult = () => ({ success: true });
     serverFixtures = () => ({ success: true, data: [] });
+    serverSettings = () => ({ success: true, data: {} });
+    settingsResult = (settings) => ({ success: true, data: settings });
+    settingsWrites = [];
     // Set by a completed first sign-in; leaving it unset runs the migration path
     globalThis.localStorage = { getItem: () => 'completed', setItem: () => {} };
     globalThis.navigator = { onLine: true };
     ({
         initSync, sync, processQueue, pushGame, pushGameUpdate, pushGameDelete,
-        pushFixture, pushFixtureUpdate, pushFixtureDelete
+        pushFixture, pushFixtureUpdate, pushFixtureDelete, pushSettings
     } = await loadSync());
 });
 
@@ -208,7 +233,8 @@ describe('initSync', () => {
             'push:replaceRoster:Edited At The Field',
             'pull:getPlayers',
             'pull:getGames',
-            'pull:getFixtures'
+            'pull:getFixtures',
+            'pull:getTeamSettings'
         ]);
     });
 
@@ -225,7 +251,9 @@ describe('initSync', () => {
     test('still pulls when there is nothing queued', async () => {
         await initSync();
 
-        expect(calls).toEqual(['pull:getPlayers', 'pull:getGames', 'pull:getFixtures']);
+        expect(calls).toEqual([
+            'pull:getPlayers', 'pull:getGames', 'pull:getFixtures', 'pull:getTeamSettings'
+        ]);
     });
 
     test('the pull lands after the push, so local storage ends up current', async () => {
@@ -947,5 +975,225 @@ describe('migrating the schedule on first sign-in', () => {
         await initSync();
 
         expect(calls).toContain('push:bulkImportFixtures:Rovers');
+    });
+});
+
+/**
+ * How the team plays: the division, the field size, the formation.
+ *
+ * It lived in this device's localStorage and nowhere else, so a coach who set
+ * up 12U on the laptop and opened the app on their phone at the field was
+ * handed 10U and a 7v7 formation, and the assistant coach never saw either.
+ */
+describe('pushSettings', () => {
+    const NINE_A_SIDE = { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4 };
+
+    test('the device keeps the change whether or not the server hears about it', async () => {
+        await signInWithTeam();
+        globalThis.navigator.onLine = false;
+
+        await pushSettings(NINE_A_SIDE);
+
+        expect(localSettings()).toMatchObject({ ageDivision: '12U', formation: '3-2-3' });
+    });
+
+    test('with a signal it reaches the team', async () => {
+        await signInWithTeam();
+
+        await pushSettings(NINE_A_SIDE);
+
+        expect(settingsWrites).toEqual([{ teamId: 'team-1', settings: NINE_A_SIDE }]);
+    });
+
+    test('with none it is queued rather than lost', async () => {
+        await signInWithTeam();
+        globalThis.navigator.onLine = false;
+
+        const result = await pushSettings(NINE_A_SIDE);
+
+        expect(result).toMatchObject({ success: true, queued: true });
+        expect(settingsWrites).toEqual([]);
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({ entityType: 'settings', teamId: 'team-1' })
+        ]);
+    });
+
+    test('what is queued is what will actually play', async () => {
+        // 4-4-2 needs eleven. Storing what the coach tapped and normalizing on
+        // the way out would hand the other coaches a formation they cannot use.
+        await signInWithTeam();
+        globalThis.navigator.onLine = false;
+
+        await pushSettings({ ageDivision: '12U', fieldPlayers: 9, formation: '4-4-2' });
+
+        expect(remainingQueue()[0].data).toMatchObject({ fieldPlayers: 9, formation: '3-3-2' });
+    });
+
+    test('five taps at the field are one write, not five', async () => {
+        await signInWithTeam();
+        globalThis.navigator.onLine = false;
+
+        await pushSettings({ ...NINE_A_SIDE, formation: '3-2-3' });
+        await pushSettings({ ...NINE_A_SIDE, formation: '3-3-2' });
+        await pushSettings({ ...NINE_A_SIDE, formation: '2-3-3' });
+
+        expect(remainingQueue()).toHaveLength(1);
+        expect(remainingQueue()[0].data.formation).toBe('2-3-3');
+    });
+
+    test('a queued change to one team does not swallow another team\'s', async () => {
+        await signInWithTeam();
+        globalThis.navigator.onLine = false;
+        queueEntries(queuedSettings({ ageDivision: '14U' }, 'team-2'));
+
+        await pushSettings(NINE_A_SIDE);
+
+        expect(remainingQueue().map(e => e.teamId).sort()).toEqual(['team-1', 'team-2']);
+    });
+});
+
+describe('processQueue and how the team plays', () => {
+    test('a queued change replays to the server', async () => {
+        await signInWithTeam();
+        queueEntries(queuedSettings({ ageDivision: '12U', fieldPlayers: 9 }, 'team-1'));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(settingsWrites[0].teamId).toBe('team-1');
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('it goes to the team it was made against, not the one open now', async () => {
+        // Every team always has settings, so a replay addressed to whichever
+        // team happens to be selected would not fail — it would quietly hand
+        // one side the other's formation.
+        await signInWithTeam();
+        queueEntries(queuedSettings({ ageDivision: '14U' }, 'team-9'));
+
+        await processQueue();
+
+        expect(settingsWrites[0].teamId).toBe('team-9');
+    });
+
+    test('an entry from a build that stamped no team still replays', async () => {
+        await signInWithTeam();
+        queueEntries({ entityType: 'settings', action: 'update', data: { ageDivision: '12U' }, timestamp: 4 });
+
+        await processQueue();
+
+        expect(settingsWrites[0].teamId).toBe('team-1');
+    });
+
+    test('a viewer\'s change is dropped rather than retried at every drain', async () => {
+        await signInWithTeam();
+        settingsResult = () => ({ success: false, status: 403, error: 'Insufficient permissions' });
+        queueEntries(queuedSettings({ ageDivision: '12U' }, 'team-1'));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('so is a change to a team that has since been deleted', async () => {
+        await signInWithTeam();
+        settingsResult = () => ({ success: false, status: 404, error: 'Team not found' });
+        queueEntries(queuedSettings({ ageDivision: '12U' }, 'team-1'));
+
+        await processQueue();
+
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a server that failed is tried again', async () => {
+        await signInWithTeam();
+        settingsResult = () => ({ success: false, status: 500, error: 'Internal server error' });
+        queueEntries(queuedSettings({ ageDivision: '12U' }, 'team-1'));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(0);
+        expect(remainingQueue()).toHaveLength(1);
+    });
+});
+
+describe('sync and how the team plays', () => {
+    test('the team\'s settings replace this device\'s', async () => {
+        await signInWithTeam();
+        store['ayso_settings'] = JSON.stringify({ ageDivision: '10U', fieldPlayers: 7, formation: '2-3-1' });
+        serverSettings = () => ({
+            success: true,
+            data: { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4 }
+        });
+
+        await sync();
+
+        expect(localSettings()).toEqual({
+            ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4
+        });
+    });
+
+    test('what another coach\'s custom formation is stored as is something this device can field', async () => {
+        await signInWithTeam();
+        serverSettings = () => ({
+            success: true,
+            data: { ageDivision: '10U', fieldPlayers: 7, formation: 'Their Diamond' }
+        });
+
+        await sync();
+
+        expect(localSettings().formation).toBe('2-3-1');
+    });
+
+    test('a settings pull that fails leaves the device set up as it was', async () => {
+        await signInWithTeam();
+        store['ayso_settings'] = JSON.stringify({ ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3' });
+        serverSettings = () => ({ success: false, error: 'Internal server error' });
+
+        const result = await sync();
+
+        // The roster and the season history are what the app is for; refusing
+        // to sync them because the settings 500'd is the worse trade.
+        expect(result.success).toBe(true);
+        expect(localSettings()).toMatchObject({ ageDivision: '12U', formation: '3-2-3' });
+    });
+});
+
+/**
+ * The way a coach had the app set up before they ever signed in.
+ *
+ * Same story as the schedule: the pull is authoritative, so a 12U side set up
+ * offline would be handed straight back as 10U.
+ */
+describe('migrating the settings on first sign-in', () => {
+    beforeEach(() => {
+        globalThis.localStorage = { getItem: () => null, setItem: () => {} };
+    });
+
+    test('settings the coach moved are uploaded before the first pull', async () => {
+        store['ayso_settings'] = JSON.stringify({
+            ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4
+        });
+
+        await initSync();
+
+        expect(settingsWrites[0]).toMatchObject({
+            settings: { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3' }
+        });
+        expect(calls.indexOf('push:saveTeamSettings:team-1'))
+            .toBeLessThan(calls.indexOf('pull:getTeamSettings'));
+    });
+
+    test('a device still on the defaults uploads nothing', async () => {
+        // A roster, so the migration runs rather than finding nothing to do.
+        store['ayso_players'] = JSON.stringify([{ name: 'Maya', number: 7 }]);
+        store['ayso_settings'] = JSON.stringify({
+            ageDivision: '10U', fieldPlayers: 7, formation: '2-3-1', quarters: 4
+        });
+
+        await initSync();
+
+        expect(settingsWrites).toEqual([]);
     });
 });

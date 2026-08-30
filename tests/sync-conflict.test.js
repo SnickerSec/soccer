@@ -58,7 +58,9 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
     updateFixture: async () => ({ success: true }),
     deleteFixture: async () => ({ success: true }),
     bulkImportGames: async () => ({ success: true }),
-    bulkImportFixtures: async () => ({ success: true })
+    bulkImportFixtures: async () => ({ success: true }),
+    getTeamSettings: async () => ({ success: true, data: {} }),
+    saveTeamSettings: async () => ({ success: true })
 }));
 
 async function loadSync() {

@@ -8,11 +8,13 @@ import { getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
 import {
     getTeams, createTeam, getPlayers, replaceRoster,
     getGames, saveGame, updateGame, deleteGame, bulkImportGames,
-    getFixtures, saveFixture, updateFixture, deleteFixture, bulkImportFixtures
+    getFixtures, saveFixture, updateFixture, deleteFixture, bulkImportFixtures,
+    getTeamSettings, saveTeamSettings
 } from './cloud-storage.js';
 import { safeGetFromStorage, safeSetToStorage, safeParseJSON } from './storage.js';
 import { mergeRosters } from './roster-merge.js';
 import { surviveMerge } from './player-rename.js';
+import { normalizeSettings, sameSettings, DEFAULT_SETTINGS } from './team-settings.js';
 
 // Sync status enum
 export const SYNC_STATUS = {
@@ -174,10 +176,11 @@ export async function sync() {
 
     try {
         // Pull data from cloud
-        const [playersResult, gamesResult, fixturesResult] = await Promise.all([
+        const [playersResult, gamesResult, fixturesResult, settingsResult] = await Promise.all([
             getPlayers(currentTeamId),
             getGames(currentTeamId),
-            getFixtures(currentTeamId)
+            getFixtures(currentTeamId),
+            getTeamSettings(currentTeamId)
         ]);
 
         if (!playersResult.success || !gamesResult.success) {
@@ -213,6 +216,19 @@ export async function sync() {
             console.warn('Sync: could not pull the schedule:', fixturesResult.error);
         }
 
+        // How this team plays, which used to be whatever this device happened
+        // to have been set to. Normalized on the way in: it may name a custom
+        // formation only the coach who made it has.
+        let settings;
+        if (settingsResult.success && settingsResult.data) {
+            settings = normalizeSettings(settingsResult.data);
+            writeLocalSettings(settings);
+        } else if (!settingsResult.success) {
+            // Not fatal, for the same reason the schedule is not: the roster
+            // and the season history are what the app is for.
+            console.warn('Sync: could not pull the team settings:', settingsResult.error);
+        }
+
         // What the next write will claim to be built on
         rememberRoster(playersResult.data, playersResult.version);
 
@@ -227,7 +243,8 @@ export async function sync() {
             success: true,
             players: playersResult.data,
             games: gamesResult.data,
-            fixtures
+            fixtures,
+            settings
         };
     } catch (error) {
         console.error('Sync error:', error);
@@ -691,6 +708,80 @@ export async function pushFixtureDelete(fixtureId) {
     }
 }
 
+function writeLocalSettings(settings) {
+    safeSetToStorage('ayso_settings', JSON.stringify(settings));
+}
+
+/**
+ * Change how the team plays, everywhere it is kept.
+ *
+ * The division, the field size and the formation lived on the device and
+ * nowhere else, so a coach who set up 12U on the laptop and opened the app on
+ * their phone at the field was handed 10U and a 7v7 formation — and the
+ * assistant coach never saw either.
+ *
+ * Local first, then the server, then the queue with no signal, like a game or
+ * a match. There is no merge and no version: these are four fields the whole
+ * team shares, and the coach who changed one last is the one who meant it.
+ */
+export async function pushSettings(settings) {
+    const next = normalizeSettings(settings);
+    writeLocalSettings(next);
+
+    if (!currentTeamId) {
+        return { success: false, error: 'No team selected' };
+    }
+
+    if (!navigator.onLine || !await isAuthenticated()) {
+        queueSettings(currentTeamId, next);
+        return { success: true, queued: true };
+    }
+
+    updateStatus(SYNC_STATUS.SYNCING);
+
+    try {
+        const result = await saveTeamSettings(currentTeamId, next);
+
+        if (!result.success) {
+            updateStatus(SYNC_STATUS.ERROR);
+            return result;
+        }
+
+        lastSyncTime = new Date();
+        updateStatus(SYNC_STATUS.SYNCED);
+        return result;
+    } catch (error) {
+        updateStatus(SYNC_STATUS.ERROR);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Queue how the team plays, replacing anything already queued for that team.
+ *
+ * Unlike a game or a match there is only ever one answer per team, and it is
+ * sent whole rather than as a patch: five taps at the field with no signal are
+ * one write, not five that replay in order to the same end.
+ *
+ * The team is stamped on the entry because this is the first thing every team
+ * always has a value for. A replay that went to whichever team happened to be
+ * open would not fail — it would quietly hand one side the other's formation.
+ */
+function queueSettings(teamId, settings) {
+    const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
+    const remaining = queue.filter(item => !(
+        item.entityType === 'settings' && (item.teamId || teamId) === teamId
+    ));
+    remaining.push({
+        entityType: 'settings',
+        action: 'update',
+        teamId,
+        data: settings,
+        timestamp: Date.now()
+    });
+    safeSetToStorage('ayso_sync_queue', JSON.stringify(remaining));
+}
+
 /**
  * Swaps the id this device invented for the one the server issued, once a
  * queued match has replayed.
@@ -817,6 +908,19 @@ export async function processQueue() {
                 } else {
                     remaining.push(item);
                 }
+            } else if (item.entityType === 'settings' && item.action === 'update') {
+                // To the team the change was made against, not whichever one
+                // is open now. An entry from a build that stamped no team is
+                // replayed the old way rather than dropped.
+                const result = await saveTeamSettings(item.teamId || currentTeamId, item.data);
+                // 403 is a viewer, who cannot change how the team plays, and
+                // 404 a team that has since been deleted. Neither improves by
+                // being retried at every drain from here on.
+                if (result.success || result.status === 403 || result.status === 404) {
+                    processed++;
+                } else {
+                    remaining.push(item);
+                }
             } else {
                 // An entry this build has no branch for: queued by a newer one,
                 // or a type added to queueChange and forgotten here. Keeping it
@@ -848,8 +952,12 @@ async function migrateLocalDataToCloud() {
     const localFixtures = readLocalFixtures();
     const localSettings = safeParseJSON(safeGetFromStorage('ayso_settings'), {});
 
-    // Skip if no data to migrate
-    if (localPlayers.length === 0 && localGames.length === 0 && localFixtures.length === 0) {
+    // Skip if no data to migrate. Settings count as data when the coach has
+    // moved them off the defaults: the pull is authoritative, so a 12U side
+    // set up before signing in would otherwise be handed back as 10U.
+    const settingsWorthKeeping = !sameSettings(localSettings, DEFAULT_SETTINGS);
+    if (localPlayers.length === 0 && localGames.length === 0 && localFixtures.length === 0
+        && !settingsWorthKeeping) {
         localStorage.setItem('ayso_migration_status', 'completed');
         return;
     }
@@ -902,11 +1010,20 @@ async function migrateLocalDataToCloud() {
             await bulkImportFixtures(currentTeamId, migratable);
         }
 
-        // Save user settings
+        // How the coach had the app set up, for the same reason as the
+        // schedule: sync() replaces the local copy with the team's, so a
+        // division and formation chosen before signing in have to be sent up
+        // first or the first sync takes them away.
+        if (settingsWorthKeeping) {
+            await saveTeamSettings(currentTeamId, normalizeSettings(localSettings));
+        }
+
+        // Save user settings. default_settings is not written here any more:
+        // how the team plays belongs to the team, and a per-user copy that
+        // nothing read was what let two devices disagree in the first place.
         await updateUserSettings({
             theme: localStorage.getItem('ayso_theme') || 'dark',
-            default_team_id: currentTeamId,
-            default_settings: localSettings
+            default_team_id: currentTeamId
         });
 
         localStorage.setItem('ayso_migration_status', 'completed');
