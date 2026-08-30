@@ -31,6 +31,7 @@ import { shuffleArray } from '@/modules/utils';
 import {
   getPositionsForFormation,
   getFormationsForFieldSize,
+  formationHasMidfieldLine,
 } from '@/modules/formations';
 import { generateLineup, validateLineup } from '@/modules/lineup-engine';
 import { calculatePlayerStats } from '@/modules/season-stats';
@@ -1164,7 +1165,7 @@ export default function App() {
     const stats = calculatePlayerStats(players, gameHistory);
     downloadTextFile(
       seasonStatsFilename(currentTeam?.name || 'Season'),
-      seasonStatsCsv(stats),
+      seasonStatsCsv(stats, { midfieldLine: formationHasMidfieldLine(settings?.formation) }),
       'text/csv'
     );
     toast.success('Downloaded season statistics CSV');

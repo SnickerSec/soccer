@@ -12,11 +12,13 @@ import {
   User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formationHasMidfieldLine } from '@/modules/formations';
 
 export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHistory = [] }) {
-  const is33Formation = formation === '3-3' || (gameHistory.length > 0 && gameHistory.every((g) => g.formation === '3-3'));
-  const hasMidfieldStats = Object.values(stats).some((s) => (s.midfieldQuarters || 0) > 0);
-  const showMidfield = hasMidfieldStats || !is33Formation;
+  // As in SeasonTab: the current formation decides, not the history. See the
+  // comment there for why a legacy game must not rename the zones.
+  const showMidfield = formationHasMidfieldLine(formation);
+  const is33Formation = !showMidfield;
 
   const playerNames = Object.keys(stats).length > 0
     ? Object.keys(stats)
@@ -205,7 +207,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                 <div className="flex items-center gap-2">
                   <Target className="h-4 w-4" />
                   <span className="text-xs font-bold">
-                    {is33Formation && !showMidfield ? 'Forwards & Attack Zone (3-3)' : 'Forward & Attack Zone'}
+                    {is33Formation ? 'Forwards & Attack Zone (3-3)' : 'Forward & Attack Zone'}
                   </span>
                 </div>
                 <div className="text-right">
@@ -243,7 +245,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4" />
                   <span className="text-xs font-bold">
-                    {is33Formation && !showMidfield ? 'Backs & Defense Zone (3-3)' : 'Defense Zone'}
+                    {is33Formation ? 'Backs & Defense Zone (3-3)' : 'Defense Zone'}
                   </span>
                 </div>
                 <div className="text-right">
@@ -285,7 +287,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                   <div
                     style={{ width: `${offPct}%` }}
                     className="bg-amber-500 h-full"
-                    title={`${is33Formation && !showMidfield ? 'Forwards' : 'Offense'}: ${offPct}%`}
+                    title={`${is33Formation ? 'Forwards' : 'Offense'}: ${offPct}%`}
                   />
                 )}
                 {midPct > 0 && (
@@ -299,7 +301,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                   <div
                     style={{ width: `${defPct}%` }}
                     className="bg-emerald-500 h-full"
-                    title={`${is33Formation && !showMidfield ? 'Backs' : 'Defense'}: ${defPct}%`}
+                    title={`${is33Formation ? 'Backs' : 'Defense'}: ${defPct}%`}
                   />
                 )}
                 {gkPct > 0 && (
@@ -314,7 +316,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
               {/* Legend */}
               <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-amber-500" /> {is33Formation && !showMidfield ? 'Forwards' : 'Offense'} ({offPct}%)
+                  <span className="h-2 w-2 rounded-full bg-amber-500" /> {is33Formation ? 'Forwards' : 'Offense'} ({offPct}%)
                 </span>
                 {showMidfield && (
                   <span className="flex items-center gap-1">
@@ -322,7 +324,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                   </span>
                 )}
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" /> {is33Formation && !showMidfield ? 'Backs' : 'Defense'} ({defPct}%)
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" /> {is33Formation ? 'Backs' : 'Defense'} ({defPct}%)
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-purple-500" /> GK ({gkPct}%)

@@ -194,30 +194,34 @@ function positionBucket(position) {
  * @param {Record<string, object>} stats from calculatePlayerStats
  * @returns {string} CSV text
  */
-export function seasonStatsCsv(stats) {
-    const header = [
-        'Player', 'Games Played', 'Quarters Played',
-        'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'
-    ];
-
-    const lines = [csvRow(header)];
-
-    for (const [name, s] of Object.entries(stats || {})) {
+export function seasonStatsCsv(stats, { midfieldLine = true } = {}) {
+    const rows = Object.entries(stats || {}).map(([name, s]) => {
         const byBucket = { keeper: 0, defense: 0, midfield: 0, offense: 0 };
         for (const [position, count] of Object.entries(s.positions || {})) {
             byBucket[positionBucket(position)] += count;
         }
+        return { name, s, byBucket };
+    });
 
-        lines.push(csvRow([
-            name,
-            s.gamesPlayed || 0,
-            s.totalQuarters || 0,
-            byBucket.keeper,
-            byBucket.defense,
-            byBucket.midfield,
-            byBucket.offense,
-            s.totalSitting || 0
-        ]));
+    // The CSV has to agree with the Season tab above the button that produces
+    // it, or the coach exports what is on screen and gets something else. The
+    // caller passes what formationHasMidfieldLine said, so there is one rule
+    // rather than two — and this module keeps having no imports.
+    const backsAndForwards = !midfieldLine;
+
+    const header = backsAndForwards
+        ? ['Player', 'Games Played', 'Quarters Played', 'Keeper', 'Backs', 'Forwards', 'Sitting']
+        : ['Player', 'Games Played', 'Quarters Played', 'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'];
+
+    const lines = [csvRow(header)];
+
+    for (const { name, s, byBucket } of rows) {
+        lines.push(csvRow(backsAndForwards
+            ? [name, s.gamesPlayed || 0, s.totalQuarters || 0,
+               byBucket.keeper, byBucket.defense, byBucket.offense, s.totalSitting || 0]
+            : [name, s.gamesPlayed || 0, s.totalQuarters || 0,
+               byBucket.keeper, byBucket.defense, byBucket.midfield, byBucket.offense, s.totalSitting || 0]
+        ));
     }
 
     return lines.join('\n');

@@ -8,7 +8,8 @@ import {
     getFormationDescription,
     getCustomFormations,
     saveCustomFormation,
-    deleteCustomFormation
+    deleteCustomFormation,
+    formationHasMidfieldLine
 } from '../src/modules/formations.js';
 
 /**
@@ -375,5 +376,23 @@ describe('custom formations', () => {
         saveCustomFormation({ name: existing, fieldSize: 7, positions: [] });
 
         expect(getPositionsForFormation(7, existing)).toEqual(builtInPositions);
+    });
+});
+
+describe('formationHasMidfieldLine', () => {
+    test('3-3 has no midfield line — it is three backs and three forwards', () => {
+        expect(formationHasMidfieldLine('3-3')).toBe(false);
+    });
+
+    test('formations that field a midfield keep it', () => {
+        for (const f of ['2-3-1', '3-2-1', '4-3-3', '4-4-2', '2-2']) {
+            expect(formationHasMidfieldLine(f)).toBe(true);
+        }
+    });
+
+    test('an unknown or custom formation is assumed to have one, so nothing is hidden', () => {
+        expect(formationHasMidfieldLine('Diamond Press')).toBe(true);
+        expect(formationHasMidfieldLine(undefined)).toBe(true);
+        expect(formationHasMidfieldLine('')).toBe(true);
     });
 });

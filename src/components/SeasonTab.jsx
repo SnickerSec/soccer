@@ -24,6 +24,7 @@ import {
 import { calculatePlayerStats, getLineupRecommendations } from '@/modules/season-stats';
 import { parseLocalDate } from '@/modules/schedule';
 import { PlayerHeatmapCard } from './PlayerHeatmapCard';
+import { formationHasMidfieldLine } from '@/modules/formations';
 import { cn } from '@/lib/utils';
 
 /**
@@ -52,9 +53,17 @@ export function SeasonTab({
   const stats = calculatePlayerStats(players, gameHistory);
   const recommendations = getLineupRecommendations(players, gameHistory, stats);
 
-  const is33Formation = formation === '3-3' || (gameHistory.length > 0 && gameHistory.every((g) => g.formation === '3-3'));
-  const hasMidfieldStats = Object.values(stats).some((s) => (s.midfieldQuarters || 0) > 0);
-  const showMidfield = hasMidfieldStats || !is33Formation;
+  // The formation the team plays now decides what the columns are called and
+  // whether there is a midfield line at all. This used to be overridden by
+  // hasMidfieldStats, so a single legacy game in another formation flipped the
+  // whole tab back to Defense/Midfield/Offense — labels describing a shape the
+  // team no longer plays. Quarters from those games are not lost: they are
+  // reported under the table instead, so the columns still reconcile.
+  const showMidfield = formationHasMidfieldLine(formation);
+  const is33Formation = !showMidfield;
+  const hiddenMidfieldQuarters = showMidfield
+    ? 0
+    : Object.values(stats).reduce((n, s) => n + (s.midfieldQuarters || 0), 0);
 
   const totalRosterSpots = Object.values(stats).reduce((acc, s) => acc + (s.gamesOnRoster || 0), 0);
   const totalAttended = Object.values(stats).reduce((acc, s) => acc + (s.gamesAttended || 0), 0);
@@ -161,7 +170,7 @@ export function SeasonTab({
             {recommendations.needsOffense?.length > 0 && (
               <div>
                 <span className="font-semibold text-foreground">
-                  {is33Formation && !hasMidfieldStats ? 'Needs Forward Time (Offense): ' : 'Needs Offense Time: '}
+                  {is33Formation ? 'Needs Forward Time (Offense): ' : 'Needs Offense Time: '}
                 </span>
                 <span className="text-muted-foreground">
                   {recommendations.needsOffense.map((p) => p.name).join(', ')}
@@ -171,7 +180,7 @@ export function SeasonTab({
             {recommendations.needsDefense?.length > 0 && (
               <div>
                 <span className="font-semibold text-foreground">
-                  {is33Formation && !hasMidfieldStats ? 'Needs Back Time (Defense): ' : 'Needs Defense Time: '}
+                  {is33Formation ? 'Needs Back Time (Defense): ' : 'Needs Defense Time: '}
                 </span>
                 <span className="text-muted-foreground">
                   {recommendations.needsDefense.map((p) => p.name).join(', ')}
@@ -288,9 +297,9 @@ export function SeasonTab({
                     <TableHead className="text-center">Games</TableHead>
                     <TableHead className="text-center">Quarters</TableHead>
                     <TableHead className="text-center">GK</TableHead>
-                    <TableHead className="text-center">{is33Formation && !hasMidfieldStats ? 'Backs' : 'Defense'}</TableHead>
+                    <TableHead className="text-center">{is33Formation ? 'Backs' : 'Defense'}</TableHead>
                     {showMidfield && <TableHead className="text-center">Midfield</TableHead>}
-                    <TableHead className="text-center">{is33Formation && !hasMidfieldStats ? 'Forwards' : 'Offense'}</TableHead>
+                    <TableHead className="text-center">{is33Formation ? 'Forwards' : 'Offense'}</TableHead>
                     <TableHead className="text-center">Sit</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -336,6 +345,17 @@ export function SeasonTab({
                   ))}
                 </TableBody>
               </Table>
+
+              {/* The midfield column is gone with the midfield line, but those
+                  quarters were played. Reported here so GK + Backs + Forwards
+                  not summing to Quarters has a visible explanation. */}
+              {hiddenMidfieldQuarters > 0 && (
+                <p className="pt-3 text-[11px] text-muted-foreground" id="hiddenMidfieldNote">
+                  Not shown above: {hiddenMidfieldQuarters} midfield{' '}
+                  {hiddenMidfieldQuarters === 1 ? 'quarter' : 'quarters'} from games played in a
+                  formation with a midfield line. The current formation has backs and forwards only.
+                </p>
+              )}
             </div>
           )}
         </CardContent>

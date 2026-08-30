@@ -297,6 +297,31 @@ describe('seasonStatsCsv', () => {
         ]);
     });
 
+    test('a 3-3 team gets Backs and Forwards, and no column of midfield zeros', () => {
+        const threeThree = {
+            'Ana Ruiz': {
+                gamesPlayed: 2, totalQuarters: 8, totalSitting: 0,
+                positions: { Keeper: 1, 'Left Back': 3, Striker: 2, 'Right Forward': 2 }
+            }
+        };
+
+        expect(cells(seasonStatsCsv(threeThree, { midfieldLine: false }), 0)).toEqual([
+            'Player', 'Games Played', 'Quarters Played',
+            'Keeper', 'Backs', 'Forwards', 'Sitting'
+        ]);
+
+        // Keeper 1, Backs 3, Forwards 4 (Striker + Right Forward), Sitting 0
+        expect(cells(seasonStatsCsv(threeThree, { midfieldLine: false }), 1))
+            .toEqual(['Ana Ruiz', '2', '8', '1', '3', '4', '0']);
+    });
+
+    test('defaults to the midfield column when the caller says nothing', () => {
+        expect(cells(seasonStatsCsv(stats), 0)).toEqual([
+            'Player', 'Games Played', 'Quarters Played',
+            'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'
+        ]);
+    });
+
     test('reads the fields calculatePlayerStats actually returns', () => {
         const [name, games, quarters, , , , , sitting] = cells(seasonStatsCsv(stats), 1);
 

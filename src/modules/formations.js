@@ -131,6 +131,30 @@ export function getFormationsForFieldSize(playersOnField) {
 }
 
 /**
+ * Whether a formation fields a midfield line at all.
+ *
+ * Read off the formation's own positions rather than a list of names, so it
+ * stays right as formations are added: 3-3 is three backs and three forwards
+ * with nothing between them, and a Season tab that labels that "Defense /
+ * Midfield / Offense" is describing a shape the team does not play.
+ *
+ * An unknown or custom formation is assumed to have one — the caller then
+ * keeps the midfield column, which shows real quarters rather than hiding them.
+ */
+export function formationHasMidfieldLine(formation) {
+    if (!formation) return true;
+
+    for (const bySize of Object.values(FORMATIONS)) {
+        const positions = bySize[formation];
+        if (Array.isArray(positions)) {
+            return positions.some((p) => p.includes('Mid') || p === 'Midfield');
+        }
+    }
+
+    return true;
+}
+
+/**
  * Check if position is defensive
  */
 export function isDefensivePosition(position) {
