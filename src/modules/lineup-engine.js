@@ -171,7 +171,7 @@ function quarterCombinations(size, quarters) {
  * Sitting three of four quarters cannot avoid adjacency, so in that case the
  * best available set is returned and validateLineup reports it honestly.
  */
-function chooseSittingQuarters(size, remaining, quarters) {
+function chooseSittingQuarters(size, remaining, quarters, avoidQuarters = []) {
     if (size <= 0) return [];
 
     const all = quarterCombinations(Math.min(size, quarters), quarters);
@@ -181,13 +181,19 @@ function chooseSittingQuarters(size, remaining, quarters) {
     const spaced = pool.filter(set => !hasConsecutive(set));
     const candidates = spaced.length > 0 ? spaced : pool;
 
+    // Prefer candidates that do not include avoided quarters (e.g. Q1 when sat Q4 in previous match)
+    const avoidedFiltered = avoidQuarters.length > 0
+        ? candidates.filter(set => !set.some(q => avoidQuarters.includes(q)))
+        : candidates;
+    const poolToChooseFrom = avoidedFiltered.length > 0 ? avoidedFiltered : candidates;
+
     // Most remaining capacity first, so quarters fill evenly; ties broken at
     // random to keep successive lineups from looking identical
     let best = [];
     let bestTotal = -Infinity;
     let bestFloor = -Infinity;
-    shuffleArray(candidates);
-    candidates.forEach(set => {
+    shuffleArray(poolToChooseFrom);
+    poolToChooseFrom.forEach(set => {
         const total = set.reduce((sum, q) => sum + remaining[q], 0);
         const floor = Math.min(...set.map(q => remaining[q]));
         // Most total room first; then the option whose tightest quarter has the
@@ -221,7 +227,10 @@ function spacedSets(size, quarters) {
  * order given, or null when no exact solution exists, leaving the caller to
  * fall back to the greedy choice.
  */
-function planSittingQuarters(targets, sittingPerQuarter, quarters) {
+function planSittingQuarters(requirements, sittingPerQuarter, quarters) {
+    const reqs = requirements.map(r => typeof r === 'number' ? { target: r, avoid: [] } : r);
+    const targets = reqs.map(r => r.target);
+
     if (targets.every(t => t === 0)) return targets.map(() => []);
 
     // Grouped by how many quarters each player sits; anything above two cannot
@@ -269,16 +278,46 @@ function planSittingQuarters(targets, sittingPerQuarter, quarters) {
 
     if (!search(0, new Map(demand), { ...capacity })) return null;
 
-    // Hand the solved sets back out in the order the players were given
+    // Hand the solved sets back out, satisfying players with avoid constraints first
     const queues = new Map(sizes.map(size => [size, []]));
     flat.forEach(({ size, set }, index) => {
         for (let i = 0; i < chosenCounts[index]; i++) queues.get(size).push(set);
     });
 
-    return targets.map(target => (target === 0 ? [] : queues.get(target).shift() ?? []));
+    const results = new Array(reqs.length).fill(null);
+
+    // Pass 1: Assign players who need to avoid specific quarters (e.g. Q1 when sat Q4 last game)
+    reqs.forEach((req, idx) => {
+        if (req.target === 0) {
+            results[idx] = [];
+            return;
+        }
+        if (req.avoid && req.avoid.length > 0) {
+            const queue = queues.get(req.target);
+            if (queue && queue.length > 0) {
+                const matchIndex = queue.findIndex(set => !set.some(q => req.avoid.includes(q)));
+                if (matchIndex !== -1) {
+                    results[idx] = queue.splice(matchIndex, 1)[0];
+                }
+            }
+        }
+    });
+
+    // Pass 2: Assign all remaining unassigned players
+    reqs.forEach((req, idx) => {
+        if (results[idx] !== null) return;
+        if (req.target === 0) {
+            results[idx] = [];
+            return;
+        }
+        const queue = queues.get(req.target);
+        results[idx] = queue && queue.length > 0 ? queue.shift() : [];
+    });
+
+    return results;
 }
 
-export function determineSittingSchedule(players, playersOnField, quarters, seasonStats) {
+export function determineSittingSchedule(players, playersOnField, quarters, seasonStats = {}) {
     const totalPlayers = players.length;
     const sittingPerQuarter = totalPlayers - playersOnField;
     const schedule = { 1: [], 2: [], 3: [], 4: [] };
@@ -293,15 +332,15 @@ export function determineSittingSchedule(players, playersOnField, quarters, seas
     const regularPlayers = playersCopy.filter(p => !p.mustRest);
 
     regularPlayers.sort((a, b) => {
-        const statsA = seasonStats[a.name] || { totalSitting: 0, gamesPlayed: 0 };
-        const statsB = seasonStats[b.name] || { totalSitting: 0, gamesPlayed: 0 };
+        const statsA = seasonStats?.[a.name] || { totalSitting: 0, gamesPlayed: 0 };
+        const statsB = seasonStats?.[b.name] || { totalSitting: 0, gamesPlayed: 0 };
         const avgSitA = statsA.gamesPlayed > 0 ? statsA.totalSitting / statsA.gamesPlayed : 0;
         const avgSitB = statsB.gamesPlayed > 0 ? statsB.totalSitting / statsB.gamesPlayed : 0;
         return avgSitA - avgSitB;
     });
 
     shuffleWithinSimilarGroups(regularPlayers, (p) => {
-        const stats = seasonStats[p.name] || { totalSitting: 0, gamesPlayed: 0 };
+        const stats = seasonStats?.[p.name] || { totalSitting: 0, gamesPlayed: 0 };
         return stats.gamesPlayed > 0 ? Math.round(stats.totalSitting / stats.gamesPlayed * 2) / 2 : 0;
     });
 
@@ -316,12 +355,18 @@ export function determineSittingSchedule(players, playersOnField, quarters, seas
     shuffleWithinSimilarGroups(playersForExtraSit, (p) => sittingGroup(p, seasonStats));
 
     const targetSits = new Map();
+    const avoidMap = new Map();
+
     playersForExtraSit.forEach((player, index) => {
         let target = minSitsPerPlayer + (index < playersWithExtraSit ? 1 : 0);
         // A player asked to rest sits at least once, even on a roster where
         // nobody would otherwise sit at all
         if (player.mustRest) target = Math.max(target, 1);
         targetSits.set(player.name, target);
+
+        // If player sat in Q4 of their last match, avoid having them sit in Q1 of this match
+        const satQ4Last = Boolean(seasonStats?.[player.name]?.lastGameSatQ4);
+        avoidMap.set(player.name, satQ4Last ? [1] : []);
     });
 
     const allPlayersCombined = [...mustRestPlayers, ...regularPlayers];
@@ -336,15 +381,19 @@ export function determineSittingSchedule(players, playersOnField, quarters, seas
     for (let q = 1; q <= quarters; q++) remaining[q] = sittingPerQuarter;
 
     const plan = planSittingQuarters(
-        assignmentOrder.map(p => targetSits.get(p.name) ?? 0),
+        assignmentOrder.map(p => ({
+            target: targetSits.get(p.name) ?? 0,
+            avoid: avoidMap.get(p.name) || []
+        })),
         sittingPerQuarter,
         quarters
     );
 
     assignmentOrder.forEach((player, index) => {
+        const playerAvoid = avoidMap.get(player.name) || [];
         const chosen = (plan && plan[index]
             ? plan[index]
-            : chooseSittingQuarters(targetSits.get(player.name) ?? 0, remaining, quarters)) || [];
+            : chooseSittingQuarters(targetSits.get(player.name) ?? 0, remaining, quarters, playerAvoid)) || [];
 
         chosen.forEach(q => {
             player.sittingQuarters.push(q);
@@ -358,38 +407,49 @@ export function determineSittingSchedule(players, playersOnField, quarters, seas
     return schedule;
 }
 
-function selectKeeper(availablePlayers, quarter, seasonStats) {
+function selectKeeper(availablePlayers, quarter, seasonStats = {}) {
     const allowedKeepers = availablePlayers.filter(player => !player.noKeeper);
     const poolToSelectFrom = allowedKeepers.length > 0 ? allowedKeepers : availablePlayers;
     let potentialKeepers = poolToSelectFrom.filter(player => !player.goalieQuarter);
 
     if (potentialKeepers.length > 0) {
+        const statsOf = (name) => seasonStats?.[name] || {};
+
         potentialKeepers.sort((a, b) => {
-            const gkA = seasonStats[a.name]?.goalkeeperQuarters || 0;
-            const gkB = seasonStats[b.name]?.goalkeeperQuarters || 0;
-            return gkA - gkB;
+            const gkA = statsOf(a.name).goalkeeperQuarters || 0;
+            const gkB = statsOf(b.name).goalkeeperQuarters || 0;
+            if (gkA !== gkB) return gkA - gkB;
+
+            // Multi-game tie breaker: prefer players who were NOT keeper in their previous game
+            const wasGkLastA = statsOf(a.name).lastGameKeeper ? 1 : 0;
+            const wasGkLastB = statsOf(b.name).lastGameKeeper ? 1 : 0;
+            return wasGkLastA - wasGkLastB;
         });
 
-        const minGK = seasonStats[potentialKeepers[0].name]?.goalkeeperQuarters || 0;
+        const minGK = statsOf(potentialKeepers[0].name).goalkeeperQuarters || 0;
         const lowestGKGroup = potentialKeepers.filter(p =>
-            (seasonStats[p.name]?.goalkeeperQuarters || 0) === minGK
+            (statsOf(p.name).goalkeeperQuarters || 0) === minGK
         );
 
-        const hasKeeperRatings = lowestGKGroup.some(p => (p.positionalRatings || {}).keeper);
+        // Within lowest GK group, prioritize candidates who did not play keeper in their last match
+        const notLastGameKeepers = lowestGKGroup.filter(p => !statsOf(p.name).lastGameKeeper);
+        const candidateGroup = notLastGameKeepers.length > 0 ? notLastGameKeepers : lowestGKGroup;
+
+        const hasKeeperRatings = candidateGroup.some(p => (p.positionalRatings || {}).keeper);
         if (hasKeeperRatings) {
-            lowestGKGroup.sort((a, b) => {
+            candidateGroup.sort((a, b) => {
                 const rA = (a.positionalRatings || {}).keeper || 0;
                 const rB = (b.positionalRatings || {}).keeper || 0;
                 return rB - rA;
             });
-            const topRating = (lowestGKGroup[0].positionalRatings || {}).keeper || 0;
-            const topRatedKeepers = lowestGKGroup.filter(p =>
+            const topRating = (candidateGroup[0].positionalRatings || {}).keeper || 0;
+            const topRatedKeepers = candidateGroup.filter(p =>
                 ((p.positionalRatings || {}).keeper || 0) === topRating
             );
             return topRatedKeepers[Math.floor(Math.random() * topRatedKeepers.length)];
         }
 
-        return lowestGKGroup[Math.floor(Math.random() * lowestGKGroup.length)];
+        return candidateGroup[Math.floor(Math.random() * candidateGroup.length)];
     }
 
     return poolToSelectFrom[0];
@@ -402,7 +462,7 @@ function getPositionRatingCategory(position) {
     return 'offense';
 }
 
-function assignPositionsOptimally(players, positions, defensivePositions, seasonStats) {
+function assignPositionsOptimally(players, positions, defensivePositions, seasonStats = {}) {
     const assignments = [];
     const remainingPlayers = [...players];
     const remainingPositions = [...positions];
@@ -425,6 +485,7 @@ function assignPositionsOptimally(players, positions, defensivePositions, season
                 score -= 1000 * timesPlayedPosition;
             }
 
+            // 1. Current match D/O balance (primary)
             const currentImbalance = Math.abs(defensive - offensive);
             let projectedImbalance;
             if (isDefensive) {
@@ -439,7 +500,20 @@ function assignPositionsOptimally(players, positions, defensivePositions, season
                 score -= 200 * (projectedImbalance - currentImbalance);
             }
 
-            const playerSeasonStats = seasonStats[player.name];
+            // 2. Multi-game / Season-wide D/O balance
+            const playerSeasonStats = seasonStats?.[player.name];
+            if (playerSeasonStats) {
+                const seasonDef = playerSeasonStats.defensiveQuarters || 0;
+                const seasonOff = (playerSeasonStats.offensiveQuarters || 0) + (playerSeasonStats.midfieldQuarters || 0);
+                const seasonImbalance = seasonDef - seasonOff; // > 0 means has played more defense across season
+                if (isDefensive) {
+                    score -= seasonImbalance * 25;
+                } else {
+                    score += seasonImbalance * 25;
+                }
+            }
+
+            // 3. Season-wide Position Variety
             if (playerSeasonStats && playerSeasonStats.positions) {
                 const timesPlayedPositionSeason = playerSeasonStats.positions[position] || 0;
                 const totalPositionsPlayed = Object.values(playerSeasonStats.positions).reduce((a, b) => a + b, 0);

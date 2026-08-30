@@ -1,6 +1,7 @@
 // Storage utilities for localStorage operations
 
 export function safeGetFromStorage(key) {
+    if (typeof localStorage === 'undefined') return null;
     try {
         return localStorage.getItem(key);
     } catch (error) {
@@ -10,6 +11,7 @@ export function safeGetFromStorage(key) {
 }
 
 export function safeSetToStorage(key, value) {
+    if (typeof localStorage === 'undefined') return false;
     try {
         localStorage.setItem(key, value);
         return true;
@@ -24,6 +26,7 @@ export function safeSetToStorage(key, value) {
 }
 
 export function safeRemoveFromStorage(key) {
+    if (typeof localStorage === 'undefined') return false;
     try {
         localStorage.removeItem(key);
         return true;

@@ -11,8 +11,10 @@ export function calculatePlayerStats(players = [], savedGames = []) {
         stats[player.name] = createEmptyStats();
     });
 
+    const gamesList = Array.isArray(savedGames) ? savedGames : [];
+
     // Aggregate stats from saved games
-    (savedGames || []).forEach(game => {
+    gamesList.forEach((game) => {
         (game.players || []).forEach(player => {
             if (!stats[player.name]) {
                 stats[player.name] = createEmptyStats();
@@ -22,6 +24,7 @@ export function calculatePlayerStats(players = [], savedGames = []) {
 
             // Track attendance
             s.gamesOnRoster++;
+            const isAttended = player.status === 'available' || (player.quartersPlayed && player.quartersPlayed.length > 0);
             if (player.status === 'available') {
                 s.gamesAttended++;
                 s.gamesPlayed++;
@@ -29,25 +32,76 @@ export function calculatePlayerStats(players = [], savedGames = []) {
                 s.gamesAbsent++;
             } else if (player.status === 'injured') {
                 s.gamesInjured++;
+            } else if (isAttended) {
+                s.gamesAttended++;
+                s.gamesPlayed++;
             }
 
-            s.totalQuarters += player.quartersPlayed?.length || 0;
-            s.totalSitting += player.quartersSitting?.length || 0;
+            const qPlayed = player.quartersPlayed?.length || 0;
+            const qSitting = player.quartersSitting?.length || 0;
+            s.totalQuarters += qPlayed;
+            s.quartersPlayed = s.totalQuarters;
+            s.totalSitting += qSitting;
+            s.sittingQuarters = s.totalSitting;
 
-            // Track captain assignments from player snapshot (isCaptain flag is set when game is saved)
+            // Track captain assignments from player snapshot
             if (player.isCaptain) {
                 s.captainGames++;
             }
 
-            // Track positions
-            player.positionsPlayed?.forEach(pos => {
-                s.positions[pos.position] = (s.positions[pos.position] || 0) + 1;
-            });
+            // Track positions and zone distribution
+            let gameKeeperCount = 0;
+            let gameDefCount = 0;
+            let gameMidCount = 0;
+            let gameOffCount = 0;
 
-            // Count goalkeeper games from actual positions played (more reliable than goalieQuarter field)
-            const keeperQuartersThisGame = player.positionsPlayed?.filter(pos => pos.position === 'Keeper').length || 0;
-            if (keeperQuartersThisGame > 0) {
+            if (Array.isArray(player.positionsPlayed) && player.positionsPlayed.length > 0) {
+                player.positionsPlayed.forEach(pos => {
+                    const posName = pos.position;
+                    s.positions[posName] = (s.positions[posName] || 0) + 1;
+                    if (posName === 'Keeper') {
+                        gameKeeperCount++;
+                        gameDefCount++;
+                    } else if (posName.includes('Back')) {
+                        gameDefCount++;
+                    } else if (posName.includes('Mid') || posName === 'Midfield') {
+                        gameMidCount++;
+                    } else {
+                        gameOffCount++;
+                    }
+                });
+            } else {
+                gameDefCount = player.defensiveQuarters || 0;
+                gameOffCount = player.offensiveQuarters || 0;
+                if (player.goalieQuarter) gameKeeperCount = 1;
+            }
+
+            if (gameKeeperCount > 0) {
                 s.goalkeeperQuarters++;
+                s.keeperQuarters = s.goalkeeperQuarters;
+            }
+            s.defensiveQuarters += gameDefCount;
+            s.defenseQuarters = s.defensiveQuarters;
+            s.midfieldQuarters += gameMidCount;
+            s.offensiveQuarters += gameOffCount;
+            s.offenseQuarters = s.offensiveQuarters;
+
+            // Track most recent game participation for cross-game rotation
+            if (!s.lastGamePlayed && isAttended) {
+                const totalQ = game.quarters?.length || 4;
+                const satQ4 = Boolean(player.quartersSitting && player.quartersSitting.includes(totalQ));
+                s.lastGamePlayed = {
+                    id: game.id,
+                    date: game.date,
+                    name: game.name,
+                    wasKeeper: gameKeeperCount > 0,
+                    satQ4,
+                    quartersSitting: player.quartersSitting || [],
+                    quartersPlayed: player.quartersPlayed || []
+                };
+                s.lastGameKeeper = gameKeeperCount > 0;
+                s.lastGameSatQ4 = satQ4;
+                s.lastGameSatQuarters = player.quartersSitting || [];
             }
         });
     });
@@ -63,10 +117,22 @@ function createEmptyStats() {
         gamesAbsent: 0,
         gamesInjured: 0,
         totalQuarters: 0,
+        quartersPlayed: 0,
         totalSitting: 0,
+        sittingQuarters: 0,
         goalkeeperQuarters: 0,
+        keeperQuarters: 0,
         captainGames: 0,
-        positions: {}
+        defensiveQuarters: 0,
+        defenseQuarters: 0,
+        midfieldQuarters: 0,
+        offensiveQuarters: 0,
+        offenseQuarters: 0,
+        positions: {},
+        lastGamePlayed: null,
+        lastGameKeeper: false,
+        lastGameSatQ4: false,
+        lastGameSatQuarters: []
     };
 }
 
@@ -109,16 +175,6 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
         const s = stats[player.name] || createEmptyStats();
         const gamesPlayed = s.gamesPlayed || 0;
 
-        // Get offensive/defensive balance from saved games
-        let offenseQtrs = 0, defenseQtrs = 0;
-        savedGames.forEach(game => {
-            const gamePlayer = game.players.find(p => p.name === player.name);
-            if (gamePlayer) {
-                offenseQtrs += gamePlayer.offensiveQuarters || 0;
-                defenseQtrs += gamePlayer.defensiveQuarters || 0;
-            }
-        });
-
         return {
             name: player.name,
             noKeeper: player.noKeeper,
@@ -126,8 +182,8 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
             avgSitting: gamesPlayed > 0 ? s.totalSitting / gamesPlayed : 0,
             gkCount: s.goalkeeperQuarters,
             captainCount: s.captainGames || 0,
-            offenseQtrs,
-            defenseQtrs,
+            offenseQtrs: s.offensiveQuarters,
+            defenseQtrs: s.defensiveQuarters,
             positionCount: Object.keys(s.positions).length,
             positions: s.positions
         };

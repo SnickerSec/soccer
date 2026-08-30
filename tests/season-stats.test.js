@@ -138,6 +138,32 @@ describe('calculatePlayerStats', () => {
         expect(stats['Charlie'].gamesAbsent).toBe(1);
         expect(stats['Charlie'].gamesOnRoster).toBe(1);
     });
+
+    test('should calculate offensive, defensive and midfield quarters', () => {
+        const stats = calculatePlayerStats(mockPlayers, mockSavedGames);
+        expect(stats['Alice'].offensiveQuarters).toBe(1);
+        expect(stats['Alice'].midfieldQuarters).toBe(1);
+        expect(stats['Alice'].defensiveQuarters).toBe(1);
+        expect(stats['Alice'].offenseQuarters).toBe(1);
+        expect(stats['Alice'].defenseQuarters).toBe(1);
+
+        expect(stats['Bob'].offensiveQuarters).toBe(0);
+        expect(stats['Bob'].midfieldQuarters).toBe(0);
+        expect(stats['Bob'].defensiveQuarters).toBe(4);
+        expect(stats['Bob'].defenseQuarters).toBe(4);
+    });
+
+    test('should track recent game status for cross-game rotation', () => {
+        const stats = calculatePlayerStats(mockPlayers, mockSavedGames);
+        // Alice sat Q4 in mockSavedGames[0] and was keeper
+        expect(stats['Alice'].lastGameSatQ4).toBe(true);
+        expect(stats['Alice'].lastGameKeeper).toBe(true);
+        expect(stats['Alice'].lastGamePlayed).toBeDefined();
+
+        // Bob played all 4 quarters as Left Back
+        expect(stats['Bob'].lastGameSatQ4).toBe(false);
+        expect(stats['Bob'].lastGameKeeper).toBe(false);
+    });
 });
 
 describe('getLineupRecommendations', () => {

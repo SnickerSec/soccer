@@ -451,3 +451,115 @@ describe('strength balancing (players with ratings)', () => {
         }
     });
 });
+
+describe('multi-game rotation balancing with season stats', () => {
+    test('avoids sitting Q1 if a player sat Q4 in the previous match', () => {
+        // 10 players, 7 on field -> 3 sit per quarter
+        const players = makeRoster(10);
+        // Player 1 sat Q4 in their previous match
+        const seasonStats = {
+            'Player 1': { totalSitting: 1, gamesPlayed: 1, lastGameSatQ4: true }
+        };
+
+        let satQ1Count = 0;
+        const totalRuns = 20;
+        for (let i = 0; i < totalRuns; i++) {
+            const schedule = determineSittingSchedule(players, 7, QUARTERS, seasonStats);
+            if (schedule[1].includes('Player 1')) {
+                satQ1Count++;
+            }
+        }
+
+        // Out of 20 runs, Player 1 should avoid Q1
+        expect(satQ1Count).toBe(0);
+    });
+
+    test('rotates goalkeepers across matches to avoid back-to-back keeper duty', () => {
+        // 10 players at 7v7 (1 keeper position per quarter)
+        const players = makeRoster(10);
+        // All players have played 1 keeper quarter across the season,
+        // but Player 1 was keeper in their most recent match while other players were not
+        const seasonStats = {};
+        players.forEach((p, idx) => {
+            seasonStats[p.name] = {
+                goalkeeperQuarters: 1,
+                lastGameKeeper: idx === 0, // only Player 1 was keeper last game
+                gamesPlayed: 2
+            };
+        });
+
+        // Run generations and verify goalkeeper distribution
+        let player1KeeperCount = 0;
+        let player2KeeperCount = 0;
+        const totalRuns = 30;
+
+        for (let i = 0; i < totalRuns; i++) {
+            const result = generate(10, { playersOnField: 7, formation: '2-3-1', players, seasonStats });
+            const p1 = result.players.find(p => p.name === 'Player 1');
+            const p2 = result.players.find(p => p.name === 'Player 2');
+            if (p1.goalieQuarter) player1KeeperCount++;
+            if (p2.goalieQuarter) player2KeeperCount++;
+        }
+
+        // Player 2 (not keeper last game) should be favored over Player 1 (keeper last game)
+        expect(player2KeeperCount).toBeGreaterThan(player1KeeperCount);
+    });
+
+    test('balances season offensive and defensive experience across games', () => {
+        // 9 players at 7v7 2-3-1 (Positions: Keeper, Left Back, Right Back, Left Wing, Right Wing, Center Mid, Striker)
+        const players = makeRoster(9);
+        // Player 1 has played heavy defense over the season (6 defense, 0 offense)
+        // Player 2 has played heavy offense (0 defense, 6 offense)
+        const seasonStats = {
+            'Player 1': { defensiveQuarters: 6, offensiveQuarters: 0, gamesPlayed: 2 },
+            'Player 2': { defensiveQuarters: 0, offensiveQuarters: 6, gamesPlayed: 2 }
+        };
+
+        let p1OffenseTotal = 0;
+        let p2DefenseTotal = 0;
+        const totalRuns = 20;
+
+        for (let i = 0; i < totalRuns; i++) {
+            const result = generate(9, { playersOnField: 7, formation: '2-3-1', players, seasonStats });
+            const p1 = result.players.find(p => p.name === 'Player 1');
+            const p2 = result.players.find(p => p.name === 'Player 2');
+            p1OffenseTotal += p1.offensiveQuarters;
+            p2DefenseTotal += p2.defensiveQuarters;
+        }
+
+        // Over 20 runs, Player 1 (defense-heavy historically) should receive significant offensive minutes
+        // and Player 2 (offense-heavy historically) should receive significant defensive minutes
+        expect(p1OffenseTotal / totalRuns).toBeGreaterThan(1.2);
+        expect(p2DefenseTotal / totalRuns).toBeGreaterThan(1.2);
+    });
+
+    test('allocates extra sitting quarters to players with lowest season sitting average', () => {
+        // 10 players at 7v7 -> total sit slots = (10 - 7) * 4 = 12
+        // Min sits per player = floor(12 / 10) = 1. Two players must sit 2 quarters.
+        const players = makeRoster(10);
+        // Player 1 and Player 2 have sat 0 quarters across 2 games
+        // All other players have sat 2 quarters across 2 games
+        const seasonStats = {};
+        players.forEach((p, idx) => {
+            if (idx < 2) {
+                seasonStats[p.name] = { totalSitting: 0, gamesPlayed: 2 };
+            } else {
+                seasonStats[p.name] = { totalSitting: 2, gamesPlayed: 2 };
+            }
+        });
+
+        for (let i = 0; i < 15; i++) {
+            const schedule = determineSittingSchedule(players, 7, QUARTERS, seasonStats);
+            const sits = {};
+            for (let q = 1; q <= 4; q++) {
+                schedule[q].forEach(name => {
+                    sits[name] = (sits[name] || 0) + 1;
+                });
+            }
+
+            // Player 1 and Player 2 should receive the extra sitting quarters (2 sits each)
+            expect(sits['Player 1']).toBe(2);
+            expect(sits['Player 2']).toBe(2);
+        }
+    });
+});

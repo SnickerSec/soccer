@@ -777,7 +777,7 @@ export default function App() {
       const stats = calculatePlayerStats(curPlayers, gameHistory);
 
       // Select 2 team captains from active players (favoring players who have served as captain least)
-      const statsMap = stats?.players || {};
+      const statsMap = stats || {};
       const activeCandidates = [...activePlayers]
         .map((p) => ({
           name: p.name,
