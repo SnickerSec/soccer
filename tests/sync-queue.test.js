@@ -23,6 +23,10 @@ let gameResult;
 let gameUpdateResult;
 let gameDeleteResult;
 let fixtureResult;
+let fixtureUpdateResult;
+let fixtureDeleteResult;
+/** What the server's schedule holds, for the pull sync() now makes. */
+let serverFixtures;
 
 jest.unstable_mockModule('../src/modules/storage.js', () => ({
     safeGetFromStorage: (key) => (key in store ? store[key] : null),
@@ -58,6 +62,10 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
         calls.push('pull:getGames');
         return { success: true, data: [] };
     },
+    getFixtures: async () => {
+        calls.push('pull:getFixtures');
+        return serverFixtures();
+    },
     replaceRoster: async (teamId, players, expectedVersion, renames) => {
         calls.push(`push:replaceRoster:${players.map(p => p.name).join(',')}`);
         rosterWrites.push({ players, expectedVersion, renames });
@@ -79,7 +87,19 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
         calls.push(`push:deleteGame:${gameId}`);
         return gameDeleteResult(gameId);
     },
-    bulkImportGames: async () => ({ success: true })
+    updateFixture: async (fixtureId, updates) => {
+        calls.push(`push:updateFixture:${fixtureId}`);
+        return fixtureUpdateResult(fixtureId, updates);
+    },
+    deleteFixture: async (fixtureId) => {
+        calls.push(`push:deleteFixture:${fixtureId}`);
+        return fixtureDeleteResult(fixtureId);
+    },
+    bulkImportGames: async () => ({ success: true }),
+    bulkImportFixtures: async (teamId, fixtures) => {
+        calls.push(`push:bulkImportFixtures:${fixtures.map(f => f.opponent).join(',')}`);
+        return { success: true, data: fixtures };
+    }
 }));
 
 /**
@@ -98,6 +118,9 @@ let pushGame;
 let pushGameUpdate;
 let pushGameDelete;
 let pushFixture;
+let pushFixtureUpdate;
+let pushFixtureDelete;
+let sync;
 
 /** Queue entries as pushPlayers/pushGame would have written them offline. */
 function queueOfflineRosterEdit(players) {
@@ -126,6 +149,19 @@ const queuedGameDelete = (id) =>
 const queuedFixture = (fixture) =>
     ({ entityType: 'fixtures', action: 'save', data: fixture, timestamp: 3 });
 
+const queuedFixtureUpdate = (id, updates) =>
+    ({ entityType: 'fixtures', action: 'update', data: { id, updates }, timestamp: 3 });
+
+const queuedFixtureDelete = (id) =>
+    ({ entityType: 'fixtures', action: 'delete', data: { id }, timestamp: 3 });
+
+/** The schedule as this device has it. */
+const localFixtures = () => JSON.parse(store['ayso_schedule_fixtures'] || '[]');
+
+const setLocalFixtures = (fixtures) => {
+    store['ayso_schedule_fixtures'] = JSON.stringify(fixtures);
+};
+
 const remainingQueue = () => JSON.parse(store['ayso_sync_queue']);
 
 /**
@@ -150,11 +186,16 @@ beforeEach(async () => {
     gameUpdateResult = () => ({ success: true });
     gameDeleteResult = () => ({ success: true });
     fixtureResult = (fixture) => ({ success: true, data: { ...fixture, id: 'cloud-fix-1' } });
+    fixtureUpdateResult = () => ({ success: true });
+    fixtureDeleteResult = () => ({ success: true });
+    serverFixtures = () => ({ success: true, data: [] });
     // Set by a completed first sign-in; leaving it unset runs the migration path
     globalThis.localStorage = { getItem: () => 'completed', setItem: () => {} };
     globalThis.navigator = { onLine: true };
-    ({ initSync, processQueue, pushGame, pushGameUpdate, pushGameDelete, pushFixture } =
-        await loadSync());
+    ({
+        initSync, sync, processQueue, pushGame, pushGameUpdate, pushGameDelete,
+        pushFixture, pushFixtureUpdate, pushFixtureDelete
+    } = await loadSync());
 });
 
 describe('initSync', () => {
@@ -166,7 +207,8 @@ describe('initSync', () => {
         expect(calls).toEqual([
             'push:replaceRoster:Edited At The Field',
             'pull:getPlayers',
-            'pull:getGames'
+            'pull:getGames',
+            'pull:getFixtures'
         ]);
     });
 
@@ -183,7 +225,7 @@ describe('initSync', () => {
     test('still pulls when there is nothing queued', async () => {
         await initSync();
 
-        expect(calls).toEqual(['pull:getPlayers', 'pull:getGames']);
+        expect(calls).toEqual(['pull:getPlayers', 'pull:getGames', 'pull:getFixtures']);
     });
 
     test('the pull lands after the push, so local storage ends up current', async () => {
@@ -622,5 +664,288 @@ describe('pushFixture', () => {
         const result = await freshPushFixture({ opponent: 'Rovers' });
 
         expect(result).toEqual({ success: false, error: 'No team selected' });
+    });
+});
+
+/**
+ * Rescheduling and cancelling a match.
+ *
+ * Both used to go straight to the API inside a catch that only logged, so with
+ * no signal the coach was told the match had moved and no one else ever heard.
+ * The delete was worse than lost: sync() now replaces the local schedule with
+ * the server's, so a cancellation that never landed is handed back at the next
+ * pull.
+ */
+describe('pushFixtureUpdate', () => {
+    beforeEach(async () => {
+        await signInWithTeam();
+        setLocalFixtures([{ id: 'cloud-fix-1', opponent: 'Rovers', gameTime: '09:00' }]);
+    });
+
+    test('writes the edit locally and sends it', async () => {
+        const result = await pushFixtureUpdate('cloud-fix-1', { gameTime: '11:30' });
+
+        expect(result.success).toBe(true);
+        expect(calls).toEqual(['push:updateFixture:cloud-fix-1']);
+        expect(localFixtures()[0].gameTime).toBe('11:30');
+    });
+
+    test('offline, the edit is kept locally and queued', async () => {
+        globalThis.navigator = { onLine: false };
+
+        const result = await pushFixtureUpdate('cloud-fix-1', { gameTime: '11:30' });
+
+        expect(result).toEqual({ success: true, queued: true });
+        expect(calls).toEqual([]);
+        expect(localFixtures()[0].gameTime).toBe('11:30');
+        expect(remainingQueue()[0]).toMatchObject({
+            entityType: 'fixtures',
+            action: 'update',
+            data: { id: 'cloud-fix-1', updates: { gameTime: '11:30' } }
+        });
+    });
+
+    test('an edit the server refuses is queued rather than lost', async () => {
+        fixtureUpdateResult = () => ({ success: false, error: 'nope' });
+
+        await pushFixtureUpdate('cloud-fix-1', { gameTime: '11:30' });
+
+        expect(remainingQueue()[0]).toMatchObject({
+            entityType: 'fixtures', action: 'update', data: { id: 'cloud-fix-1' }
+        });
+    });
+
+    test('an edit to a match still queued for creation goes into that entry', async () => {
+        // There is no row to PUT to yet: the server has never seen this match
+        globalThis.navigator = { onLine: false };
+        queueEntries(queuedFixture({ id: 'local-1', opponent: 'Rovers', gameTime: '09:00' }));
+
+        const result = await pushFixtureUpdate('local-1', { gameTime: '11:30' });
+
+        expect(result).toEqual({ success: true, queued: true });
+        expect(remainingQueue()).toHaveLength(1);
+        expect(remainingQueue()[0]).toMatchObject({
+            action: 'save',
+            data: { id: 'local-1', opponent: 'Rovers', gameTime: '11:30' }
+        });
+    });
+
+    test('without a team there is nothing to send it to', async () => {
+        const { pushFixtureUpdate: freshUpdate } = await loadSync();
+
+        const result = await freshUpdate('cloud-fix-1', { gameTime: '11:30' });
+
+        expect(result).toEqual({ success: false, error: 'No team selected' });
+    });
+});
+
+describe('pushFixtureDelete', () => {
+    beforeEach(async () => {
+        await signInWithTeam();
+        setLocalFixtures([
+            { id: 'cloud-fix-1', opponent: 'Rovers' },
+            { id: 'cloud-fix-2', opponent: 'City' }
+        ]);
+    });
+
+    test('removes it here and asks the server to remove it there', async () => {
+        const result = await pushFixtureDelete('cloud-fix-1');
+
+        expect(result).toEqual({ success: true });
+        expect(calls).toEqual(['push:deleteFixture:cloud-fix-1']);
+        expect(localFixtures().map(f => f.id)).toEqual(['cloud-fix-2']);
+    });
+
+    test('offline, the delete is queued so the match does not come back', async () => {
+        globalThis.navigator = { onLine: false };
+
+        const result = await pushFixtureDelete('cloud-fix-1');
+
+        expect(result).toEqual({ success: true, queued: true });
+        expect(localFixtures().map(f => f.id)).toEqual(['cloud-fix-2']);
+        expect(remainingQueue()[0]).toMatchObject({
+            entityType: 'fixtures', action: 'delete', data: { id: 'cloud-fix-1' }
+        });
+    });
+
+    test('a match the server never saw takes its queued creation with it', async () => {
+        globalThis.navigator = { onLine: false };
+        queueEntries(queuedFixture({ id: 'local-1', opponent: 'Wanderers' }));
+
+        const result = await pushFixtureDelete('local-1');
+
+        expect(result).toEqual({ success: true, queued: false });
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a match already gone from the server is not retried', async () => {
+        fixtureDeleteResult = () => ({ success: false, status: 404, error: 'Fixture not found' });
+
+        const result = await pushFixtureDelete('cloud-fix-1');
+
+        expect(result.success).toBe(true);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a delete the server failed on is queued for the next drain', async () => {
+        fixtureDeleteResult = () => ({ success: false, status: 500, error: 'boom' });
+
+        await pushFixtureDelete('cloud-fix-1');
+
+        expect(remainingQueue()[0]).toMatchObject({
+            entityType: 'fixtures', action: 'delete', data: { id: 'cloud-fix-1' }
+        });
+    });
+});
+
+describe('processQueue and schedule edits', () => {
+    beforeEach(signInWithTeam);
+
+    test('replays a queued edit', async () => {
+        queueEntries(queuedFixtureUpdate('cloud-fix-1', { gameTime: '11:30' }));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(calls).toEqual(['push:updateFixture:cloud-fix-1']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('replays a queued delete', async () => {
+        queueEntries(queuedFixtureDelete('cloud-fix-1'));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(calls).toEqual(['push:deleteFixture:cloud-fix-1']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('drops an edit to a match that has since been deleted', async () => {
+        fixtureUpdateResult = () => ({ success: false, status: 404, error: 'Fixture not found' });
+        queueEntries(queuedFixtureUpdate('cloud-fix-1', { gameTime: '11:30' }));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('keeps an edit the server failed on', async () => {
+        fixtureUpdateResult = () => ({ success: false, status: 500, error: 'boom' });
+        queueEntries(queuedFixtureUpdate('cloud-fix-1', { gameTime: '11:30' }));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(0);
+        expect(remainingQueue()).toHaveLength(1);
+    });
+
+    test('a replayed creation leaves the local match holding the server id', async () => {
+        // Without this the next edit or delete quotes 'local-1', which the
+        // server 404s — and the pull hands the match straight back
+        setLocalFixtures([{ id: 'local-1', opponent: 'Rovers' }]);
+        queueEntries(queuedFixture({ id: 'local-1', opponent: 'Rovers' }));
+
+        await processQueue();
+
+        expect(localFixtures()).toEqual([{ id: 'cloud-fix-1', opponent: 'Rovers' }]);
+    });
+});
+
+/**
+ * The schedule on the wire.
+ *
+ * It used to be fetched only when the team was switched, and adopted only when
+ * the server had at least one match — so a match another coach deleted never
+ * went away here, and one they added did not arrive until the coach happened
+ * to switch teams and back.
+ */
+describe('sync and the schedule', () => {
+    beforeEach(signInWithTeam);
+
+    test('the server list replaces the local one', async () => {
+        setLocalFixtures([{ id: 'cloud-fix-1', opponent: 'Rovers', gameTime: '09:00' }]);
+        serverFixtures = () => ({
+            success: true,
+            data: [{ id: 'cloud-fix-1', opponent: 'Rovers', gameTime: '11:30' }]
+        });
+
+        const result = await sync();
+
+        expect(result.fixtures).toEqual([{ id: 'cloud-fix-1', opponent: 'Rovers', gameTime: '11:30' }]);
+        expect(localFixtures()[0].gameTime).toBe('11:30');
+    });
+
+    test('a match deleted elsewhere goes away here, even as the last one', async () => {
+        setLocalFixtures([{ id: 'cloud-fix-1', opponent: 'Rovers' }]);
+        serverFixtures = () => ({ success: true, data: [] });
+
+        await sync();
+
+        expect(localFixtures()).toEqual([]);
+    });
+
+    test('a schedule the server could not give up leaves the local one alone', async () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        setLocalFixtures([{ id: 'cloud-fix-1', opponent: 'Rovers' }]);
+        serverFixtures = () => ({ success: false, error: 'boom' });
+
+        const result = await sync();
+
+        // The roster and the history are what the app is for: they still synced
+        expect(result.success).toBe(true);
+        expect(result.fixtures).toBeUndefined();
+        expect(localFixtures()).toEqual([{ id: 'cloud-fix-1', opponent: 'Rovers' }]);
+        warn.mockRestore();
+    });
+
+    test('a pull tells its listeners local storage is the newer copy', async () => {
+        // How the app knows to read the schedule back; a push reports SYNCED
+        // too, and re-reading on one of those would race the state being pushed
+        const seen = [];
+        const { initSync: freshInit } = await loadSync();
+        await freshInit((status, meta) => seen.push([status, meta?.pulled]));
+
+        expect(seen).toContainEqual(['synced', true]);
+        expect(seen).not.toContainEqual(['syncing', true]);
+    });
+});
+
+/**
+ * The schedule a coach built before they ever signed in.
+ *
+ * sync() replaces the local schedule with the server's, so a season planned
+ * offline would be pulled out from under them on the first sync if the
+ * migration did not send it up first.
+ */
+describe('migrating the schedule on first sign-in', () => {
+    beforeEach(() => {
+        globalThis.localStorage = { getItem: () => null, setItem: () => {} };
+    });
+
+    test('the local schedule is uploaded before the first pull', async () => {
+        setLocalFixtures([
+            { id: 'local-1', opponent: 'Rovers', gameDate: '2026-09-12' }
+        ]);
+
+        await initSync();
+
+        expect(calls).toContain('push:bulkImportFixtures:Rovers');
+        expect(calls.indexOf('push:bulkImportFixtures:Rovers'))
+            .toBeLessThan(calls.indexOf('pull:getFixtures'));
+    });
+
+    test('a match the server would refuse does not cost the coach the rest', async () => {
+        // The bulk route rejects the whole batch over one bad row
+        setLocalFixtures([
+            { id: 'local-1', opponent: '', gameDate: '2026-09-12' },
+            { id: 'local-2', opponent: 'Rovers', gameDate: '2026-09-19' },
+            { id: 'local-3', opponent: 'City', gameDate: 'some evening' }
+        ]);
+
+        await initSync();
+
+        expect(calls).toContain('push:bulkImportFixtures:Rovers');
     });
 });

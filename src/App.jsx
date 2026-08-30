@@ -52,6 +52,8 @@ import {
   pushGameUpdate,
   pushGameDelete,
   pushFixture,
+  pushFixtureUpdate,
+  pushFixtureDelete,
   getSyncStatus,
   getCurrentTeamId,
   setCurrentTeam,
@@ -62,11 +64,6 @@ import {
   getInviteTokenFromUrl,
   clearInviteTokenFromUrl,
 } from '@/modules/team-manager';
-import {
-  getFixtures,
-  updateFixture as updateFixtureInCloud,
-  deleteFixture as deleteFixtureFromCloud,
-} from '@/modules/cloud-storage';
 import {
   downloadTextFile,
   lineupCsv,
@@ -81,6 +78,21 @@ import { generateMatchCardPdf } from '@/modules/match-card-pdf';
 import { extractPlayersFromFile } from '@/modules/roster-importer';
 import { buildShareUrl, decodeShareData } from '@/modules/share-link';
 import { toast } from 'sonner';
+
+/**
+ * The schedule as localStorage has it.
+ *
+ * sync() writes the server's copy there, so this is also how a pull reaches
+ * the screen: read it again once the sync that ran at sign-in or on a team
+ * switch has finished.
+ */
+function readStoredFixtures() {
+  const saved = safeParseJSON(
+    safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SCHEDULE),
+    []
+  );
+  return Array.isArray(saved) ? saved : [];
+}
 
 export default function App() {
   // Navigation
@@ -133,13 +145,7 @@ export default function App() {
   });
 
   // Match Schedule Fixtures
-  const [fixtures, setFixtures] = useState(() => {
-    const saved = safeParseJSON(
-      safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SCHEDULE),
-      []
-    );
-    return Array.isArray(saved) ? saved : [];
-  });
+  const [fixtures, setFixtures] = useState(readStoredFixtures);
 
   // Auth & Teams
   const [currentUser, setCurrentUser] = useState(null);
@@ -358,9 +364,17 @@ export default function App() {
         });
         if (!testAuthUserRef.current && user) {
           setCurrentUser(user);
-          await initSync((status) => {
+          await initSync((status, meta) => {
             setSyncStatus(status);
+            // A pull — from the online handler as much as from startup — has
+            // just replaced the stored schedule with the server's.
+            if (meta?.pulled) {
+              setFixtures(readStoredFixtures());
+            }
           });
+          // initSync drains the queue and pulls; the schedule it wrote is
+          // newer than the one this component read when it mounted.
+          setFixtures(readStoredFixtures());
           await refreshTeams();
         }
       } catch (err) {
@@ -494,18 +508,11 @@ export default function App() {
       []
     );
     setGameHistory(localHistory);
-    const localFixtures = safeParseJSON(
-      safeGetFromStorage(CONSTANTS.STORAGE_KEYS.SCHEDULE),
-      []
-    );
-    setFixtures(localFixtures);
-    if (teamId) {
-      getFixtures(teamId).then((res) => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setFixtures(res.data);
-        }
-      }).catch(() => {});
-    }
+    // sync() has already pulled this team's schedule into localStorage. The
+    // fetch that used to live here adopted the cloud list only when it had at
+    // least one match in it, so a team whose last match another coach deleted
+    // kept showing the one this device remembered.
+    setFixtures(readStoredFixtures());
     toast.success(`Switched to ${selected?.name || 'team'}`);
   };
 
@@ -1109,11 +1116,11 @@ export default function App() {
         prev.map((f) => (f.id === fixtureData.id ? { ...f, ...fixtureData, updatedAt: new Date().toISOString() } : f))
       );
       if (currentUser && currentTeam) {
-        try {
-          await updateFixtureInCloud(fixtureData.id, fixtureData);
-        } catch (e) {
-          console.error('Failed to update cloud fixture:', e);
-        }
+        // Through the sync engine, like a game edit: the call this replaced
+        // went straight to the API inside a catch that only logged, so a match
+        // rescheduled with no signal never left the device — and the next pull
+        // put the old kick-off time back.
+        pushFixtureUpdate(fixtureData.id, fixtureData).catch(() => {});
       }
     } else {
       const newFixture = {
@@ -1146,11 +1153,9 @@ export default function App() {
     }
     setFixtures((prev) => prev.filter((f) => f.id !== fixture.id));
     if (currentUser && currentTeam && fixture.id) {
-      try {
-        await deleteFixtureFromCloud(fixture.id);
-      } catch (e) {
-        console.error('Failed to delete cloud fixture:', e);
-      }
+      // Queues the delete when there is no signal, and drops the creation
+      // instead if the match has not reached the server yet.
+      pushFixtureDelete(fixture.id).catch(() => {});
     }
     toast.info('Match deleted');
   };

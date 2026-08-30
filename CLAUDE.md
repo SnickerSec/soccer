@@ -262,6 +262,41 @@ elsewhere, and there is nothing left to edit or remove. `api-client.js`
 therefore puts the HTTP status on a failed response, so the queue can tell that
 apart from a 500 it must keep.
 
+### The match schedule
+
+The schedule is the most collaborative thing in the app — several coaches and a
+snack rota — and it was the last entity still half offline-first. Creating a
+match was queued; editing and deleting went straight to the API inside a catch
+that only logged, so on the touchline they applied to the device and to nobody
+else. `pushFixtureUpdate` and `pushFixtureDelete` in `src/modules/sync.js` are
+the way to change one now, mirroring the game pair down to folding an edit into
+a creation that is still queued, dropping the creation when the match is
+deleted before it ever replayed, and counting a 404 as done.
+
+`sync()` pulls the schedule with the roster and the history, and the server's
+list replaces the local one outright. It used to be fetched only on a team
+switch, and adopted only when the server had at least one match — so a
+cancellation made on another device could never arrive: the match came back
+every time, and a team whose last match was deleted kept showing it forever.
+
+Two things follow from the pull being authoritative. `migrateLocalDataToCloud`
+uploads the schedule, or a season planned before signing in would be pulled out
+from under the coach on their first sync; matches the bulk route would reject
+are left behind rather than failing the batch and costing them the rest.
+And a queued creation adopts the id the server issues when it replays
+(`adoptFixtureId`) — without that the local copy keeps the id this device made
+up, every later edit or delete 404s against it, and the pull hands the match
+back.
+
+A fixtures pull that fails is not fatal: the roster and the season history are
+what the app is for, and refusing to sync them because the schedule 500'd is
+the worse trade. The local schedule stands until the next try.
+
+Sync listeners are told `pulled: true` when local storage has just been
+replaced by the server's copy, which is App's cue to read the schedule back.
+A push reports `synced` too, and re-reading on one of those would race the
+state being pushed.
+
 ### Renaming a player
 
 Nothing carries a player id. `players` is keyed `UNIQUE(team_id, name)`, the

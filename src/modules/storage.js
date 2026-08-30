@@ -40,6 +40,7 @@ export function safeRemoveFromStorage(key) {
 const TEAM_SCOPED_KEYS = [
     'ayso_players',
     'ayso_lineup_history',
+    'ayso_schedule_fixtures',
     'ayso_settings',
     'ayso_sync_queue',
     'ayso_migration_status',

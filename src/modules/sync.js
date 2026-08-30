@@ -7,7 +7,8 @@ import { isAuthenticated } from './api-client.js';
 import { getCurrentUser, getUserSettings, updateUserSettings } from './auth.js';
 import {
     getTeams, createTeam, getPlayers, replaceRoster,
-    getGames, saveGame, updateGame, deleteGame, bulkImportGames, saveFixture
+    getGames, saveGame, updateGame, deleteGame, bulkImportGames,
+    getFixtures, saveFixture, updateFixture, deleteFixture, bulkImportFixtures
 } from './cloud-storage.js';
 import { safeGetFromStorage, safeSetToStorage, safeParseJSON } from './storage.js';
 import { mergeRosters } from './roster-merge.js';
@@ -98,11 +99,11 @@ export async function initSync(onStatusChange) {
 /**
  * Update sync status and notify listeners
  */
-function updateStatus(status) {
+function updateStatus(status, extra = {}) {
     syncStatus = status;
     syncListeners.forEach(listener => {
         try {
-            listener(status, { teamId: currentTeamId, lastSync: lastSyncTime });
+            listener(status, { teamId: currentTeamId, lastSync: lastSyncTime, ...extra });
         } catch (error) {
             console.error('Sync listener error:', error);
         }
@@ -173,9 +174,10 @@ export async function sync() {
 
     try {
         // Pull data from cloud
-        const [playersResult, gamesResult] = await Promise.all([
+        const [playersResult, gamesResult, fixturesResult] = await Promise.all([
             getPlayers(currentTeamId),
-            getGames(currentTeamId)
+            getGames(currentTeamId),
+            getFixtures(currentTeamId)
         ]);
 
         if (!playersResult.success || !gamesResult.success) {
@@ -190,16 +192,42 @@ export async function sync() {
         safeSetToStorage('ayso_players', JSON.stringify(playersResult.data));
         safeSetToStorage('ayso_lineup_history', JSON.stringify(gamesResult.data));
 
+        // The schedule is pulled with the rest so a match another coach added —
+        // or cancelled — arrives on an ordinary sync. It used to be fetched
+        // only when the team was switched, and only adopted when the server
+        // had at least one match, so a deletion made on another device could
+        // never reach this one: the match came back every time.
+        //
+        // The server's list replaces the local one outright, as history does.
+        // Anything on the device that the cloud has not got is therefore gone,
+        // which is why migrateLocalDataToCloud uploads the schedule a coach
+        // built before they signed in.
+        let fixtures;
+        if (fixturesResult.success && Array.isArray(fixturesResult.data)) {
+            fixtures = fixturesResult.data;
+            writeLocalFixtures(fixtures);
+        } else {
+            // Not fatal: the roster and the season history are what the app is
+            // for, and refusing to sync them because the schedule failed would
+            // be the worse trade. The local schedule stands until the next try.
+            console.warn('Sync: could not pull the schedule:', fixturesResult.error);
+        }
+
         // What the next write will claim to be built on
         rememberRoster(playersResult.data, playersResult.version);
 
         lastSyncTime = new Date();
-        updateStatus(SYNC_STATUS.SYNCED);
+        // `pulled` tells a listener that local storage now holds the server's
+        // copy rather than the screen's — the app reloads the schedule from it.
+        // A push reports SYNCED too, and re-reading on one of those would race
+        // the state that is being pushed.
+        updateStatus(SYNC_STATUS.SYNCED, { pulled: true });
 
         return {
             success: true,
             players: playersResult.data,
-            games: gamesResult.data
+            games: gamesResult.data,
+            fixtures
         };
     } catch (error) {
         console.error('Sync error:', error);
@@ -339,16 +367,17 @@ function writeLocalGames(games) {
 }
 
 /**
- * Folds an edit into a game that is still queued for creation, if it is.
+ * Folds an edit into a record that is still queued for creation, if it is.
  *
  * A game saved at the field and edited before the signal came back has never
  * been seen by the server, so there is no row to PUT to: the edit belongs in
- * the creation that has yet to replay. Returns whether it found one.
+ * the creation that has yet to replay. Returns whether it found one. A match
+ * added to the schedule offline and then rescheduled is the same story.
  */
-function editQueuedSave(gameId, updates) {
+function editQueuedSave(entityType, id, updates) {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
     const entry = queue.find(item =>
-        item.entityType === 'games' && item.action === 'save' && item.data?.id === gameId
+        item.entityType === entityType && item.action === 'save' && item.data?.id === id
     );
     if (!entry) return false;
 
@@ -358,16 +387,16 @@ function editQueuedSave(gameId, updates) {
 }
 
 /**
- * Drops a queued creation for a game that has since been deleted.
+ * Drops a queued creation for a record that has since been deleted.
  *
  * Replaying it would create the game in the cloud seconds before the delete
  * removed it again — or, if the delete could not be queued against an id the
  * server never issued, leave it there for good.
  */
-function dropQueuedSave(gameId) {
+function dropQueuedSave(entityType, id) {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
     const remaining = queue.filter(item => !(
-        item.entityType === 'games' && item.data?.id === gameId
+        item.entityType === entityType && item.data?.id === id
     ));
     if (remaining.length === queue.length) return false;
 
@@ -441,7 +470,7 @@ export async function pushGameUpdate(gameId, updates) {
         return { success: false, error: 'No team selected' };
     }
 
-    if (editQueuedSave(gameId, updates)) {
+    if (editQueuedSave('games', gameId, updates)) {
         return { success: true, queued: true };
     }
 
@@ -489,7 +518,7 @@ export async function pushGameDelete(gameId) {
     }
 
     // Never created up there: dropping the queued creation is the whole job.
-    if (dropQueuedSave(gameId)) {
+    if (dropQueuedSave('games', gameId)) {
         return { success: true, queued: false };
     }
 
@@ -518,6 +547,15 @@ export async function pushGameDelete(gameId) {
     }
 }
 
+/** The match schedule as it stands on this device. */
+function readLocalFixtures() {
+    return safeParseJSON(safeGetFromStorage('ayso_schedule_fixtures'), []);
+}
+
+function writeLocalFixtures(fixtures) {
+    safeSetToStorage('ayso_schedule_fixtures', JSON.stringify(fixtures));
+}
+
 /**
  * Push a fixture to cloud, or queue it until there is a connection.
  *
@@ -526,9 +564,6 @@ export async function pushGameDelete(gameId) {
  * already safe on the device by the time this is called. What was missing was
  * the other half — with no signal the write simply failed, and a match added
  * on the touchline never reached the coaches who were not there.
- *
- * Only creating is queued, matching games: an edit or a delete made offline
- * still applies locally and is lost to the cloud.
  */
 export async function pushFixture(fixture) {
     if (!currentTeamId) {
@@ -557,6 +592,118 @@ export async function pushFixture(fixture) {
         updateStatus(SYNC_STATUS.ERROR);
         return { success: false, error: error.message };
     }
+}
+
+/**
+ * Change a match on the schedule — its time, its pitch, whose turn the snacks
+ * are — everywhere it is kept.
+ *
+ * The edit went straight to the server inside a catch that only logged, so on
+ * the touchline with no signal the coach was told the match had moved and no
+ * one else ever heard. It is queued now, the way a game edit is.
+ */
+export async function pushFixtureUpdate(fixtureId, updates) {
+    const fixtures = readLocalFixtures();
+    const index = fixtures.findIndex(f => f.id === fixtureId);
+    if (index >= 0) {
+        fixtures[index] = { ...fixtures[index], ...updates };
+        writeLocalFixtures(fixtures);
+    }
+
+    if (!currentTeamId) {
+        return { success: false, error: 'No team selected' };
+    }
+
+    if (editQueuedSave('fixtures', fixtureId, updates)) {
+        return { success: true, queued: true };
+    }
+
+    if (!navigator.onLine || !await isAuthenticated()) {
+        queueChange('fixtures', 'update', { id: fixtureId, updates });
+        return { success: true, queued: true };
+    }
+
+    updateStatus(SYNC_STATUS.SYNCING);
+
+    try {
+        const result = await updateFixture(fixtureId, updates);
+        if (!result.success) {
+            // Queued rather than dropped: the edit is already on the device,
+            // and the coach was told it was saved.
+            queueChange('fixtures', 'update', { id: fixtureId, updates });
+            updateStatus(SYNC_STATUS.ERROR);
+            return result;
+        }
+
+        lastSyncTime = new Date();
+        updateStatus(SYNC_STATUS.SYNCED);
+        return result;
+    } catch (error) {
+        queueChange('fixtures', 'update', { id: fixtureId, updates });
+        updateStatus(SYNC_STATUS.ERROR);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Remove a match from the schedule, on the device and in the cloud.
+ *
+ * Now that sync() pulls the schedule and replaces the local copy with it, a
+ * delete that never reached the server is not merely invisible to the other
+ * coaches: the next pull hands the cancelled match straight back.
+ */
+export async function pushFixtureDelete(fixtureId) {
+    writeLocalFixtures(readLocalFixtures().filter(f => f.id !== fixtureId));
+
+    if (!currentTeamId) {
+        return { success: false, error: 'No team selected' };
+    }
+
+    // Never created up there: dropping the queued creation is the whole job.
+    if (dropQueuedSave('fixtures', fixtureId)) {
+        return { success: true, queued: false };
+    }
+
+    if (!navigator.onLine || !await isAuthenticated()) {
+        queueChange('fixtures', 'delete', { id: fixtureId });
+        return { success: true, queued: true };
+    }
+
+    updateStatus(SYNC_STATUS.SYNCING);
+
+    try {
+        const result = await deleteFixture(fixtureId);
+        // A 404 is another coach having deleted it first, which is the outcome
+        // this was asking for.
+        if (!result.success && result.status !== 404) {
+            queueChange('fixtures', 'delete', { id: fixtureId });
+            updateStatus(SYNC_STATUS.ERROR);
+            return result;
+        }
+
+        lastSyncTime = new Date();
+        updateStatus(SYNC_STATUS.SYNCED);
+        return { success: true };
+    } catch (error) {
+        queueChange('fixtures', 'delete', { id: fixtureId });
+        updateStatus(SYNC_STATUS.ERROR);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Swaps the id this device invented for the one the server issued, once a
+ * queued match has replayed.
+ */
+function adoptFixtureId(localId, saved) {
+    if (!localId || !saved?.id || saved.id === localId) return;
+
+    const fixtures = readLocalFixtures();
+    const index = fixtures.findIndex(f => f.id === localId);
+    if (index < 0) return;
+
+    fixtures[index] = { ...fixtures[index], ...saved };
+    writeLocalFixtures(fixtures);
 }
 
 /**
@@ -641,11 +788,31 @@ export async function processQueue() {
                     remaining.push(item);
                 }
             } else if (item.entityType === 'fixtures' && item.action === 'save') {
-                // The server assigns the id, so the replayed fixture comes back
-                // as a new row; the local copy is replaced by the cloud list
-                // the next time the schedule is loaded, as a game's is.
                 const result = await saveFixture(currentTeamId, item.data);
                 if (result.success) {
+                    // The server issues the id, and the local copy still
+                    // holds the one this device made up. Adopting
+                    // the real one here is what lets a later edit or delete
+                    // name a row the server has heard of — without it they
+                    // 404, and the pull hands the match back.
+                    adoptFixtureId(item.data?.id, result.data);
+                    processed++;
+                } else {
+                    remaining.push(item);
+                }
+            } else if (item.entityType === 'fixtures' && item.action === 'update') {
+                const result = await updateFixture(item.data.id, item.data.updates);
+                // A 404 means the match has since been deleted, by this coach
+                // on another device or by another coach. There is nothing left
+                // to edit, so the entry is done rather than retried forever.
+                if (result.success || result.status === 404) {
+                    processed++;
+                } else {
+                    remaining.push(item);
+                }
+            } else if (item.entityType === 'fixtures' && item.action === 'delete') {
+                const result = await deleteFixture(item.data.id);
+                if (result.success || result.status === 404) {
                     processed++;
                 } else {
                     remaining.push(item);
@@ -678,10 +845,11 @@ async function migrateLocalDataToCloud() {
 
     const localPlayers = safeParseJSON(safeGetFromStorage('ayso_players'), []);
     const localGames = safeParseJSON(safeGetFromStorage('ayso_lineup_history'), []);
+    const localFixtures = readLocalFixtures();
     const localSettings = safeParseJSON(safeGetFromStorage('ayso_settings'), {});
 
     // Skip if no data to migrate
-    if (localPlayers.length === 0 && localGames.length === 0) {
+    if (localPlayers.length === 0 && localGames.length === 0 && localFixtures.length === 0) {
         localStorage.setItem('ayso_migration_status', 'completed');
         return;
     }
@@ -716,6 +884,22 @@ async function migrateLocalDataToCloud() {
         // Migrate games
         if (localGames.length > 0) {
             await bulkImportGames(currentTeamId, localGames);
+        }
+
+        // Migrate the schedule. This matters more than it looks: sync() now
+        // replaces the local schedule with the server's, so a season a coach
+        // planned before signing in would be pulled out from under them on the
+        // first sync if it were not sent up here first.
+        //
+        // A match the server would reject takes the whole batch down with it,
+        // so the ones it cannot accept are left behind rather than costing the
+        // coach the rest of the season.
+        const migratable = localFixtures.filter(f => (
+            f && typeof f.opponent === 'string' && f.opponent.trim()
+            && typeof f.gameDate === 'string' && !Number.isNaN(Date.parse(f.gameDate))
+        ));
+        if (migratable.length > 0) {
+            await bulkImportFixtures(currentTeamId, migratable);
         }
 
         // Save user settings
