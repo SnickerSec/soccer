@@ -19,6 +19,16 @@ import { ShareLineupDialog } from '@/components/ShareLineupDialog';
 import { Footer } from '@/components/Footer';
 import { PrintSheet } from '@/components/PrintSheet';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { CONSTANTS } from '@/constants';
 import { UndoHistory } from '@/modules/history';
@@ -176,6 +186,7 @@ export default function App() {
   const [notesModalGame, setNotesModalGame] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   // Undo / Redo History
   const historyRef = useRef(new UndoHistory({ limit: CONSTANTS.MAX_UNDO_STACK_SIZE }));
@@ -774,14 +785,18 @@ export default function App() {
   };
 
   const handleClearAll = () => {
-    if (!confirm('Are you sure you want to clear all players and reset the roster?')) {
-      return;
-    }
-    saveSnapshot();
-    setPlayers([]);
-    setCaptains([]);
-    setLineup(null);
-    toast.info('Cleared all players');
+    setConfirmDialog({
+      title: 'Clear Roster?',
+      description: 'Are you sure you want to clear all players and reset the roster?',
+      confirmText: 'Clear Roster',
+      onConfirm: () => {
+        saveSnapshot();
+        setPlayers([]);
+        setCaptains([]);
+        setLineup(null);
+        toast.info('Cleared all players');
+      },
+    });
   };
 
   const handleLoadDemo = () => {
@@ -1122,25 +1137,30 @@ export default function App() {
     toast.success(`Saved game: "${name}"`);
   };
 
-  const handleDeleteGame = async (gameId) => {
-    if (!confirm('Are you sure you want to delete this game record?')) return;
+  const handleDeleteGame = (gameId) => {
+    setConfirmDialog({
+      title: 'Delete Game Record?',
+      description: 'Are you sure you want to delete this game record from season history?',
+      confirmText: 'Delete Game',
+      onConfirm: async () => {
+        setGameHistory((prev) => {
+          const updated = prev.filter((g) => g.id !== gameId);
+          safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(updated));
+          return updated;
+        });
 
-    setGameHistory((prev) => {
-      const updated = prev.filter((g) => g.id !== gameId);
-      safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(updated));
-      return updated;
+        if (currentUser && currentTeam) {
+          // pushGameDelete quotes the game's own id — the call here passed the
+          // team's, so the row survived and the next sync brought it back — and
+          // queues the delete when there is no signal to send it over.
+          try {
+            await pushGameDelete(gameId);
+          } catch (e) {}
+        }
+
+        toast.info('Game deleted');
+      },
     });
-
-    if (currentUser && currentTeam) {
-      // pushGameDelete quotes the game's own id — the call here passed the
-      // team's, so the row survived and the next sync brought it back — and
-      // queues the delete when there is no signal to send it over.
-      try {
-        await pushGameDelete(gameId);
-      } catch (e) {}
-    }
-
-    toast.info('Game deleted');
   };
 
   const handleSaveNotes = (gameId, notes) => {
@@ -1172,11 +1192,15 @@ export default function App() {
   };
 
   const handleClearSeasonHistory = () => {
-    if (!confirm('Are you sure you want to permanently clear all season game history?')) {
-      return;
-    }
-    setGameHistory([]);
-    toast.info('Season history cleared');
+    setConfirmDialog({
+      title: 'Clear Season History?',
+      description: 'Are you sure you want to permanently clear all season game history?',
+      confirmText: 'Clear History',
+      onConfirm: () => {
+        setGameHistory([]);
+        toast.info('Season history cleared');
+      },
+    });
   };
 
   // Schedule & Fixture handlers
@@ -1227,17 +1251,21 @@ export default function App() {
     }
   };
 
-  const handleDeleteFixture = async (fixture) => {
-    if (!confirm(`Are you sure you want to delete match vs "${fixture.opponent}"?`)) {
-      return;
-    }
-    setFixtures((prev) => prev.filter((f) => f.id !== fixture.id));
-    if (currentUser && currentTeam && fixture.id) {
-      // Queues the delete when there is no signal, and drops the creation
-      // instead if the match has not reached the server yet.
-      pushFixtureDelete(fixture.id).catch(() => {});
-    }
-    toast.info('Match deleted');
+  const handleDeleteFixture = (fixture) => {
+    setConfirmDialog({
+      title: 'Delete Match?',
+      description: `Are you sure you want to delete match vs "${fixture.opponent}"?`,
+      confirmText: 'Delete Match',
+      onConfirm: async () => {
+        setFixtures((prev) => prev.filter((f) => f.id !== fixture.id));
+        if (currentUser && currentTeam && fixture.id) {
+          // Queues the delete when there is no signal, and drops the creation
+          // instead if the match has not reached the server yet.
+          pushFixtureDelete(fixture.id).catch(() => {});
+        }
+        toast.info('Match deleted');
+      },
+    });
   };
 
   const handleGenerateLineupForFixture = (fixture) => {
@@ -1589,6 +1617,39 @@ export default function App() {
         shareUrl={shareUrl}
         onClose={() => setShareUrl(null)}
       />
+
+      <AlertDialog
+        open={Boolean(confirmDialog)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDialog(null);
+        }}
+      >
+        {confirmDialog && (
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {confirmDialog.description}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setConfirmDialog(null)}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant={confirmDialog.variant || 'destructive'}
+                onClick={() => {
+                  const cb = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  if (cb) cb();
+                }}
+              >
+                {confirmDialog.confirmText || 'Confirm'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        )}
+      </AlertDialog>
     </div>
   );
 }

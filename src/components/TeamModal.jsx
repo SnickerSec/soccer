@@ -6,6 +6,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -119,41 +129,48 @@ export function TeamModal({
     setView('edit');
   };
 
-  const handleSaveTeam = async (e) => {
+  const handleCreateTeam = async (e) => {
     e.preventDefault();
     if (!teamNameInput.trim()) return;
 
     setIsSubmitting(true);
     try {
-      if (selectedTeam) {
-        // Update existing team
-        const res = await updateTeam(selectedTeam.id, {
-          name: teamNameInput.trim(),
-          ageDivision: teamDivisionInput,
-        });
-        if (res.success) {
-          toast.success('Team updated successfully');
-          onTeamsUpdated();
-          setView('list');
-        } else {
-          toast.error(res.error || 'Failed to update team');
-        }
+      const res = await createTeam(teamNameInput.trim(), teamDivisionInput);
+      if (res.success) {
+        toast.success(`Team "${teamNameInput.trim()}" created!`);
+        onTeamsUpdated();
+        onSelectTeam(res.data.id);
+        onClose();
       } else {
-        // Create new team
-        const res = await createTeam(teamNameInput.trim(), teamDivisionInput);
-        if (res.success) {
-          toast.success('Team created successfully');
-          onTeamsUpdated();
-          if (res.data?.id) {
-            onSelectTeam(res.data.id);
-          }
-          setView('list');
-        } else {
-          toast.error(res.error || 'Failed to create team');
-        }
+        toast.error(res.error || 'Failed to create team');
       }
-    } catch (error) {
-      toast.error('An error occurred');
+    } catch (e) {
+      toast.error('Failed to create team');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateTeam = async (e) => {
+    e.preventDefault();
+    if (!teamNameInput.trim() || !selectedTeam) return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await updateTeam(selectedTeam.id, {
+        name: teamNameInput.trim(),
+        ageDivision: teamDivisionInput,
+      });
+      if (res.success) {
+        toast.success('Team updated!');
+        onTeamsUpdated();
+        setSelectedTeam(res.data);
+        setView('details');
+      } else {
+        toast.error(res.error || 'Failed to update team');
+      }
+    } catch (e) {
+      toast.error('Failed to update team');
     } finally {
       setIsSubmitting(false);
     }
@@ -163,9 +180,10 @@ export function TeamModal({
     if (!selectedTeam) return;
     try {
       const res = await generateInviteLink(selectedTeam.id, inviteRole);
-      if (res.success && res.data?.inviteUrl) {
-        setInviteLink(res.data.inviteUrl);
-        toast.success('Invite link generated');
+      if (res.success && res.data) {
+        const origin = window.location.origin;
+        setInviteLink(`${origin}/?invite=${res.data.token}`);
+        toast.success('Invite link generated!');
       } else {
         toast.error(res.error || 'Failed to generate invite');
       }
@@ -181,57 +199,72 @@ export function TeamModal({
     }
   };
 
-  const handleRemoveMember = async (memberId) => {
+  const handleRemoveMember = (memberId) => {
     if (!selectedTeam) return;
-    if (!confirm('Are you sure you want to remove this member?')) return;
-
-    try {
-      const res = await removeMember(selectedTeam.id, memberId);
-      if (res.success) {
-        toast.success('Member removed');
-        setMembers((prev) => prev.filter((m) => m.id !== memberId));
-      } else {
-        toast.error(res.error || 'Failed to remove member');
-      }
-    } catch (e) {
-      toast.error('Failed to remove member');
-    }
+    setConfirmDialog({
+      title: 'Remove Member?',
+      description: 'Are you sure you want to remove this member from the team?',
+      confirmText: 'Remove Member',
+      onConfirm: async () => {
+        try {
+          const res = await removeMember(selectedTeam.id, memberId);
+          if (res.success) {
+            toast.success('Member removed');
+            setMembers((prev) => prev.filter((m) => m.id !== memberId));
+          } else {
+            toast.error(res.error || 'Failed to remove member');
+          }
+        } catch (e) {
+          toast.error('Failed to remove member');
+        }
+      },
+    });
   };
 
-  const handleLeaveTeam = async () => {
+  const handleLeaveTeam = () => {
     if (!selectedTeam) return;
-    if (!confirm(`Are you sure you want to leave ${selectedTeam.name}?`)) return;
-
-    try {
-      const res = await leaveTeam(selectedTeam.id);
-      if (res.success) {
-        toast.success(`Left ${selectedTeam.name}`);
-        onTeamsUpdated();
-        setView('list');
-      } else {
-        toast.error(res.error || 'Failed to leave team');
-      }
-    } catch (e) {
-      toast.error('Failed to leave team');
-    }
+    setConfirmDialog({
+      title: `Leave ${selectedTeam.name}?`,
+      description: `Are you sure you want to leave ${selectedTeam.name}? You will lose access to this team's roster and schedule.`,
+      confirmText: 'Leave Team',
+      onConfirm: async () => {
+        try {
+          const res = await leaveTeam(selectedTeam.id);
+          if (res.success) {
+            toast.success(`Left ${selectedTeam.name}`);
+            onTeamsUpdated();
+            setView('list');
+          } else {
+            toast.error(res.error || 'Failed to leave team');
+          }
+        } catch (e) {
+          toast.error('Failed to leave team');
+        }
+      },
+    });
   };
 
-  const handleDeleteTeam = async () => {
+  const handleDeleteTeam = () => {
     if (!selectedTeam) return;
-    if (!confirm(`Are you sure you want to PERMANENTLY delete ${selectedTeam.name}? This will remove all roster data and game history for all members.`)) return;
-
-    try {
-      const res = await deleteTeam(selectedTeam.id);
-      if (res.success) {
-        toast.success('Team deleted');
-        onTeamsUpdated();
-        setView('list');
-      } else {
-        toast.error(res.error || 'Failed to delete team');
-      }
-    } catch (e) {
-      toast.error('Failed to delete team');
-    }
+    setConfirmDialog({
+      title: `Delete ${selectedTeam.name}?`,
+      description: `Are you sure you want to PERMANENTLY delete ${selectedTeam.name}? This will remove all roster data and game history for all members.`,
+      confirmText: 'Delete Team',
+      onConfirm: async () => {
+        try {
+          const res = await deleteTeam(selectedTeam.id);
+          if (res.success) {
+            toast.success('Team deleted');
+            onTeamsUpdated();
+            setView('list');
+          } else {
+            toast.error(res.error || 'Failed to delete team');
+          }
+        } catch (e) {
+          toast.error('Failed to delete team');
+        }
+      },
+    });
   };
 
   return (
@@ -543,6 +576,39 @@ export function TeamModal({
           </div>
         )}
       </DialogContent>
+
+      <AlertDialog
+        open={Boolean(confirmDialog)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDialog(null);
+        }}
+      >
+        {confirmDialog && (
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {confirmDialog.description}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setConfirmDialog(null)}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant={confirmDialog.variant || "destructive"}
+                onClick={() => {
+                  const cb = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  if (cb) cb();
+                }}
+              >
+                {confirmDialog.confirmText || "Confirm"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        )}
+      </AlertDialog>
     </Dialog>
   );
 }
