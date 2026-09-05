@@ -329,6 +329,39 @@ export default function App() {
     safeSetToStorage(CONSTANTS.STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }, [settings]);
 
+  /**
+   * Take up the roster and history a pull left in localStorage.
+   *
+   * sync() writes the server's roster to storage but cannot touch React state,
+   * and startup used to adopt only the schedule and the settings from it. So
+   * the roster sat in storage unread, `players` stayed [], and the effect that
+   * persists players then wrote that [] straight back over it — the coach
+   * signed in and found an empty roster tab even when the server had one.
+   */
+  const adoptRoster = useCallback(() => {
+    const localPlayers = safeParseJSON(
+      safeGetFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS),
+      []
+    );
+    // What the pull adopted, so the effect does not push the server its own
+    // roster back and bump roster_version for every other coach.
+    const user = currentUserRef.current;
+    const team = currentTeamRef.current;
+    if (user && team) {
+      syncedRosterRef.current = {
+        team: `${user.id}:${team.id}`,
+        roster: JSON.stringify(
+          localPlayers.map((p) => ({ ...p, isCaptain: !!p.isCaptain }))
+        ),
+      };
+    }
+    setPlayers(localPlayers);
+    setCaptains(localPlayers.filter((p) => p.isCaptain).map((p) => p.name));
+    setGameHistory(
+      safeParseJSON(safeGetFromStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY), [])
+    );
+  }, []);
+
   /** Take up what a pull or a team switch left in localStorage. */
   const adoptSettings = useCallback(() => {
     const stored = readStoredSettings();
@@ -479,6 +512,7 @@ export default function App() {
             if (meta?.pulled) {
               setFixtures(readStoredFixtures());
               adoptSettings();
+              adoptRoster();
             }
           });
           // initSync drains the queue and pulls; the schedule and the
@@ -487,6 +521,9 @@ export default function App() {
           setFixtures(readStoredFixtures());
           adoptSettings();
           await refreshTeams();
+          // refreshTeams is what settles which team is open, so the roster the
+          // pull left in storage is taken up after it rather than before.
+          adoptRoster();
           await adoptRemoteTheme();
         }
       } catch (err) {
@@ -608,31 +645,8 @@ export default function App() {
     const selected = teams.find((t) => t.id === teamId);
     setCurrentTeamState(selected || null);
     await sync();
-    // Reload local data
-    const localPlayers = safeParseJSON(
-      safeGetFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS),
-      []
-    );
-    // What the pull adopted, so the effect above does not push the server's
-    // own roster straight back at it and bump roster_version for every coach.
-    if (currentUser && selected) {
-      syncedRosterRef.current = {
-        team: `${currentUser.id}:${selected.id}`,
-        roster: JSON.stringify(
-          localPlayers.map((p) => ({
-            ...p,
-            isCaptain: localPlayers.some((q) => q.name === p.name && q.isCaptain),
-          }))
-        ),
-      };
-    }
-    setPlayers(localPlayers);
-    setCaptains(localPlayers.filter((p) => p.isCaptain).map((p) => p.name));
-    const localHistory = safeParseJSON(
-      safeGetFromStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY),
-      []
-    );
-    setGameHistory(localHistory);
+    // The roster, the captains and the history the pull just wrote to storage.
+    adoptRoster();
     // sync() has already pulled this team's schedule into localStorage. The
     // fetch that used to live here adopted the cloud list only when it had at
     // least one match in it, so a team whose last match another coach deleted

@@ -187,33 +187,40 @@ could remove the last one refuse: `DELETE .../members/:memberId` and
 `DELETE .../membership`, the latter being how any member leaves a team on their
 own.
 
-### The roster push is guarded, not an effect's to decide
+### Signing in must not cost the team its roster
 
 `PUT .../players` replaces a team's whole roster, so an empty list deletes
-every player for every coach on the team. App holds the roster in React state
-and pushes it from an effect whose dependencies include `currentUser` and
-`currentTeam` — and those change for reasons that are not edits: a sign-in, a
-team switch, and the pull that follows either one.
+every player for every coach. Two separate things had to be true for the app
+to survive a sign-in, and neither was.
 
-That cost a real roster. Moving the app to `shinguard.app` gave it a new
-origin, so `localStorage` was empty; signing in set `currentUser`, the effect
-fired holding `[]`, and the roster was deleted server-side before the pull
-could fill it in. `roster_version` went up, the rows went away, and the only
-surviving copy was the `player_snapshot` inside a saved game.
+`sync()` writes the pulled roster to localStorage but cannot touch React
+state, and startup adopted only the schedule and the settings from it. So
+`players` stayed `[]`, and the effect that persists players wrote that `[]`
+back over the roster the pull had just stored. `adoptRoster` in App is what
+takes up the roster, the captains and the history now — after `refreshTeams`,
+which is what settles which team is open, and again on every pull.
 
-`rosterPushDecision` in `src/modules/roster-push-guard.js` is what the effect
-asks now. It records the roster per team: the first sight of a team is never
-pushed, and after that only a roster that differs from the last one recorded
-counts as an edit. `handleSelectTeam` records what the pull adopts, so the
-server is not handed its own roster back — which would bump `roster_version`
-and reject an edit another coach had in flight.
+The push itself is an effect whose dependencies include `currentUser` and
+`currentTeam`, and those change for reasons that are not edits: a sign-in, a
+team switch, and the pull that follows either. `rosterPushDecision` in
+`src/modules/roster-push-guard.js` records the roster per team — the first
+sight of a team is never pushed, and after that only a roster differing from
+the last one recorded counts as an edit. Clearing a roster deliberately still
+pushes, since it differs from what was recorded.
 
-Clearing a roster on purpose still pushes: it differs from what was recorded.
-The guard suppresses a roster the app never loaded, not one a coach emptied.
+Together they cost a real roster. Moving to `shinguard.app` gave the app a new
+origin, so localStorage was empty; the roster was deleted server-side before
+the pull could fill it in, and the only surviving copy was the
+`player_snapshot` inside a saved game.
 
-This is the same hazard the settings push avoids by not being an effect at all.
-An effect that writes to the server has to be able to tell "the user changed
-this" from "the app just finished loading" — and dependencies alone cannot.
+The lesson worth keeping is about the effect, not the domain: an effect that
+writes to the server has to be able to tell "the user changed this" from "the
+app just finished loading", and a dependency array cannot. The settings push
+avoids the whole hazard by not being an effect at all.
+
+`tests/e2e/roster-not-wiped-on-signin.spec.js` covers both, including the
+slow-pull case that is the incident's real shape. Both were verified by
+removing each fix and watching the tests fail.
 
 ### Roster concurrency
 
