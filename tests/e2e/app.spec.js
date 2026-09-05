@@ -79,11 +79,12 @@ test.describe('AYSO Roster Pro', () => {
             return el && parseInt(el.textContent || '0') >= 7;
         }, { timeout: 10000 });
 
-        // Set up dialog handler before clicking
-        page.on('dialog', dialog => dialog.accept());
-
-        // Clear all
+        // Clear all — a themed AlertDialog, not a native confirm, so there is
+        // no page.on('dialog') to accept: the coach clicks the button.
         await page.click('#clearAll');
+        await expect(page.locator('#confirmDialog')).toBeVisible();
+        await expect(page.locator('#confirmDialogTitle')).toHaveText('Clear Roster?');
+        await page.click('#confirmDialogConfirm');
 
         // Wait for player count to be 0
         await page.waitForFunction(() => {

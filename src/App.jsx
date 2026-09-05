@@ -1625,18 +1625,19 @@ export default function App() {
         }}
       >
         {confirmDialog && (
-          <AlertDialogContent>
+          <AlertDialogContent id="confirmDialog">
             <AlertDialogHeader>
-              <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+              <AlertDialogTitle id="confirmDialogTitle">{confirmDialog.title}</AlertDialogTitle>
               <AlertDialogDescription>
                 {confirmDialog.description}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setConfirmDialog(null)}>
+              <AlertDialogCancel id="confirmDialogCancel" onClick={() => setConfirmDialog(null)}>
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
+                id="confirmDialogConfirm"
                 variant={confirmDialog.variant || 'destructive'}
                 onClick={() => {
                   const cb = confirmDialog.onConfirm;

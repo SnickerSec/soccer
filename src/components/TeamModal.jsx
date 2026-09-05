@@ -152,6 +152,11 @@ export function TeamModal({
     }
   };
 
+  // The form is one view for two operations, and it must stay one reference:
+  // 719dde2 split the handler in two and left onSubmit pointing at the name it
+  // had deleted, so opening the create form threw and unmounted the whole app.
+  const handleSaveTeam = (e) => (selectedTeam ? handleUpdateTeam(e) : handleCreateTeam(e));
+
   const handleUpdateTeam = async (e) => {
     e.preventDefault();
     if (!teamNameInput.trim() || !selectedTeam) return;
