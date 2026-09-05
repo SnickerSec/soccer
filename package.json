@@ -57,6 +57,9 @@
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0"
   },
+  "overrides": {
+    "qs": "^6.16.0"
+  },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.121",
     "@jest/globals": "^29.7.0",
