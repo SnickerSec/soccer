@@ -1,10 +1,10 @@
 /**
  * Canonical hostname redirect.
  *
- * The app answers on the domain it moved to and on the one it moved from, so
- * the rules about which of those actually serves the app are worth pinning:
- * a blanket "redirect anything not canonical" would bounce Railway's health
- * check and localhost, and a redirect on a write would drop its body.
+ * The app answers on the apex and on www, and only the apex serves it. The
+ * rules about which hosts are redirected are worth pinning: a blanket
+ * "redirect anything not canonical" would bounce Railway's health check and
+ * localhost, and a redirect on a write would drop its body.
  */
 
 import { describe, test, expect } from '@jest/globals';
@@ -14,14 +14,9 @@ import express from 'express';
 const { canonicalRedirect, CANONICAL_HOST } = await import('../../server/canonical-host.js');
 
 describe('canonicalRedirect', () => {
-    test('sends the legacy domain to the canonical host, path and query intact', () => {
-        expect(canonicalRedirect('GET', 'aysoroster.com', '/app?invite=tok-123&tab=roster'))
+    test('sends www to the apex, path and query intact', () => {
+        expect(canonicalRedirect('GET', 'www.shinguard.app', '/app?invite=tok-123&tab=roster'))
             .toBe('https://shinguard.app/app?invite=tok-123&tab=roster');
-    });
-
-    test('sends www to the apex', () => {
-        expect(canonicalRedirect('GET', 'www.shinguard.app', '/')).toBe('https://shinguard.app/');
-        expect(canonicalRedirect('GET', 'www.aysoroster.com', '/')).toBe('https://shinguard.app/');
     });
 
     test('serves the canonical host itself', () => {
@@ -36,19 +31,27 @@ describe('canonicalRedirect', () => {
         expect(canonicalRedirect('GET', undefined, '/')).toBeNull();
     });
 
+    test('does not redirect a domain the project no longer owns', () => {
+        // aysoroster.com was let go and removed from the service. Nothing here
+        // should send traffic to, or accept it on behalf of, a name we do not
+        // control.
+        expect(canonicalRedirect('GET', 'aysoroster.com', '/')).toBeNull();
+        expect(canonicalRedirect('GET', 'www.aysoroster.com', '/')).toBeNull();
+    });
+
     test('ignores the port and the case of the Host header', () => {
-        expect(canonicalRedirect('GET', 'AYSORoster.com:8080', '/')).toBe('https://shinguard.app/');
+        expect(canonicalRedirect('GET', 'WWW.Shinguard.app:8080', '/')).toBe('https://shinguard.app/');
     });
 
     test('does not redirect a write', () => {
         // A 301 may be replayed as a GET, which would silently drop the body.
         for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
-            expect(canonicalRedirect(method, 'aysoroster.com', '/api/teams')).toBeNull();
+            expect(canonicalRedirect(method, 'www.shinguard.app', '/api/teams')).toBeNull();
         }
     });
 
     test('redirects HEAD as well as GET', () => {
-        expect(canonicalRedirect('HEAD', 'aysoroster.com', '/')).toBe('https://shinguard.app/');
+        expect(canonicalRedirect('HEAD', 'www.shinguard.app', '/')).toBe('https://shinguard.app/');
     });
 });
 
@@ -65,8 +68,8 @@ describe('as express middleware', () => {
         return app;
     }
 
-    test('answers 301 with a Location on the legacy domain', async () => {
-        const res = await request(buildApp()).get('/').set('Host', 'aysoroster.com');
+    test('answers 301 with a Location on www', async () => {
+        const res = await request(buildApp()).get('/').set('Host', 'www.shinguard.app');
         expect(res.status).toBe(301);
         expect(res.headers.location).toBe('https://shinguard.app/');
     });

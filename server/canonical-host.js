@@ -1,12 +1,10 @@
 /**
  * One canonical hostname for the app.
  *
- * The site moved from aysoroster.com to shinguard.app, and both are still
- * pointed at this service so that bookmarks, installed PWAs and invite links
- * already in circulation keep working. Serving the same app on four hostnames
- * is what we do not want: a session cookie is per-origin, so a coach signed in
- * on the old domain looks signed out on the new one, and search engines index
- * both copies. So the legacy names redirect rather than serve.
+ * The app answers on shinguard.app and on www.shinguard.app, and only the
+ * apex should serve it. A session cookie belongs to an origin, so a coach who
+ * signed in on one would look signed out on the other, and search engines
+ * would index two copies of the same site.
  *
  * The list is an allowlist rather than "anything that is not canonical".
  * Railway's health check and its generated *.up.railway.app domain reach this
@@ -16,9 +14,7 @@
 
 export const CANONICAL_HOST = 'shinguard.app';
 
-const LEGACY_HOSTS = new Set([
-    'aysoroster.com',
-    'www.aysoroster.com',
+const REDIRECTED_HOSTS = new Set([
     'www.shinguard.app',
 ]);
 
@@ -35,7 +31,7 @@ export function canonicalRedirect(method, host, originalUrl) {
 
     // Host carries a port when the client sent one, and case is not significant.
     const hostname = String(host).toLowerCase().split(':')[0];
-    if (!LEGACY_HOSTS.has(hostname)) return null;
+    if (!REDIRECTED_HOSTS.has(hostname)) return null;
 
     return `https://${CANONICAL_HOST}${originalUrl || '/'}`;
 }

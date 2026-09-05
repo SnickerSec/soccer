@@ -222,14 +222,15 @@ cannot be recovered — they reopen empty.
 
 ### The domain
 
-The app is `shinguard.app`. It was `aysoroster.com`, which is still declared on
-the Railway service and still holds a valid certificate there, so a request that
-reaches Railway under the old name is answered rather than refused.
+The app is `shinguard.app`. It was `aysoroster.com`, which is gone: the
+registration was not renewed, and both it and its `www` were removed from the
+Railway service. A domain nobody here controls must not stay attached to the
+service — whoever registers it next could point it at this app and serve the
+whole thing, branding included, under a name they own.
 
-`server/canonical-host.js` is what answers it: `aysoroster.com`, its `www`, and
-`www.shinguard.app` are 301'd to the apex, so there is one origin. That matters
-beyond tidiness — a session cookie belongs to an origin, and a coach signed in
-on the old name would look signed out on the new one.
+`server/canonical-host.js` sends `www.shinguard.app` to the apex, so there is
+one origin. That matters beyond tidiness — a session cookie belongs to an
+origin, and a coach signed in on `www` would look signed out on the apex.
 
 The list there is an allowlist, not "anything that is not canonical". Railway's
 health check and its generated `*.up.railway.app` name reach the server under
