@@ -1,7 +1,7 @@
 ---
 name: roster-polish
 description: >-
-  Audits and improves AYSO Roster Pro across six lanes — UI/UX, mobile, database,
+  Audits and improves Shinguard across six lanes — UI/UX, mobile, database,
   features, performance, and code polish — then implements the change the user picks,
   with a verification gate matched to the lane. Use when asked to improve, polish,
   refine, tune, clean up, or "make better" any part of this app, or when asked what
@@ -105,7 +105,7 @@ Severity rubric — use it literally so the colors carry information:
 ## Step 4 — Report
 
 ```markdown
-# ⚽ AYSO Roster Pro — Polish Review
+# ⚽ Shinguard — Polish Review
 
 **Evidence base:** [lanes run, suites run, what could NOT be measured and why]
 

@@ -2,7 +2,7 @@
 /**
  * Diagnostic for the roster-polish skill.
  *
- * Measures the AYSO Roster Pro codebase across six lanes — ui, mobile, db,
+ * Measures the Shinguard codebase across six lanes — ui, mobile, db,
  * features, perf, polish — and prints findings with file:line evidence.
  *
  * Every check here is a HEURISTIC that points at a line to read. It is a
@@ -620,7 +620,7 @@ findings.sort((a, b) => RANK[a.severity] - RANK[b.severity] || a.lane.localeComp
 if (AS_JSON) {
     console.log(JSON.stringify({ root: ROOT, lanes, findings, notMeasured }, null, 2));
 } else {
-    console.log(`\n⚽ AYSO Roster Pro — polish audit`);
+    console.log(`\n⚽ Shinguard — polish audit`);
     console.log(`   repo: ${ROOT}`);
     console.log(`   lanes: ${lanes.join(', ')}`);
     const counts = findings.reduce((acc, f) => ({ ...acc, [f.severity]: (acc[f.severity] || 0) + 1 }), {});
