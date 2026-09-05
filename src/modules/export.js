@@ -129,7 +129,7 @@ export function lineupClipboardText(lineup, players, formation) {
 
 /** The long form written to a .txt file, with the per-player summary. */
 export function lineupText(lineup, positions, players) {
-    let text = 'AYSO Roster Pro - Game Lineup\n==============================\n\n';
+    let text = 'Shinguard - Game Lineup\n==============================\n\n';
 
     for (const quarter of lineup) {
         text += `Quarter ${quarter.quarter}\n---------\n`;

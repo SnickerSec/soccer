@@ -220,6 +220,27 @@ broke was reopening a synced game, which found no quarters and fell back to a
 default formation. Games saved before the fix stored those columns empty and
 cannot be recovered — they reopen empty.
 
+### The domain
+
+The app is `shinguard.app`. It was `aysoroster.com`, which is still declared on
+the Railway service and still holds a valid certificate there, so a request that
+reaches Railway under the old name is answered rather than refused.
+
+`server/canonical-host.js` is what answers it: `aysoroster.com`, its `www`, and
+`www.shinguard.app` are 301'd to the apex, so there is one origin. That matters
+beyond tidiness — a session cookie belongs to an origin, and a coach signed in
+on the old name would look signed out on the new one.
+
+The list there is an allowlist, not "anything that is not canonical". Railway's
+health check and its generated `*.up.railway.app` name reach the server under
+their own `Host`, as does localhost; a blanket redirect bounces all three and
+fails the deploy. Only GET and HEAD are redirected, because a 301 may be
+replayed as a GET and would drop the body of an API write.
+
+Nothing else hardcodes the domain. `APP_URL` is what the OAuth callback and the
+invite links are built from, so moving again means that variable, the Google
+console's redirect URI, and this list — not a search across the source.
+
 ### The printed sheet
 
 Print used to hand the browser the whole app, which came out as several pages

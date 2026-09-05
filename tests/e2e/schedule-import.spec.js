@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Schedule & Calendar Importer', () => {
   const sampleIcsContent = `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//AYSO Roster Pro//Schedule Importer Test//EN
+PRODID:-//Shinguard//Schedule Importer Test//EN
 CALSCALE:GREGORIAN
 BEGIN:VEVENT
 UID:event-1@ayso.test

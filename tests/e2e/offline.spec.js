@@ -23,7 +23,7 @@ test.describe('Offline support', () => {
         await page.reload();
 
         // The page renders and the app boots
-        await expect(page.locator('h1')).toHaveText('AYSO Roster Pro');
+        await expect(page.locator('h1')).toHaveText('Shinguard');
         await expect(page.locator('#presentPlayerCount')).toBeVisible();
 
         // Core interaction still works

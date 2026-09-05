@@ -9,6 +9,7 @@ import passport from 'passport';
 import { csrfSync } from 'csrf-sync';
 import { configurePassport } from './server/auth.js';
 import pool from './server/db.js';
+import { canonicalRedirect } from './server/canonical-host.js';
 
 // Route imports
 import authRoutes from './server/routes/auth.js';
@@ -27,6 +28,15 @@ const PORT = process.env.PORT || 3000;
 
 // Trust Railway's proxy so express-rate-limit can read X-Forwarded-For correctly
 app.set('trust proxy', 1);
+
+// Send the legacy domain, and www, to the one canonical hostname. This runs
+// before everything else so a redirected request costs no session lookup and
+// nothing against the rate limit budget.
+app.use((req, res, next) => {
+    const target = canonicalRedirect(req.method, req.get('host'), req.originalUrl);
+    if (target) return res.redirect(301, target);
+    next();
+});
 
 // Security headers middleware
 app.use((req, res, next) => {
@@ -166,6 +176,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`AYSO Roster Pro running on port ${PORT}`);
+    console.log(`Shinguard running on port ${PORT}`);
     console.log(`Open http://localhost:${PORT} in your browser`);
 });

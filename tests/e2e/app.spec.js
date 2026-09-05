@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // Run tests serially to avoid conflicts
 test.describe.configure({ mode: 'serial' });
 
-test.describe('AYSO Roster Pro', () => {
+test.describe('Shinguard', () => {
     test.beforeEach(async ({ page }) => {
         // Navigate and wait for complete load
         await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -12,8 +12,8 @@ test.describe('AYSO Roster Pro', () => {
     });
 
     test('displays the main page with correct title', async ({ page }) => {
-        await expect(page).toHaveTitle('AYSO Roster Pro');
-        await expect(page.locator('h1')).toContainText('AYSO Roster Pro');
+        await expect(page).toHaveTitle('Shinguard');
+        await expect(page.locator('h1')).toContainText('Shinguard');
     });
 
     test('shows roster management section', async ({ page }) => {

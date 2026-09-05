@@ -96,7 +96,7 @@ export function ScheduleTab({
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//AYSO Roster Pro//Match Calendar//EN',
+      'PRODID:-//Shinguard//Match Calendar//EN',
       'CALSCALE:GREGORIAN',
       generateIcsEvent(fixture, teamName, ageDivision),
       'END:VCALENDAR',

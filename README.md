@@ -1,4 +1,4 @@
-# AYSO Roster Pro
+# Shinguard
 
 A professional lineup generator for AYSO youth soccer teams, ensuring fair play time and optimal position rotation for all players. Designed specifically for AYSO's "Everyone Plays" philosophy.
 

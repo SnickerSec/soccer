@@ -99,7 +99,7 @@ export function Header({
           <img src="/favicon.svg" alt="" className="brand-mark h-8 w-8 shrink-0" width="32" height="32" />
           <div className="brand-text">
             <h1 className="text-base sm:text-lg font-semibold tracking-tight text-foreground whitespace-nowrap leading-none m-0">
-              AYSO Roster Pro
+              Shinguard
             </h1>
             <p className="subtitle text-xs text-muted-foreground hidden sm:block mt-0.5 m-0">
               Fair rotation for youth soccer

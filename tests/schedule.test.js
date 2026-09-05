@@ -147,7 +147,7 @@ describe('iCalendar (.ics) generation', () => {
 
         expect(seasonIcs).toContain('BEGIN:VCALENDAR');
         expect(seasonIcs).toContain('END:VCALENDAR');
-        expect(seasonIcs).toContain('PRODID:-//AYSO Roster Pro//Match Schedule Calendar//EN');
+        expect(seasonIcs).toContain('PRODID:-//Shinguard//Match Schedule Calendar//EN');
         expect(seasonIcs).toContain('Hawaiian Strikers vs Tigers');
         expect(seasonIcs).toContain('Hawaiian Strikers vs Lions');
         // Canceled match should be omitted

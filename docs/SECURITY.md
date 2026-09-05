@@ -1,4 +1,4 @@
-# Security Overview - AYSO Roster Pro
+# Security Overview - Shinguard
 
 This describes how the application is secured as it stands. For what data is
 stored and who can see it, see the user-facing page at `/privacy.html`.

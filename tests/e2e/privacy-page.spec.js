@@ -63,6 +63,6 @@ test.describe('Privacy page', () => {
     test('offers a way back to the app', async ({ page }) => {
         await page.goto('/privacy.html');
         await page.locator('.doc-back').click();
-        await expect(page.locator('h1')).toHaveText('AYSO Roster Pro');
+        await expect(page.locator('h1')).toHaveText('Shinguard');
     });
 });

@@ -49,7 +49,7 @@ function findRepoRoot() {
     for (const dir of candidates) {
         try {
             const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-            if (pkg.name === 'ayso-roster-pro') return dir;
+            if (pkg.name === 'shinguard') return dir;
         } catch { /* keep looking */ }
     }
     return null;
@@ -58,7 +58,7 @@ function findRepoRoot() {
 const ROOT = findRepoRoot();
 if (!ROOT) {
     console.error(
-        'Could not locate the ayso-roster-pro repo.\n' +
+        'Could not locate the shinguard repo.\n' +
         'Run this from inside the repo, or set ROSTER_REPO_ROOT=/path/to/soccer.'
     );
     process.exit(2);

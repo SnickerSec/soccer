@@ -1,6 +1,6 @@
 /**
  * Application Constants
- * Centralized configuration values for the AYSO Roster Pro application
+ * Centralized configuration values for the Shinguard application
  */
 
 export const CONSTANTS = {

@@ -104,7 +104,7 @@ test.describe('Site header', () => {
     test('exactly one h1 per page', async ({ page }) => {
         await page.goto('/');
         await expect(page.locator('h1')).toHaveCount(1);
-        await expect(page.locator('h1')).toHaveText('AYSO Roster Pro');
+        await expect(page.locator('h1')).toHaveText('Shinguard');
 
         await page.goto('/privacy.html');
         await expect(page.locator('h1')).toHaveCount(1);
