@@ -957,7 +957,9 @@ export default function App() {
     const url = buildShareUrl(shareData, window.location);
     navigator.clipboard.writeText(url).then(() => {
       toast.success('Share link copied to clipboard!');
-    }).catch(() => {});
+    }).catch(() => {
+      toast.error('Failed to copy share link to clipboard');
+    });
   };
 
   const handleExportCSV = () => {

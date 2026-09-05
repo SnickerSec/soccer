@@ -1030,7 +1030,6 @@ async function migrateLocalDataToCloud() {
         localStorage.setItem('ayso_migration_date', new Date().toISOString());
 
         updateStatus(SYNC_STATUS.SYNCED);
-        console.log('Migration completed successfully');
     } catch (error) {
         console.error('Migration error:', error);
         updateStatus(SYNC_STATUS.ERROR);
@@ -1049,13 +1048,11 @@ export async function cleanup() {
 // Listen for online/offline events
 if (typeof window !== 'undefined') {
     window.addEventListener('online', async () => {
-        console.log('Back online, processing queue...');
         await processQueue();
         await sync();
     });
 
     window.addEventListener('offline', () => {
-        console.log('Went offline');
         updateStatus(SYNC_STATUS.OFFLINE);
     });
 }
