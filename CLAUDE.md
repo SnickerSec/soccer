@@ -187,6 +187,34 @@ could remove the last one refuse: `DELETE .../members/:memberId` and
 `DELETE .../membership`, the latter being how any member leaves a team on their
 own.
 
+### The roster push is guarded, not an effect's to decide
+
+`PUT .../players` replaces a team's whole roster, so an empty list deletes
+every player for every coach on the team. App holds the roster in React state
+and pushes it from an effect whose dependencies include `currentUser` and
+`currentTeam` — and those change for reasons that are not edits: a sign-in, a
+team switch, and the pull that follows either one.
+
+That cost a real roster. Moving the app to `shinguard.app` gave it a new
+origin, so `localStorage` was empty; signing in set `currentUser`, the effect
+fired holding `[]`, and the roster was deleted server-side before the pull
+could fill it in. `roster_version` went up, the rows went away, and the only
+surviving copy was the `player_snapshot` inside a saved game.
+
+`rosterPushDecision` in `src/modules/roster-push-guard.js` is what the effect
+asks now. It records the roster per team: the first sight of a team is never
+pushed, and after that only a roster that differs from the last one recorded
+counts as an edit. `handleSelectTeam` records what the pull adopts, so the
+server is not handed its own roster back — which would bump `roster_version`
+and reject an edit another coach had in flight.
+
+Clearing a roster on purpose still pushes: it differs from what was recorded.
+The guard suppresses a roster the app never loaded, not one a coach emptied.
+
+This is the same hazard the settings push avoids by not being an effect at all.
+An effect that writes to the server has to be able to tell "the user changed
+this" from "the app just finished loading" — and dependencies alone cannot.
+
 ### Roster concurrency
 
 A team can have several coaches, and a roster save replaces the whole list, so

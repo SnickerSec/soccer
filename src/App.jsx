@@ -44,6 +44,7 @@ import {
   formationHasMidfieldLine,
 } from '@/modules/formations';
 import { generateLineup, validateLineup } from '@/modules/lineup-engine';
+import { rosterPushDecision } from '@/modules/roster-push-guard';
 import { calculatePlayerStats, currentQuarters, currentPlayerPositions } from '@/modules/season-stats';
 import {
   validateRename,
@@ -249,55 +250,78 @@ export default function App() {
     toast.info('Redo applied');
   }, [snapshot]);
 
+  /**
+   * The roster this effect has already accounted for, per team.
+   *
+   * The push below must not fire merely because a sign-in or a team switch
+   * just set currentUser/currentTeam. At that moment `players` is whatever
+   * this device happens to hold — [] in a browser opening this origin for the
+   * first time — and the pull that fills it in has not landed yet. Pushing
+   * then hands PUT /players an empty roster, and that route replaces the whole
+   * list, so signing in deletes the team's players for everyone.
+   *
+   * That is not hypothetical: it is how the roster was lost when the app moved
+   * to a new domain, because a new origin gets empty localStorage. The same
+   * hazard is why the settings push is deliberately not an effect.
+   *
+   * So the first run for a team only records what it saw, and handleSelectTeam
+   * records the roster it adopts from the pull. A push happens when the roster
+   * differs from that — which is a real edit.
+   */
+  const syncedRosterRef = useRef(null);
+
   // Persist players to storage & cloud sync
   useEffect(() => {
-    safeSetToStorage(
-      CONSTANTS.STORAGE_KEYS.PLAYERS,
-      JSON.stringify(
-        players.map((p) => ({
-          ...p,
-          isCaptain: captains.includes(p.name),
-        }))
-      )
-    );
-    if (currentUser && currentTeam) {
-      // Drained here so the rename and the roster that already carries the new
-      // name reach the server as one write: it moves the player's saved games
-      // in the same transaction that saves the roster. Put back if the write
-      // fails, so the next push carries them again rather than leaving the
-      // server's history pointing at a name nobody holds.
-      const renames = pendingRenamesRef.current;
-      pendingRenamesRef.current = [];
-      const keepForRetry = () => {
-        if (renames.length > 0) {
-          pendingRenamesRef.current = [...renames, ...pendingRenamesRef.current];
-        }
-      };
-      pushPlayers(
-        players.map((p) => ({
-          ...p,
-          isCaptain: captains.includes(p.name),
-        })),
-        { renames }
-      )
-        .then((result) => {
-          if (!result) return;
-          if (result.success === false) {
-            keepForRetry();
-            return;
-          }
-          // Players another coach edited at the same time, which the merge
-          // settled in their favour — including a rename it had to abandon.
-          // Saying so is the point of tracking them: an edit that vanishes
-          // without a word is the one a coach acts on at the next game.
-          if (result.conflicts?.length > 0) {
-            toast.warning(
-              `Another coach was editing at the same time. Their version won for: ${result.conflicts.join(', ')}.`
-            );
-          }
-        })
-        .catch(keepForRetry);
+    const roster = players.map((p) => ({
+      ...p,
+      isCaptain: captains.includes(p.name),
+    }));
+    const serialized = JSON.stringify(roster);
+    safeSetToStorage(CONSTANTS.STORAGE_KEYS.PLAYERS, serialized);
+
+    if (!currentUser || !currentTeam) {
+      syncedRosterRef.current = null;
+      return;
     }
+
+    const { push, next } = rosterPushDecision(syncedRosterRef.current, {
+      teamKey: `${currentUser.id}:${currentTeam.id}`,
+      serialized,
+    });
+    syncedRosterRef.current = next;
+    if (!push) return;
+
+    // Drained here so the rename and the roster that already carries the new
+    // name reach the server as one write: it moves the player's saved games
+    // in the same transaction that saves the roster. Put back if the write
+    // fails, so the next push carries them again rather than leaving the
+    // server's history pointing at a name nobody holds.
+    const renames = pendingRenamesRef.current;
+    pendingRenamesRef.current = [];
+    const keepForRetry = () => {
+      if (renames.length > 0) {
+        pendingRenamesRef.current = [...renames, ...pendingRenamesRef.current];
+      }
+    };
+    pushPlayers(roster, { renames })
+      .then((result) => {
+        if (!result) return;
+        if (result.success === false) {
+          keepForRetry();
+          return;
+        }
+        // Players another coach edited at the same time, which the merge
+        // settled in their favour — including a rename it had to abandon.
+        // Saying so is the point of tracking them: an edit that vanishes
+        // without a word is the one a coach acts on at the next game.
+        if (result.conflicts?.length > 0) {
+          toast.warning(
+            `Another coach was editing at the same time. Their version won for: ${result.conflicts.join(', ')}.`
+          );
+        }
+      })
+      .catch(keepForRetry);
+  
   }, [players, captains, currentUser, currentTeam]);
 
   // Persist settings
@@ -589,6 +613,19 @@ export default function App() {
       safeGetFromStorage(CONSTANTS.STORAGE_KEYS.PLAYERS),
       []
     );
+    // What the pull adopted, so the effect above does not push the server's
+    // own roster straight back at it and bump roster_version for every coach.
+    if (currentUser && selected) {
+      syncedRosterRef.current = {
+        team: `${currentUser.id}:${selected.id}`,
+        roster: JSON.stringify(
+          localPlayers.map((p) => ({
+            ...p,
+            isCaptain: localPlayers.some((q) => q.name === p.name && q.isCaptain),
+          }))
+        ),
+      };
+    }
     setPlayers(localPlayers);
     setCaptains(localPlayers.filter((p) => p.isCaptain).map((p) => p.name));
     const localHistory = safeParseJSON(
