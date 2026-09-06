@@ -4,7 +4,6 @@
  *
  * Kept apart from the app class because none of it needs app state — it takes
  * a lineup and some players and returns a string — and because the CSV quoting
- * rule is the kind of thing that is only ever noticed when it is wrong.
  */
 
 /** Leading characters a spreadsheet reads as the start of a formula. */
@@ -50,7 +49,10 @@ export function csvRow(values) {
 
 /** Today, as the date suffix the export filenames use. */
 function today() {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
 }
 
 /**

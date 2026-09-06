@@ -35,6 +35,7 @@ import {
   generateSeasonIcs,
   calculateVolunteerStats,
   exportScheduleCsv,
+  toDateOnly,
 } from '@/modules/schedule';
 import { downloadTextFile } from '@/modules/export';
 import { cn } from '@/lib/utils';
@@ -66,7 +67,7 @@ export function ScheduleTab({
     return (a.gameTime || '').localeCompare(b.gameTime || '');
   });
 
-  const nowStr = new Date().toISOString().split('T')[0];
+  const nowStr = toDateOnly();
 
   const upcomingFixtures = sortedFixtures.filter(
     (f) => f.status === 'upcoming' && (f.gameDate >= nowStr || !f.status || f.status === 'upcoming')

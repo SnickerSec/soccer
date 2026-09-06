@@ -5,6 +5,7 @@
 import { describe, test, expect } from '@jest/globals';
 import {
     parseLocalDate,
+    toDateOnly,
     formatMatchDate,
     formatTimeString,
     formatParentMemo,
@@ -13,6 +14,37 @@ import {
     calculateVolunteerStats,
     exportScheduleCsv,
 } from '../src/modules/schedule.js';
+
+describe('toDateOnly', () => {
+    test('defaults to today in local calendar date without UTC shift', () => {
+        const now = new Date();
+        const expectedMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const expectedDay = String(now.getDate()).padStart(2, '0');
+        const expected = `${now.getFullYear()}-${expectedMonth}-${expectedDay}`;
+
+        expect(toDateOnly()).toBe(expected);
+    });
+
+    test('formats a Date object using local year, month, and day', () => {
+        // Late evening on Sep 5 (which in UTC is already Sep 6)
+        const date = new Date(2026, 8, 5, 23, 45, 0);
+        expect(toDateOnly(date)).toBe('2026-09-05');
+    });
+
+    test('extracts YYYY-MM-DD from an existing calendar date string', () => {
+        expect(toDateOnly('2026-09-12')).toBe('2026-09-12');
+    });
+
+    test('extracts YYYY-MM-DD from an ISO timestamp', () => {
+        expect(toDateOnly('2026-09-12T15:30:00.000Z')).toBe('2026-09-12');
+    });
+
+    test('returns null on null, empty string, or invalid date', () => {
+        expect(toDateOnly(null)).toBeNull();
+        expect(toDateOnly('')).toBeNull();
+        expect(toDateOnly(new Date(NaN))).toBeNull();
+    });
+});
 
 describe('parseLocalDate', () => {
     test('reads a plain calendar date as that local day', () => {

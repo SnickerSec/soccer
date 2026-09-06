@@ -23,6 +23,7 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { toDateOnly } from '@/modules/schedule';
 
 const JERSEY_COLOR_PRESETS = [
   { name: 'Royal Blue', class: 'bg-blue-600 text-white' },
@@ -74,7 +75,7 @@ export function FixtureModal({
       const today = new Date();
       const nextSat = new Date();
       nextSat.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7 || 7));
-      const dateStr = nextSat.toISOString().split('T')[0];
+      const dateStr = toDateOnly(nextSat);
 
       setGameDate(dateStr);
       setGameTime('09:00');
