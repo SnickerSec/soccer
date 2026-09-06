@@ -49,6 +49,31 @@
     --captain: 45 93% 58%;
     --captain-foreground: 210 40% 98%;
 
+    /*
+     * The pitch. Deliberately declared once rather than per theme: a football
+     * field is green in the sun and green in the dark, and a coach switching to
+     * light mode is not asking for a different colour of grass. The theme still
+     * reaches the card the diagram sits in and the legend text beneath it.
+     *
+     * Each marker carries its own foreground because the text on it used to be
+     * a hardcoded white, and white on the keeper's yellow measures 1.51:1 — the
+     * shirt number was effectively invisible at the ~8px it renders on a phone.
+     * The foregrounds below are the same hue at 6% lightness, which puts every
+     * marker above the 4.5:1 AA threshold with room to spare for sunlight:
+     * keeper 11.73:1, defense 6.04:1, offense 5.14:1.
+     */
+    --pitch-grass: 120 35% 45%;
+    --pitch-line: 0 0% 100%;
+
+    --pitch-keeper: 48 100% 50%;
+    --pitch-keeper-foreground: 48 90% 6%;
+
+    --pitch-defense: 204 70% 53%;
+    --pitch-defense-foreground: 204 70% 6%;
+
+    --pitch-offense: 6 78% 57%;
+    --pitch-offense-foreground: 6 78% 6%;
+
     --radius-sm: 0.25rem;
     --radius-md: 0.375rem;
     --radius-lg: 0.5rem;
@@ -125,6 +150,24 @@
   body {
     @apply bg-background text-foreground min-h-screen antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /*
+   * The pitch markings inherit their colour from here rather than each shape
+   * carrying `stroke="white"`. var() does not resolve inside an SVG
+   * presentation attribute, so a token has to arrive through CSS.
+   */
+  .soccer-field {
+    fill: hsl(var(--pitch-line));
+    stroke: hsl(var(--pitch-line));
+  }
+  .soccer-field .pitch-grass {
+    fill: hsl(var(--pitch-grass));
+    stroke: none;
+  }
+  /* Shirt numbers are filled, never outlined — the stroke above is for lines. */
+  .soccer-field text {
+    stroke: none;
   }
 }
 

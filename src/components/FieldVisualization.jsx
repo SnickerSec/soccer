@@ -31,22 +31,40 @@ const POSITION_COORDS = {
   'Attacking Mid': { x: 50, y: 35 },
 };
 
-const MARKER_COLORS = {
-  keeper: '#ffcc00',
-  defensive: '#3498db',
-  offensive: '#e74c3c',
+/*
+ * The pitch palette lives in src/index.css as --pitch-* tokens, in pairs: every
+ * marker fill has a foreground chosen to stay readable on it. The text used to
+ * be a hardcoded white, which on the keeper's yellow measures 1.51:1 — the
+ * shirt number a coach most needs to read was the one they could not.
+ *
+ * These are `style` rather than `fill=` attributes on purpose: var() does not
+ * resolve inside an SVG presentation attribute, only through CSS.
+ */
+const MARKER_ROLES = {
+  keeper: {
+    fill: 'hsl(var(--pitch-keeper))',
+    text: 'hsl(var(--pitch-keeper-foreground))',
+  },
+  defensive: {
+    fill: 'hsl(var(--pitch-defense))',
+    text: 'hsl(var(--pitch-defense-foreground))',
+  },
+  offensive: {
+    fill: 'hsl(var(--pitch-offense))',
+    text: 'hsl(var(--pitch-offense-foreground))',
+  },
 };
 
 const LEGEND_ITEMS = [
-  { className: 'keeper', label: 'Keeper', color: '#ffcc00' },
-  { className: 'defensive', label: 'Defense', color: '#3498db' },
-  { className: 'offensive', label: 'Offense', color: '#e74c3c' },
+  { className: 'keeper', label: 'Keeper', role: 'keeper' },
+  { className: 'defensive', label: 'Defense', role: 'defensive' },
+  { className: 'offensive', label: 'Offense', role: 'offensive' },
 ];
 
-function markerColor(position) {
-  if (position === 'Keeper') return MARKER_COLORS.keeper;
-  if (position.includes('Back')) return MARKER_COLORS.defensive;
-  return MARKER_COLORS.offensive;
+function markerRole(position) {
+  if (position === 'Keeper') return 'keeper';
+  if (position.includes('Back')) return 'defensive';
+  return 'offensive';
 }
 
 export function FieldVisualization({
@@ -69,27 +87,27 @@ export function FieldVisualization({
         className="soccer-field w-full max-w-[280px] h-auto rounded shadow-inner"
       >
         {/* Pitch surface */}
-        <rect x="0" y="0" width="400" height="600" fill="#4a9b4a" />
-        <rect x="20" y="20" width="360" height="560" fill="none" stroke="white" strokeWidth="3" />
-        <line x1="20" y1="300" x2="380" y2="300" stroke="white" strokeWidth="3" />
-        <circle cx="200" cy="300" r="60" fill="none" stroke="white" strokeWidth="3" />
-        <circle cx="200" cy="300" r="5" fill="white" />
+        <rect x="0" y="0" width="400" height="600" className="pitch-grass" />
+        <rect x="20" y="20" width="360" height="560" fill="none" strokeWidth="3" />
+        <line x1="20" y1="300" x2="380" y2="300" strokeWidth="3" />
+        <circle cx="200" cy="300" r="60" fill="none" strokeWidth="3" />
+        <circle cx="200" cy="300" r="5" />
 
         {/* Penalty areas */}
-        <rect x="100" y="20" width="200" height="100" fill="none" stroke="white" strokeWidth="3" />
-        <rect x="100" y="480" width="200" height="100" fill="none" stroke="white" strokeWidth="3" />
+        <rect x="100" y="20" width="200" height="100" fill="none" strokeWidth="3" />
+        <rect x="100" y="480" width="200" height="100" fill="none" strokeWidth="3" />
 
         {/* Goal areas */}
-        <rect x="140" y="20" width="120" height="40" fill="none" stroke="white" strokeWidth="3" />
-        <rect x="140" y="540" width="120" height="40" fill="none" stroke="white" strokeWidth="3" />
+        <rect x="140" y="20" width="120" height="40" fill="none" strokeWidth="3" />
+        <rect x="140" y="540" width="120" height="40" fill="none" strokeWidth="3" />
 
         {/* Goals */}
-        <rect x="170" y="10" width="60" height="10" fill="white" />
-        <rect x="170" y="580" width="60" height="10" fill="white" />
+        <rect x="170" y="10" width="60" height="10" />
+        <rect x="170" y="580" width="60" height="10" />
 
         {/* Penalty spots */}
-        <circle cx="200" cy="80" r="3" fill="white" />
-        <circle cx="200" cy="520" r="3" fill="white" />
+        <circle cx="200" cy="80" r="3" />
+        <circle cx="200" cy="520" r="3" />
 
         {/* Player markers */}
         {positionEntries.map(([position, playerVal]) => {
@@ -102,14 +120,15 @@ export function FieldVisualization({
           const hasNumber = Boolean(playerInfo && playerInfo.number);
           const displayText = hasNumber ? String(playerInfo.number) : getPlayerInitials(playerName);
 
+          const role = markerRole(position);
+
           return (
             <g key={position} className="player-marker cursor-pointer">
               <circle
                 cx={x}
                 cy={y}
                 r="18"
-                fill={markerColor(position)}
-                stroke="white"
+                style={{ fill: MARKER_ROLES[role].fill }}
                 strokeWidth="2"
               />
               <text
@@ -117,7 +136,7 @@ export function FieldVisualization({
                 y={y}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fill="white"
+                style={{ fill: MARKER_ROLES[role].text }}
                 fontSize={hasNumber ? '12' : '10'}
                 fontWeight="bold"
               >
@@ -134,7 +153,7 @@ export function FieldVisualization({
           <span key={item.label} className="legend-item flex items-center gap-1">
             <span
               className={`legend-color ${item.className} inline-block w-2.5 h-2.5 rounded-full`}
-              style={{ backgroundColor: item.color }}
+              style={{ backgroundColor: MARKER_ROLES[item.role].fill }}
             />
             {item.label}
           </span>
