@@ -1533,25 +1533,6 @@ export default function App() {
           />
         </div>
 
-        {/* Schedule Tab Panel */}
-        <div
-          id="schedule-tab"
-          className={cn(activeTab === 'schedule' ? "active block" : "hidden")}
-        >
-          <ScheduleTab
-            fixtures={fixtures}
-            players={players}
-            teamName={currentTeam?.name || 'Our Team'}
-            ageDivision={settings.ageDivision}
-            onAddFixture={handleAddFixture}
-            onEditFixture={handleEditFixture}
-            onDeleteFixture={handleDeleteFixture}
-            onGenerateLineupForFixture={handleGenerateLineupForFixture}
-            onLaunchMatchdayForFixture={handleLaunchMatchdayForFixture}
-            onImportScheduleFile={handleImportScheduleFile}
-          />
-        </div>
-
         {/* Season Tab Panel */}
         <div
           id="season-tab"
@@ -1586,6 +1567,25 @@ export default function App() {
               setActiveTab('roster');
               toast.info(`Viewing lineup from "${game.name}"`);
             }}
+          />
+        </div>
+
+        {/* Schedule Tab Panel */}
+        <div
+          id="schedule-tab"
+          className={cn(activeTab === 'schedule' ? "active block" : "hidden")}
+        >
+          <ScheduleTab
+            fixtures={fixtures}
+            players={players}
+            teamName={currentTeam?.name || 'Our Team'}
+            ageDivision={settings.ageDivision}
+            onAddFixture={handleAddFixture}
+            onEditFixture={handleEditFixture}
+            onDeleteFixture={handleDeleteFixture}
+            onGenerateLineupForFixture={handleGenerateLineupForFixture}
+            onLaunchMatchdayForFixture={handleLaunchMatchdayForFixture}
+            onImportScheduleFile={handleImportScheduleFile}
           />
         </div>
 

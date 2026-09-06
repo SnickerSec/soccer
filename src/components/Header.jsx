@@ -127,20 +127,6 @@ export function Header({
             <button
               type="button"
               role="tab"
-              id="schedule-tab-btn"
-              aria-controls="schedule-tab"
-              aria-selected={activeTab === 'schedule'}
-              onClick={() => onTabChange && onTabChange('schedule')}
-              className={cn(
-                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
-                activeTab === 'schedule' && "active bg-background text-foreground shadow font-semibold"
-              )}
-            >
-              Schedule
-            </button>
-            <button
-              type="button"
-              role="tab"
               id="season-tab-btn"
               aria-controls="season-tab"
               aria-selected={activeTab === 'season'}
@@ -151,6 +137,20 @@ export function Header({
               )}
             >
               Season
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="schedule-tab-btn"
+              aria-controls="schedule-tab"
+              aria-selected={activeTab === 'schedule'}
+              onClick={() => onTabChange && onTabChange('schedule')}
+              className={cn(
+                "tab-button inline-flex items-center justify-center whitespace-nowrap rounded-md px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium transition-all cursor-pointer",
+                activeTab === 'schedule' && "active bg-background text-foreground shadow font-semibold"
+              )}
+            >
+              Schedule
             </button>
             <button
               type="button"
