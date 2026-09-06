@@ -5,6 +5,13 @@
 @layer base {
   :root,
   [data-theme="dark"] {
+    /* Native controls draw themselves, and without this they draw light: the
+       date input's calendar glyph came out dark on the dark background and
+       could not be seen at all. This is what tells the browser which way round
+       the page is, so the glyph, the picker panel and the time input's spinner
+       all follow the theme instead of just the tokens above. */
+    color-scheme: dark;
+
     --background: 222 47% 6%;
     --foreground: 210 40% 96%;
 
@@ -49,6 +56,8 @@
   }
 
   [data-theme="light"] {
+    color-scheme: light;
+
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
 
