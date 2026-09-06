@@ -364,28 +364,28 @@ describe('DELETE /api/teams/:teamId/members/:memberId', () => {
 
     test('refuses to remove the last owner', async () => {
         actingAs('owner');
-        //                        BEGIN     SELECT target        COUNT owners
-        const client = stubClient([rows(), rows({ role: 'owner' }), rows({ count: 1 })]);
+        //                        BEGIN     SELECT target        LOCK team            COUNT owners
+        const client = stubClient([rows(), rows({ role: 'owner' }), rows({ id: 'team-1' }), rows({ count: 1 })]);
 
         const res = await request(buildApp(teamRoutes, ALICE))
             .delete('/api/teams/team-1/members/member-2');
 
         expect(res.status).toBe(409);
         // No DELETE, and the transaction is unwound
-        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'SELECT', 'SELECT', 'ROLLBACK']);
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'SELECT', 'SELECT', 'SELECT', 'ROLLBACK']);
         expect(client.released.count).toBe(1);
     });
 
     test('removes an owner when another remains', async () => {
         actingAs('owner');
-        const client = stubClient([rows(), rows({ role: 'owner' }), rows({ count: 2 }), rows()]);
+        const client = stubClient([rows(), rows({ role: 'owner' }), rows({ id: 'team-1' }), rows({ count: 2 }), rows()]);
 
         const res = await request(buildApp(teamRoutes, ALICE))
             .delete('/api/teams/team-1/members/member-2');
 
         expect(res.status).toBe(200);
         expect(client.statements.map(s => s.verb))
-            .toEqual(['BEGIN', 'SELECT', 'SELECT', 'DELETE', 'COMMIT']);
+            .toEqual(['BEGIN', 'SELECT', 'SELECT', 'SELECT', 'DELETE', 'COMMIT']);
     });
 
     test('still answers when the rollback itself fails', async () => {
@@ -444,12 +444,12 @@ describe('DELETE /api/teams/:teamId/membership', () => {
 
     test('refuses when the caller is the only owner', async () => {
         actingAs('owner');
-        const client = stubClient([rows(), rows({ id: 'member-1', role: 'owner' }), rows({ count: 1 })]);
+        const client = stubClient([rows(), rows({ id: 'member-1', role: 'owner' }), rows({ id: 'team-1' }), rows({ count: 1 })]);
 
         const res = await request(buildApp(teamRoutes, ALICE))
             .delete('/api/teams/team-1/membership');
 
         expect(res.status).toBe(409);
-        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'SELECT', 'SELECT', 'ROLLBACK']);
+        expect(client.statements.map(s => s.verb)).toEqual(['BEGIN', 'SELECT', 'SELECT', 'SELECT', 'ROLLBACK']);
     });
 });

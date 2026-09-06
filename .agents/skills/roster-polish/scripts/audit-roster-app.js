@@ -393,6 +393,17 @@ function laneDb() {
             }
             if (/^\s*\)\s*;/.test(line)) table = null;
         });
+
+        const alterFkRegex = /ALTER TABLE\s+"?(\w+)"?[\s\S]*?FOREIGN KEY\s*\(\s*"?(\w+)"?\s*\)\s*REFERENCES\s+"?(\w+)"?[\s\S]*?ON DELETE/gi;
+        let alterMatch;
+        while ((alterMatch = alterFkRegex.exec(text)) !== null) {
+            const alterTable = alterMatch[1].toLowerCase();
+            const alterCol = alterMatch[2].toLowerCase();
+            const existingFk = fks.find((f) => f.table.toLowerCase() === alterTable && f.column.toLowerCase() === alterCol);
+            if (existingFk) {
+                existingFk.onDelete = true;
+            }
+        }
     }
 
     if (badNames.length) {

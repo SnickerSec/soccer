@@ -161,4 +161,42 @@ describeDb('migrations', () => {
 
         await pool.query('DELETE FROM profiles WHERE id = $1', [user.id]);
     });
+
+    test('deleting a profile nulls out invited_by and created_by rather than failing', async () => {
+        const { rows: [inviter] } = await pool.query(
+            `INSERT INTO profiles (google_id, email) VALUES ('g-inviter', 'inviter@example.com') RETURNING *`);
+        const { rows: [member] } = await pool.query(
+            `INSERT INTO profiles (google_id, email) VALUES ('g-invited', 'invited@example.com') RETURNING *`);
+        const { rows: [team] } = await pool.query(
+            `INSERT INTO teams (name, created_by) VALUES ('FK FC', $1) RETURNING *`, [member.id]);
+
+        // Member was invited by inviter
+        await pool.query(
+            `UPDATE team_members SET invited_by = $1 WHERE team_id = $2 AND user_id = $3`,
+            [inviter.id, team.id, member.id]
+        );
+
+        // Game was recorded by inviter
+        const { rows: [game] } = await pool.query(
+            `INSERT INTO games (team_id, name, created_by) VALUES ($1, 'Match 1', $2) RETURNING *`,
+            [team.id, inviter.id]
+        );
+
+        // Deleting inviter profile should succeed and SET NULL on foreign keys
+        await pool.query('DELETE FROM profiles WHERE id = $1', [inviter.id]);
+
+        const { rows: [updatedMember] } = await pool.query(
+            'SELECT invited_by FROM team_members WHERE team_id = $1 AND user_id = $2',
+            [team.id, member.id]
+        );
+        expect(updatedMember.invited_by).toBeNull();
+
+        const { rows: [updatedGame] } = await pool.query(
+            'SELECT created_by FROM games WHERE id = $1',
+            [game.id]
+        );
+        expect(updatedGame.created_by).toBeNull();
+
+        await pool.query('DELETE FROM profiles WHERE id = $1', [member.id]);
+    });
 });

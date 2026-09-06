@@ -198,6 +198,13 @@ router.delete('/api/teams/:teamId/members/:memberId', requireTeamAccess('owner')
         }
 
         if (target.rows[0].role === 'owner') {
+            // Lock the parent team row so concurrent owner removals cannot both
+            // proceed and empty the team.
+            await client.query(
+                'SELECT id FROM teams WHERE id = $1 FOR UPDATE',
+                [teamId]
+            );
+
             const owners = await client.query(
                 `SELECT count(*)::int AS count FROM team_members
                  WHERE team_id = $1 AND role = 'owner' AND joined_at IS NOT NULL`,
@@ -263,6 +270,13 @@ router.delete('/api/teams/:teamId/membership', requireTeamAccess('viewer'), asyn
         }
 
         if (own.rows[0].role === 'owner') {
+            // Lock the parent team row so concurrent owner leaves cannot both
+            // proceed and empty the team.
+            await client.query(
+                'SELECT id FROM teams WHERE id = $1 FOR UPDATE',
+                [teamId]
+            );
+
             const owners = await client.query(
                 `SELECT count(*)::int AS count FROM team_members
                  WHERE team_id = $1 AND role = 'owner' AND joined_at IS NOT NULL`,
