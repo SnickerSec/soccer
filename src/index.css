@@ -147,13 +147,19 @@
     min-height: 44px;
   }
 
-  /* Clamped on one axis only, an icon-only button comes out a 44x24 oval.
-     The second selector is the dialog close button, which pairs its icon with
-     a visually-hidden label — a 16px X in the corner of every dialog, and the
-     way out of Live Matchday. */
-  button:has(> svg:only-child),
-  [role="button"]:has(> svg:only-child),
-  button:has(> svg + .sr-only:last-child) {
+  /* Clamped on one axis only, a button comes out a 44x24 oval. This started
+     as an icon-only rule, on the assumption that a text label makes a button
+     wide enough by itself. A one- or two-character label does not: the "GK"
+     and "R" rotation toggles beside every player measured 37px and 27px wide
+     at 390px, and they are tapped at the touchline as often as anything here.
+     So it covers every button, which costs nothing where the label is already
+     wider than 44px.
+
+     Not select/textarea/input: those are laid out by their container and a
+     minimum width on them makes a narrow field overflow its row rather than
+     grow a tappable one. */
+  button,
+  [role="button"] {
     min-width: 44px;
   }
 

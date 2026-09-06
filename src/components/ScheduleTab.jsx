@@ -344,7 +344,11 @@ export function ScheduleTab({
 
       {/* Fixtures List Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-        <div className="flex items-center gap-2">
+        {/* flex-wrap: the segmented filter and the Volunteer Duty Matrix button
+            together need 380px, and this row is 358px on a phone. Without it
+            the button's own label is clipped and the whole page scrolls
+            sideways — measured at 396px against a 390px viewport. */}
+        <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-lg bg-muted p-1 text-muted-foreground">
             <button
               type="button"

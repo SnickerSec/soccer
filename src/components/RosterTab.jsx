@@ -260,8 +260,12 @@ export function RosterTab({
                   )}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-                    {/* Captain Checkbox */}
-                    <div className="flex items-center" title="Select as captain (max 2)">
+                    {/* Captain Checkbox. The label, not the box, is the tap
+                        target — the same pattern the rotation-rule checkboxes
+                        use in LineupSection. This one was left at a bare 16px
+                        square when they were fixed, on the tab a coach opens
+                        first. */}
+                    <label className="flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 cursor-pointer" title="Select as captain (max 2)">
                       <input
                         type="checkbox"
                         checked={isCaptain}
@@ -270,7 +274,7 @@ export function RosterTab({
                         aria-label={`Select ${player.name} as captain`}
                         className="captain-checkbox h-4 w-4 rounded border-primary text-primary focus:ring-primary cursor-pointer accent-primary"
                       />
-                    </div>
+                    </label>
 
                     {/* Jersey Number */}
                     <Input

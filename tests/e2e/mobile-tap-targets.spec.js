@@ -15,7 +15,7 @@ import { test, expect } from '@playwright/test';
 const MIN_TAP = 44;
 const CONTROLS = 'button, [role="button"], select, textarea, input:not([type="checkbox"]):not([type="radio"])';
 
-/** Every visible control that is shorter than the minimum, with a name to identify it. */
+/** Every visible control smaller than the minimum, with a name to identify it. */
 async function undersized(page) {
     return page.$$eval(
         'button, [role="button"], select, textarea, input:not([type="checkbox"]):not([type="radio"])',
@@ -31,15 +31,43 @@ async function undersized(page) {
                     width: el.offsetWidth,
                     name: (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().slice(0, 40),
                 }))
-                .filter((box) => box.height > 0 && box.height < min),
+                // Both axes. Height alone passed the "GK" and "R" rotation
+                // toggles beside every player at 37px and 27px wide — 44 tall
+                // and a third of a target across. A button is only tappable
+                // when both sides clear the minimum. Width is ignored for a
+                // zero-height element, which is one mid-animation rather than
+                // one too small.
+                .filter((box) => box.height > 0 && (box.height < min || box.width < min)),
         MIN_TAP
     );
+}
+
+/**
+ * A checkbox stays visually small; the label around it is what the coach taps.
+ * Every one of them, so that fixing two and missing the third cannot happen
+ * twice — .captain-checkbox sat at a bare 16px square on the Roster tab while
+ * these other two were 44px.
+ */
+const WRAPPED_CHECKBOXES = ['.rest-checkbox', '.no-keeper-checkbox', '.captain-checkbox'];
+
+async function expectLabelIsTappable(page, checkbox) {
+    const label = page.locator(`label:has(${checkbox})`).first();
+
+    // Counted before it is measured. boundingBox() on a locator that matches
+    // nothing waits out the timeout and then reports a null box, so an
+    // unwrapped checkbox failed as a 30-second hang rather than as the one
+    // sentence that says what is wrong.
+    expect(await label.count(), `${checkbox} has no wrapping label to tap`).toBeGreaterThan(0);
+
+    const box = await label.boundingBox();
+    expect(box?.height, `${checkbox} label height`).toBeGreaterThanOrEqual(MIN_TAP);
+    expect(box?.width, `${checkbox} label width`).toBeGreaterThanOrEqual(MIN_TAP);
 }
 
 test.describe('Mobile tap targets', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
-    test('every control on the lineup and matchday screens is at least 44px tall', async ({ page }) => {
+    test('every control on the lineup and matchday screens is at least 44px on both axes', async ({ page }) => {
         const errors = [];
         page.on('pageerror', (e) => errors.push(e.message));
 
@@ -49,15 +77,9 @@ test.describe('Mobile tap targets', () => {
 
         expect(await undersized(page)).toEqual([]);
 
-        // The rotation-rule checkboxes stay visually small; the label around
-        // each one is what the coach actually taps.
-        const restBox = await page.locator('label:has(.rest-checkbox)').first().boundingBox();
-        expect(restBox?.height).toBeGreaterThanOrEqual(MIN_TAP);
-        expect(restBox?.width).toBeGreaterThanOrEqual(MIN_TAP);
-
-        const keeperBox = await page.locator('label:has(.no-keeper-checkbox)').first().boundingBox();
-        expect(keeperBox?.height).toBeGreaterThanOrEqual(MIN_TAP);
-        expect(keeperBox?.width).toBeGreaterThanOrEqual(MIN_TAP);
+        for (const checkbox of WRAPPED_CHECKBOXES) {
+            await expectLabelIsTappable(page, checkbox);
+        }
 
         // Live Matchday — the screen open while a game is actually running.
         await page.click('#openMatchday');
@@ -67,16 +89,31 @@ test.describe('Mobile tap targets', () => {
         expect(errors).toEqual([]);
     });
 
-    test('the page never scrolls sideways', async ({ page }) => {
-        await page.goto('/');
-        await page.click('#demoButton');
-        await page.click('#generateLineup');
+    // Every tab, not just the one the app opens on. The Schedule tab pushed the
+    // page to 396px against a 390px viewport — its filter row and the Volunteer
+    // Duty Matrix button did not fit on one line and did not wrap — and a check
+    // that never left the roster could not see it.
+    const TABS = [
+        ['roster', '#roster-tab-btn'],
+        ['schedule', '#schedule-tab-btn'],
+        ['season', '#season-tab-btn'],
+        ['evaluation', '#evaluation-tab-btn'],
+    ];
 
-        const overflows = await page.evaluate(
-            () => document.documentElement.scrollWidth > document.documentElement.clientWidth
-        );
-        expect(overflows).toBe(false);
-    });
+    for (const [name, tabButton] of TABS) {
+        test(`the ${name} tab never scrolls sideways`, async ({ page }) => {
+            await page.goto('/');
+            await page.click('#demoButton');
+            await page.click('#generateLineup');
+            await page.click(tabButton);
+
+            const width = await page.evaluate(() => ({
+                content: document.documentElement.scrollWidth,
+                viewport: document.documentElement.clientWidth,
+            }));
+            expect(width.content).toBeLessThanOrEqual(width.viewport);
+        });
+    }
 
     test('inputs are at least 16px so mobile Safari does not zoom on focus', async ({ page }) => {
         await page.goto('/');
