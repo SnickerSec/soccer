@@ -312,8 +312,45 @@ export function SeasonTab({
 
       {/* Player Statistics Table */}
       <Card className="shadow-sm overflow-hidden">
-        <CardHeader className="py-3 px-4 border-b bg-muted/20">
+        {/*
+          The two season actions sit in this header rather than below the card:
+          they act on the table under them — one exports it, the other empties
+          it — and at the foot of the tab they were a long scroll away from it.
+
+          Same shape as the Game Settings header: the buttons stack under the
+          title below `sm` rather than squeezing it, since "Clear All History"
+          and "Export Stats (CSV)" do not fit beside a title on a phone.
+        */}
+        <CardHeader className="flex flex-col items-start gap-3 space-y-0 py-3 px-4 border-b bg-muted/20 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <CardTitle className="text-sm font-semibold">Player Statistics</CardTitle>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              id="exportSeasonStats"
+              onClick={onExportStats}
+              disabled={gameHistory.length === 0}
+              className="flex items-center gap-1.5 text-xs"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Export Stats (CSV)
+            </Button>
+
+            {gameHistory.length > 0 && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                id="clearSeasonHistory"
+                onClick={onClearHistory}
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Clear All History
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {Object.keys(stats).length === 0 ? (
@@ -427,36 +464,6 @@ export function SeasonTab({
           )}
         </CardContent>
       </Card>
-
-      {/* Season Action Buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          id="exportSeasonStats"
-          onClick={onExportStats}
-          disabled={gameHistory.length === 0}
-          className="flex items-center gap-1.5 text-xs"
-        >
-          <FileSpreadsheet className="h-3.5 w-3.5" />
-          Export Stats (CSV)
-        </Button>
-
-        {gameHistory.length > 0 && (
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            id="clearSeasonHistory"
-            onClick={onClearHistory}
-            className="flex items-center gap-1.5 text-xs"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Clear All History
-          </Button>
-        )}
-      </div>
     </div>
   );
 }
