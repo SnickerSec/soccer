@@ -7,6 +7,15 @@ import {
     currentPlayerPositions
 } from '../src/modules/season-stats.js';
 
+/** The shape getLineupRecommendations reads, with every counter at nought. */
+const emptyStats = () => ({
+    gamesPlayed: 0, gamesOnRoster: 0, gamesAttended: 0, gamesAbsent: 0, gamesInjured: 0,
+    totalQuarters: 0, quartersPlayed: 0, totalSitting: 0, sittingQuarters: 0,
+    goalkeeperQuarters: 0, keeperQuarters: 0,
+    offensiveQuarters: 0, defensiveQuarters: 0, midfieldQuarters: 0,
+    captainGames: 0, positions: {},
+});
+
 // Test data
 const mockPlayers = [
     { name: 'Alice', status: 'available', noKeeper: false },
@@ -255,10 +264,96 @@ describe('getLineupRecommendations', () => {
         expect(recommendations).toBeNull();
     });
 
-    test('should return null if no available players', () => {
-        const unavailablePlayers = mockPlayers.map(p => ({ ...p, status: 'absent' }));
-        const recommendations = getLineupRecommendations(unavailablePlayers, mockSavedGames, {});
-        expect(recommendations).toBeNull();
+    test('should return null only when the roster itself is empty', () => {
+        expect(getLineupRecommendations([], mockSavedGames, {})).toBeNull();
+    });
+
+    /**
+     * `status` is what the coach set for the *last* game and it is sticky, so
+     * using it to filter advice for the next one hid whoever missed a game —
+     * the very players the rotation owes, since they have the fewest keeper
+     * quarters and captain games. It is not consulted here any more.
+     */
+    test('a player marked absent is still recommended for the next game', () => {
+        const players = [
+            { name: 'Alice', status: 'available', noKeeper: false },
+            { name: 'Bob', status: 'absent', noKeeper: false },
+        ];
+        const stats = {
+            Alice: { ...emptyStats(), gamesPlayed: 2, totalQuarters: 8, goalkeeperQuarters: 2 },
+            Bob: { ...emptyStats(), gamesPlayed: 1, totalQuarters: 4, goalkeeperQuarters: 0 },
+        };
+
+        const recommendations = getLineupRecommendations(players, mockSavedGames, stats);
+
+        // Bob has never kept, so he is the keeper the rotation owes — being
+        // marked absent for the last game must not hide him.
+        expect(recommendations.shouldKeep.map(p => p.name)).toEqual(['Bob']);
+    });
+
+    /**
+     * The squad that reported this: ten players, two even games. Henry and Amos
+     * were the only two who had never kept, both were marked absent, and the
+     * three players the tab then recommended had each already kept once.
+     */
+    test('the keepers named are those who have kept least, whatever their status', () => {
+        const table = [
+            // name,      games, qtrs, gk, backs, fwds, sit, absences
+            ['Brady',   2, 7, 1, 3, 3, 1, 0],
+            ['Henry',   2, 6, 0, 3, 3, 2, 0],
+            ['Ephraim', 2, 7, 1, 3, 3, 1, 0],
+            ['Amos',    1, 3, 0, 2, 1, 1, 1],
+            ['Kamu',    2, 6, 1, 3, 2, 2, 0],
+            ['Jordan',  2, 6, 1, 2, 3, 2, 0],
+            ['Brees',   2, 6, 1, 2, 3, 2, 0],
+            ['Kevin',   2, 6, 1, 2, 3, 2, 0],
+            ['Elias',   2, 6, 1, 3, 2, 2, 0],
+            ['Savior',  0, 0, 0, 0, 0, 0, 2],
+        ];
+        // Absent is exactly how the reporting squad had them.
+        const absent = new Set(['Henry', 'Amos']);
+        const players = table.map(([name]) => ({
+            name,
+            noKeeper: false,
+            status: absent.has(name) ? 'absent' : 'available',
+        }));
+        const stats = {};
+        for (const [name, games, qtrs, gk, backs, fwds, sit, absences] of table) {
+            stats[name] = {
+                ...emptyStats(),
+                gamesPlayed: games, totalQuarters: qtrs, totalSitting: sit,
+                goalkeeperQuarters: gk, keeperQuarters: gk,
+                offensiveQuarters: fwds, defensiveQuarters: backs,
+                gamesAbsent: absences,
+            };
+        }
+
+        const recommendations = getLineupRecommendations(players, mockSavedGames, stats);
+
+        // Henry and Amos are the only two on nought.
+        expect(recommendations.shouldKeep.map(p => p.name).sort()).toEqual(['Amos', 'Henry']);
+        expect(recommendations.shouldKeep.every(p => p.gkCount === 0)).toBe(true);
+
+        // And Amos's own missed game is reported rather than swallowed.
+        expect(recommendations.returningFromAbsence.map(p => p.name)).toContain('Amos');
+    });
+
+    test('noKeeper still excludes a player from the goalkeeper list only', () => {
+        const players = [
+            { name: 'Alice', status: 'available', noKeeper: false },
+            { name: 'Gloves', status: 'available', noKeeper: true },
+        ];
+        const stats = {
+            Alice: { ...emptyStats(), gamesPlayed: 2, totalQuarters: 8, goalkeeperQuarters: 2 },
+            // Never kept, but will not keep — so named nowhere as a keeper,
+            // and still eligible everywhere else.
+            Gloves: { ...emptyStats(), gamesPlayed: 2, totalQuarters: 8, goalkeeperQuarters: 0 },
+        };
+
+        const recommendations = getLineupRecommendations(players, mockSavedGames, stats);
+
+        expect(recommendations.shouldKeep.map(p => p.name)).toEqual(['Alice']);
+        expect(recommendations.shouldCaptain.map(p => p.name)).toContain('Gloves');
     });
 
     test('should return recommendations object with all categories', () => {

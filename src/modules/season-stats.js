@@ -291,9 +291,24 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
     }
 
     const stats = arg3 || calculatePlayerStats(players, savedGames);
-    const availablePlayers = (players || []).filter(p => !p.status || p.status === 'available');
+    // Every player on the roster, whatever their status says today.
+    //
+    // These recommend a game that has not been played yet, and `status` is what
+    // the coach set for the last one — it is sticky, so an absence weeks ago
+    // quietly removed a player from all six lists. It removed exactly the wrong
+    // people: whoever missed games has the fewest keeper quarters and captain
+    // games, so the rotation owes them most, and they were the ones hidden. A
+    // squad where the two players who had never kept were both marked absent
+    // recommended three players who had each already kept once.
+    //
+    // Nothing said so, either. They stayed in the statistics table and the
+    // heatmap, so the advice did not look filtered, it looked wrong.
+    //
+    // `noKeeper` still excludes, but only from the goalkeeper list: that is a
+    // standing fact about a player, not one afternoon's availability.
+    const rosterPlayers = players || [];
 
-    if (availablePlayers.length === 0 || (savedGames || []).length === 0) {
+    if (rosterPlayers.length === 0 || (savedGames || []).length === 0) {
         return null;
     }
 
@@ -308,7 +323,7 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
     };
 
     // Calculate data for each player
-    const playerData = availablePlayers.map(player => {
+    const playerData = rosterPlayers.map(player => {
         const s = stats[player.name] || createEmptyStats();
         const gamesPlayed = s.gamesPlayed || 0;
 
@@ -403,8 +418,8 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
                 .join(', ')
         }));
 
-    // Players returning from absence (missed games previously, now available)
-    recommendations.returningFromAbsence = availablePlayers
+    // Players who have missed games, so the coach can give the time back
+    recommendations.returningFromAbsence = rosterPlayers
         .filter(p => {
             const s = stats[p.name];
             return s && s.gamesAbsent > 0;
