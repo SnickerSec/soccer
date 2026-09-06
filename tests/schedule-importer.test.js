@@ -4,6 +4,12 @@ import {
   normalizeTimeString,
   parseSummaryDetails,
   parseIcsSchedule,
+  parseIcsCalendar,
+  parseIcsDateTime,
+  parseIcsDescription,
+  normalizeIcsLocation,
+  classifyIcsEvent,
+  detectIcsPlatform,
   detectScheduleColumns,
   parseCsvSchedule,
   extractFixturesFromFile,
@@ -77,6 +83,23 @@ describe('parseSummaryDetails', () => {
     const res = parseSummaryDetails('AYSO Match 1: Strikers vs Vipers', 'Strikers');
     expect(res.opponent).toBe('Vipers');
   });
+
+  test('drops the TeamSnap event label', () => {
+    const res = parseSummaryDetails('Game: U10B-02 Williams vs U10B-07 Shaffer', 'U10B-02 Williams');
+    expect(res.opponent).toBe('U10B-07 Shaffer');
+    expect(res.homeAway).toBe('home');
+  });
+
+  test('takes the other side when the coach"s team is named second', () => {
+    const res = parseSummaryDetails('Game: U10B-07 Shaffer vs U10B-02 Williams', 'U10B-02 Williams');
+    expect(res.opponent).toBe('U10B-07 Shaffer');
+    expect(res.homeAway).toBe('away');
+  });
+
+  test('leaves the venue out of the opponent name', () => {
+    const res = parseSummaryDetails('Thunder vs Sharks at Kailua District Park', 'Thunder');
+    expect(res.opponent).toBe('Sharks');
+  });
 });
 
 describe('parseIcsSchedule', () => {
@@ -110,7 +133,7 @@ END:VEVENT
 END:VCALENDAR`;
 
   test('parses multiple VEVENT entries into fixtures', () => {
-    const fixtures = parseIcsSchedule(sampleIcs, 'Thunder');
+    const fixtures = parseIcsSchedule(sampleIcs, 'Thunder', 'UTC');
     expect(fixtures).toHaveLength(3);
 
     // Event 1
@@ -151,7 +174,7 @@ LOCATION:Kapiolani Park Field 1
 END:VEVENT
 END:VCALENDAR`;
 
-    const fixtures = parseIcsSchedule(foldedIcs, 'Thunder');
+    const fixtures = parseIcsSchedule(foldedIcs, 'Thunder', 'UTC');
     expect(fixtures).toHaveLength(1);
     expect(fixtures[0].opponent).toBe('Very Long Opponent Name That Wraps');
   });
@@ -218,11 +241,214 @@ END:VCALENDAR`;
       text: async () => icsContent,
     };
 
-    const res = await extractFixturesFromFile(mockFile, 'Thunder');
+    const res = await extractFixturesFromFile(mockFile, 'Thunder', 'UTC');
     expect(res.platform).toBe('iCalendar (.ics)');
     expect(res.count).toBe(2);
     // Chronologically sorted
     expect(res.fixtures[0].gameDate).toBe('2026-09-12');
     expect(res.fixtures[1].gameDate).toBe('2026-10-10');
+  });
+});
+
+describe('parseIcsDateTime', () => {
+  test('reads a UTC stamp as the coach"s own calendar date and clock', () => {
+    // 2pm Saturday in Hawaii is midnight Sunday UTC: reading the digits as
+    // written filed the whole season a day late, at 12:00 AM.
+    expect(parseIcsDateTime('20260830T000000Z', '', 'Pacific/Honolulu')).toEqual({
+      gameDate: '2026-08-29',
+      gameTime: '2:00 PM',
+    });
+    expect(parseIcsDateTime('20260912T090000Z', '', 'America/New_York')).toEqual({
+      gameDate: '2026-09-12',
+      gameTime: '5:00 AM',
+    });
+  });
+
+  test('converts a TZID wall time into the reading zone', () => {
+    expect(
+      parseIcsDateTime('20260912T090000', 'TZID=America/New_York', 'America/Los_Angeles')
+    ).toEqual({ gameDate: '2026-09-12', gameTime: '6:00 AM' });
+  });
+
+  test('takes a floating time as written', () => {
+    expect(parseIcsDateTime('20260912T090000', '', 'Pacific/Honolulu')).toEqual({
+      gameDate: '2026-09-12',
+      gameTime: '9:00 AM',
+    });
+  });
+
+  test('falls back to the digits for a zone the runtime does not know', () => {
+    expect(
+      parseIcsDateTime('20260912T090000', 'TZID=Pacific Standard Time', 'Pacific/Honolulu')
+    ).toEqual({ gameDate: '2026-09-12', gameTime: '9:00 AM' });
+  });
+
+  test('handles an all-day date with no time', () => {
+    expect(parseIcsDateTime('20260912', 'VALUE=DATE', 'Pacific/Honolulu')).toEqual({
+      gameDate: '2026-09-12',
+      gameTime: '',
+    });
+  });
+});
+
+describe('classifyIcsEvent', () => {
+  test('recognises games, practices and unlabelled events', () => {
+    expect(classifyIcsEvent('Game: U10B-02 Williams vs U10B-07 Shaffer')).toBe('game');
+    expect(classifyIcsEvent('vs Sharks')).toBe('game');
+    expect(classifyIcsEvent('Practice: U10B-02 Williams Practice at Kaha Park')).toBe('other');
+    expect(classifyIcsEvent('Team Photo Day')).toBe('other');
+    expect(classifyIcsEvent('End of season BBQ')).toBe('unknown');
+  });
+
+  test('a practice that names an opponent is still a practice', () => {
+    expect(classifyIcsEvent('Practice: Thunder vs Reserves')).toBe('other');
+  });
+
+  test('reads CATEGORIES when the summary says nothing', () => {
+    expect(classifyIcsEvent('Kailua District Park', 'Practice')).toBe('other');
+    expect(classifyIcsEvent('Kailua District Park', 'Game')).toBe('game');
+  });
+});
+
+describe('normalizeIcsLocation', () => {
+  test('flattens a venue and its address onto one line', () => {
+    expect(
+      normalizeIcsLocation('Kawai Nui Neighborhood Park\nKaha St, Kailua, HI 96734, USA')
+    ).toBe('Kawai Nui Neighborhood Park, Kaha St, Kailua, HI 96734, USA');
+  });
+
+  test('leaves a single-line location alone', () => {
+    expect(normalizeIcsLocation('Kapiolani Park, Field 3')).toBe('Kapiolani Park, Field 3');
+  });
+});
+
+describe('parseIcsDescription', () => {
+  test('keeps the duties and drops what the fixture already says', () => {
+    const description = [
+      'Game: U10B-02 Williams vs U10B-07 Shaffer',
+      'Location: Kailua District Park - PAV Field 1',
+      'Kailua District Park, South Kainalu Drive, Kailua, HI',
+      'Duration: 1 hour 15 minutes',
+      'Link: https://link.teamsnapone.com/j8yu/lti6qv3a?deep_link_value=tsone',
+    ].join('\n');
+
+    const parsed = parseIcsDescription(description, {
+      summary: 'Game: U10B-02 Williams vs U10B-07 Shaffer',
+      location:
+        'Kailua District Park - PAV Field 1\nKailua District Park, South Kainalu Drive, Kailua, HI',
+    });
+
+    expect(parsed.notes).toBe('');
+  });
+
+  test('lifts volunteer duties out of the notes', () => {
+    const parsed = parseIcsDescription(
+      'Jersey: Blue\nSnack: Alice\nFruit: Bob\nReferee: Charlie\nField Setup: Dave\nBring extra water'
+    );
+    expect(parsed.jerseyColor).toBe('Blue');
+    expect(parsed.snackParent).toBe('Alice');
+    expect(parsed.fruitParent).toBe('Bob');
+    expect(parsed.refereeDuty).toBe('Charlie');
+    expect(parsed.fieldSetup).toBe('Dave');
+    expect(parsed.notes).toBe('Bring extra water');
+  });
+});
+
+describe('detectIcsPlatform', () => {
+  test('names the service the calendar came from', () => {
+    expect(detectIcsPlatform('BEGIN:VCALENDAR\nPRODID:-//TeamSnap//TeamSnap Calendar//EN')).toBe(
+      'TeamSnap Calendar'
+    );
+    expect(detectIcsPlatform('BEGIN:VCALENDAR\nPRODID:-//Google Inc//Google Calendar//EN')).toBe(
+      'Google Calendar'
+    );
+    expect(detectIcsPlatform('BEGIN:VCALENDAR\nPRODID:-//Some League//EN')).toBe('iCalendar (.ics)');
+  });
+});
+
+describe('a TeamSnap "one calendar" dump', () => {
+  // The shape TeamSnap exports: CRLF, tab-folded lines, the whole calendar
+  // rather than the match list, and every DTSTART in UTC.
+  const teamsnapIcs = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'CALSCALE:GREGORIAN',
+    'PRODID:-//TeamSnap//TeamSnap Calendar//EN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:TeamSnap ONE Schedule',
+    'BEGIN:VEVENT',
+    'UID:event-979924@teamsnapone.com',
+    'SUMMARY:Practice: U10B-02 Williams Practice at Kaha Park',
+    'DTSTART:20260811T030000Z',
+    'DESCRIPTION:Practice: U10B-02 Williams Practice at Kaha Park\\nLocation: Kaw',
+    '\tai Nui Neighborhood Park\\nKaha St\\, Kailua\\, HI 96734\\, USA\\nDuration: 1 h',
+    '\tour\\nLink: https://link.teamsnapone.com/j8yu/lti6qv3a',
+    'LOCATION:Kawai Nui Neighborhood Park\\nKaha St\\, Kailua\\, HI 96734\\, USA',
+    'STATUS:CONFIRMED',
+    'DURATION:PT1H',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:event-1200100@teamsnapone.com',
+    'SUMMARY:Game: U10B-02 Williams vs U10B-07 Shaffer',
+    'DTSTART:20260830T000000Z',
+    'DESCRIPTION:Game: U10B-02 Williams vs U10B-07 Shaffer\\nLocation: Kailua Dis',
+    '\ttrict Park - Pavilion - PAV Field 1\\nKailua District Park\\, South Kainalu ',
+    '\tDrive\\, Kailua\\, HI\\nDuration: 1 hour 15 minutes\\nLink: https://link.teams',
+    '\tnapone.com/j8yu/lti6qv3a',
+    'LOCATION:Kailua District Park - Pavilion - PAV Field 1\\nKailua District Par',
+    '\tk\\, South Kainalu Drive\\, Kailua\\, HI',
+    'STATUS:CONFIRMED',
+    'DURATION:PT1H15M',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  test('imports the games and leaves the practices behind', () => {
+    const { fixtures, skipped } = parseIcsCalendar(
+      teamsnapIcs,
+      'U10B-02 Williams',
+      'Pacific/Honolulu'
+    );
+
+    expect(skipped).toBe(1);
+    expect(fixtures).toHaveLength(1);
+
+    const [game] = fixtures;
+    expect(game.gameDate).toBe('2026-08-29');
+    expect(game.gameTime).toBe('2:00 PM');
+    expect(game.opponent).toBe('U10B-07 Shaffer');
+    expect(game.location).toBe(
+      'Kailua District Park - Pavilion - PAV Field 1, Kailua District Park, South Kainalu Drive, Kailua, HI'
+    );
+    expect(game.notes).toBe('');
+    expect(game.status).toBe('upcoming');
+  });
+
+  test('reports the platform and the skipped count to the import preview', async () => {
+    const res = await extractFixturesFromFile(
+      { name: 'user.ics', text: async () => teamsnapIcs },
+      'U10B-02 Williams',
+      'Pacific/Honolulu'
+    );
+
+    expect(res.platform).toBe('TeamSnap Calendar');
+    expect(res.count).toBe(1);
+    expect(res.skipped).toBe(1);
+  });
+
+  test('a calendar that labels nothing is imported whole', () => {
+    const unlabelled = [
+      'BEGIN:VCALENDAR',
+      'BEGIN:VEVENT',
+      'UID:a',
+      'SUMMARY:Kickoff BBQ',
+      'DTSTART:20260912T190000Z',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const { fixtures, skipped } = parseIcsCalendar(unlabelled, 'Thunder', 'UTC');
+    expect(fixtures).toHaveLength(1);
+    expect(skipped).toBe(0);
   });
 });

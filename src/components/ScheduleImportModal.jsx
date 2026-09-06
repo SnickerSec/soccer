@@ -29,7 +29,7 @@ export function ScheduleImportModal({
   parsedData,
   onConfirmImport,
 }) {
-  const { platform = 'Calendar Schedule', fixtures = [] } = parsedData || {};
+  const { platform = 'Calendar Schedule', fixtures = [], skipped = 0 } = parsedData || {};
   const [selectedIndices, setSelectedIndices] = useState(() =>
     fixtures.map((_, i) => i)
   );
@@ -87,6 +87,15 @@ export function ScheduleImportModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 py-2">
+          {/* A full-calendar export holds practices and team events too; only
+              the matches are imported, and the coach is told what was left. */}
+          {skipped > 0 && (
+            <p className="text-xs text-muted-foreground px-1">
+              {skipped} non-match {skipped === 1 ? 'event was' : 'events were'} skipped
+              (practices, team events).
+            </p>
+          )}
+
           {/* Import Mode Radio selection */}
           <div className="p-3 rounded-lg border bg-muted/20 space-y-2">
             <span className="text-xs font-bold text-foreground block">

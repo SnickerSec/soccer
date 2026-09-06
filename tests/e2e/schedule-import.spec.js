@@ -61,6 +61,65 @@ END:VCALENDAR`;
     await expect(page.locator('#schedule-tab')).toContainText('Kapiolani Park Field 1');
   });
 
+  // A TeamSnap "one calendar" export: CRLF, tab-folded lines, every DTSTART in
+  // UTC, and the practices outnumbering the games four to one.
+  const teamsnapIcsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//TeamSnap//TeamSnap Calendar//EN',
+    'BEGIN:VEVENT',
+    'UID:event-979924@teamsnapone.com',
+    'SUMMARY:Practice: U10B-02 Williams Practice at Kaha Park',
+    'DTSTART:20260811T030000Z',
+    'LOCATION:Kawai Nui Neighborhood Park\\nKaha St\\, Kailua\\, HI 96734\\, USA',
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:event-1200100@teamsnapone.com',
+    'SUMMARY:Game: U10B-02 Williams vs U10B-07 Shaffer',
+    'DTSTART:20260830T000000Z',
+    'DESCRIPTION:Game: U10B-02 Williams vs U10B-07 Shaffer\\nLocation: Kailua Dis',
+    '\ttrict Park - PAV Field 1\\nDuration: 1 hour 15 minutes\\nLink: https://link',
+    '\t.teamsnapone.com/j8yu/lti6qv3a',
+    'LOCATION:Kailua District Park - PAV Field 1',
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  test.describe('a TeamSnap calendar dump', () => {
+    // The kickoff is 2pm Saturday in Hawaii, which TeamSnap stamps as midnight
+    // Sunday UTC. Pin the browser's zone so the assertion means that.
+    test.use({ timezoneId: 'Pacific/Honolulu' });
+
+    test('imports the games at the local kickoff and leaves the practices out', async ({ page }) => {
+      await page.goto('/');
+      await page.click('#schedule-tab-btn');
+
+      await page.locator('#scheduleFileInput').setInputFiles({
+        name: 'user.ics',
+        mimeType: 'text/calendar',
+        buffer: Buffer.from(teamsnapIcsContent, 'utf-8'),
+      });
+
+      const modal = page.locator('#scheduleImportModal');
+      await expect(modal).toBeVisible();
+      await expect(modal).toContainText('TeamSnap Calendar');
+      await expect(modal).toContainText('U10B-07 Shaffer');
+      await expect(modal).toContainText('1 non-match event was skipped');
+      await expect(modal).not.toContainText('Kaha Park');
+      // Saturday the 29th at 2pm, not Sunday the 30th at midnight.
+      await expect(modal).toContainText('Saturday, August 29, 2026 • 2:00 PM');
+
+      await page.click('#confirmScheduleImportBtn');
+      await expect(modal).not.toBeVisible();
+
+      const scheduleTab = page.locator('#schedule-tab');
+      await expect(scheduleTab).toContainText('U10B-07 Shaffer');
+      await expect(scheduleTab).not.toContainText('Kaha Park');
+    });
+  });
+
   test('uploads CSV schedule, previews, and replaces schedule', async ({ page }) => {
     const csvContent = `Date,Time,Opponent,Home/Away,Location / Field,Jersey Color,Post-Game Snack,Halftime Fruit
 2026-10-03,08:30,Firebirds,Home,Ala Wai Field 2,Red,Sarah,Tom

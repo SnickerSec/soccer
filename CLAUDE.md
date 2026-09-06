@@ -403,6 +403,44 @@ replaced by the server's copy, which is App's cue to read the schedule back.
 A push reports `synced` too, and re-reading on one of those would race the
 state being pushed.
 
+### Importing a calendar
+
+`src/modules/schedule-importer.js` reads a season out of a `.ics` export.
+TeamSnap is what it is written against, and a TeamSnap export gets three things
+wrong if it is read literally.
+
+`DTSTART` is stamped in UTC. A 2pm Saturday kickoff in Hawaii is
+`20260830T000000Z` — midnight, the following day — so reading the digits as
+written filed every match in the season a day late at 12:00 AM.
+`parseIcsDateTime` converts: `Z` is an instant and is rendered in the coach's
+own zone, a `TZID=` parameter names the zone its wall time belongs to, and a
+floating time with neither means the same clock reading everywhere and is taken
+as it stands. It takes the zone to render into as an argument, defaulting to
+the device's, because a test that asserts a converted date otherwise passes or
+fails on where the machine running it happens to be.
+
+The export is the whole calendar, not the match list. The season this was
+written against holds ten games and forty practices, and importing all fifty
+filled the schedule with matches against "Practice at Kaha Park".
+`classifyIcsEvent` reads the label TeamSnap puts in front of every summary, and
+a calendar that names any of its events a game is taken at its word — nothing
+else in it is imported, and the preview says how many were left. A calendar
+that labels nothing is still imported whole, so a hand-made one of ten untitled
+fixtures works.
+
+`SUMMARY`, `LOCATION` and `DESCRIPTION` each carry more than the field they
+fill. The label comes off the front of the opponent ("Game: A vs B"), and the
+coach's own team is recognised on either side of the separator, since "A vs us"
+is our away game. A multi-line `LOCATION` is a venue and its street address and
+is flattened onto one line. Most of a `DESCRIPTION` is the summary and the
+location again, a duration and a deep link a hundred characters long, so
+`parseIcsDescription` lifts out the volunteer duties and drops the rest rather
+than putting all of it in the notes of a match the coach is already looking at.
+
+Home and away is the one thing an export like this cannot say. TeamSnap names
+your team first whether or not you are hosting, so every match imports as home
+and the coach fixes the away ones. Nothing here guesses from the venue.
+
 ### How the team plays
 
 The division, how many take the field, the formation and the number of quarters

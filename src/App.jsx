@@ -1396,7 +1396,11 @@ export default function App() {
     try {
       const parsed = await extractFixturesFromFile(file, currentTeam?.name || '');
       if (!parsed.fixtures || parsed.fixtures.length === 0) {
-        toast.error('No matches found in this calendar file.');
+        toast.error(
+          parsed.skipped
+            ? `No matches in this calendar — its ${parsed.skipped} events are all practices or team events.`
+            : 'No matches found in this calendar file.'
+        );
         return;
       }
       setScheduleImportData(parsed);
