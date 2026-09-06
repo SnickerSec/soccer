@@ -1257,6 +1257,36 @@ export default function App() {
     });
   };
 
+  /**
+   * Put a saved game's lineup back on the field.
+   *
+   * This is what opening a game from the Season tab used to do on its own, and
+   * it is a lot: it moves the coach to the Roster tab and sets the division,
+   * field size and formation to that game's. Reading a game is now done where
+   * the game is, and this happens only when the button that says so is pressed.
+   */
+  const handleOpenGameOnField = (game) => {
+    const ageDivision = game.ageDivision || game.division || '10U';
+    const fieldPlayers = game.fieldPlayers || (CONSTANTS.AGE_DIVISIONS[ageDivision] ? CONSTANTS.AGE_DIVISIONS[ageDivision].fieldSize : 7);
+    const formation = game.formation || '2-3-1';
+    // The screen alone: this is how that game was played, not a decision about
+    // how the team plays from here on.
+    updateSettings({ ageDivision, fieldPlayers, formation }, { push: false });
+    setLineup({
+      // Under the names this formation uses now: a 3-3 saved before its middle
+      // line was renamed stores Left/Center/Right Mid, and the forward rows
+      // would all read TBD.
+      quarters: currentQuarters(game),
+      formation,
+      fieldPlayers,
+      warnings: [],
+      playerStats: game.players ? currentPlayerPositions(game) : players,
+      generatedAt: Date.now(),
+    });
+    setActiveTab('roster');
+    toast.info(`Viewing lineup from "${game.name}"`);
+  };
+
   const handleUpdateGame = (gameId, updates) => {
     setGameHistory((prev) => {
       const updated = prev.map((g) => (g.id === gameId ? { ...g, ...updates } : g));
@@ -1565,29 +1595,8 @@ export default function App() {
             onExportStats={handleExportSeasonStats}
             onClearHistory={handleClearSeasonHistory}
             onDeleteGame={handleDeleteGame}
-            onEditGame={(game) => setEditingGame(game)}
             onOpenNotes={(game) => setNotesModalGame(game)}
-            onViewGame={(game) => {
-              const ageDivision = game.ageDivision || game.division || '10U';
-              const fieldPlayers = game.fieldPlayers || (CONSTANTS.AGE_DIVISIONS[ageDivision] ? CONSTANTS.AGE_DIVISIONS[ageDivision].fieldSize : 7);
-              const formation = game.formation || '2-3-1';
-              // The screen alone: this is how that game was played, not a
-              // decision about how the team plays from here on.
-              updateSettings({ ageDivision, fieldPlayers, formation }, { push: false });
-              setLineup({
-                // Under the names this formation uses now: a 3-3 saved before
-                // its middle line was renamed stores Left/Center/Right Mid,
-                // and the forward rows would all read TBD.
-                quarters: currentQuarters(game),
-                formation,
-                fieldPlayers,
-                warnings: [],
-                playerStats: game.players ? currentPlayerPositions(game) : players,
-                generatedAt: Date.now(),
-              });
-              setActiveTab('roster');
-              toast.info(`Viewing lineup from "${game.name}"`);
-            }}
+            onViewGame={(game) => setEditingGame(game)}
           />
         </div>
 
@@ -1717,6 +1726,7 @@ export default function App() {
         game={editingGame}
         onClose={() => setEditingGame(null)}
         onSave={handleUpdateGame}
+        onOpenOnField={handleOpenGameOnField}
       />
 
       <InviteModal

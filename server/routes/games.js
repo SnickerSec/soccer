@@ -216,6 +216,40 @@ router.put('/api/games/:id', requireAuth, async (req, res) => {
             values.push(updates.date || null);
         }
 
+        // What happened is not always what was planned, so the record of the
+        // match itself is editable and not only its name and notes. The
+        // per-player rows are recomputed client-side from the corrected
+        // quarters before they get here: season stats read those and never the
+        // lineup, so the two have to be written together.
+        if (updates.lineup !== undefined) {
+            if (!Array.isArray(updates.lineup)) {
+                return res.status(400).json({ success: false, error: 'Game lineup must be an array of quarters' });
+            }
+            setClauses.push(`lineup = $${paramIndex++}`);
+            values.push(JSON.stringify(updates.lineup));
+        }
+        if (updates.players !== undefined) {
+            if (!Array.isArray(updates.players)) {
+                return res.status(400).json({ success: false, error: 'Game players must be an array' });
+            }
+            setClauses.push(`player_snapshot = $${paramIndex++}`);
+            values.push(JSON.stringify(updates.players));
+        }
+        if (updates.captains !== undefined) {
+            if (!Array.isArray(updates.captains) || updates.captains.some(c => typeof c !== 'string')) {
+                return res.status(400).json({ success: false, error: 'Game captains must be an array of names' });
+            }
+            setClauses.push(`captains = $${paramIndex++}`);
+            values.push(updates.captains);
+        }
+        if (updates.settings !== undefined) {
+            if (updates.settings === null || typeof updates.settings !== 'object' || Array.isArray(updates.settings)) {
+                return res.status(400).json({ success: false, error: 'Game settings must be an object' });
+            }
+            setClauses.push(`settings = $${paramIndex++}`);
+            values.push(JSON.stringify(updates.settings));
+        }
+
         if (setClauses.length > 0) {
             values.push(req.params.id);
             await pool.query(

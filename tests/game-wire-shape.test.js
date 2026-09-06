@@ -36,7 +36,7 @@ jest.unstable_mockModule('../src/modules/api-client.js', () => ({
     getUser: async () => ({ id: 'user-1' })
 }));
 
-const { saveGame, getGames } = await import('../src/modules/cloud-storage.js');
+const { saveGame, getGames, updateGame } = await import('../src/modules/cloud-storage.js');
 
 /** A game in the shape handleSaveGame builds. */
 const localGame = () => ({
@@ -228,5 +228,60 @@ describe('round trip', () => {
         expect(returned.ageDivision).toBe(game.ageDivision);
         expect(returned.formation).toBe(game.formation);
         expect(returned.fieldPlayers).toBe(game.fieldPlayers);
+    });
+});
+
+/**
+ * A game edited after the fact goes up the same way it went up new: the
+ * quarters belong in `lineup`, and nothing the edit did not touch may be
+ * overwritten on the way.
+ */
+describe('editing a saved game', () => {
+    test('puts corrected quarters in the column that stores them', async () => {
+        reply = { success: true };
+        const quarters = [{ quarter: 1, positions: { Keeper: 'Ben Ortiz' } }];
+
+        await updateGame('b8a1-uuid', { quarters, captains: ['Ben Ortiz'] });
+
+        expect(sent.path).toBe('/api/games/b8a1-uuid');
+        expect(sent.body.lineup).toEqual(quarters);
+        expect(sent.body.captains).toEqual(['Ben Ortiz']);
+        expect(sent.body).not.toHaveProperty('quarters');
+    });
+
+    test('sends the recomputed squad, which is what the season counts', async () => {
+        reply = { success: true };
+        const players = [{ name: 'Alex Kim', status: 'absent', quartersPlayed: [] }];
+
+        await updateGame('b8a1-uuid', { players });
+
+        expect(sent.body.players).toEqual(players);
+    });
+
+    /**
+     * A full toWireGame() would build a settings object out of undefined
+     * fields, so an edit to the notes alone would blank the division, the
+     * formation and the field size the game was played at.
+     */
+    test('a details-only edit carries no settings at all', async () => {
+        reply = { success: true };
+
+        await updateGame('b8a1-uuid', { name: 'vs Rockets (2-1)', notes: 'windy' });
+
+        expect(sent.body).toEqual({ name: 'vs Rockets (2-1)', notes: 'windy' });
+        expect(sent.body).not.toHaveProperty('settings');
+        expect(sent.body).not.toHaveProperty('lineup');
+    });
+
+    test('carries settings when the edit actually changes them', async () => {
+        reply = { success: true };
+
+        await updateGame('b8a1-uuid', { formation: '3-3', fieldPlayers: 7, ageDivision: '10U' });
+
+        expect(sent.body.settings).toEqual({
+            ageDivision: '10U',
+            formation: '3-3',
+            fieldPlayers: 7
+        });
     });
 });

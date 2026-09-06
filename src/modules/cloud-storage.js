@@ -196,11 +196,46 @@ export async function saveGame(teamId, game) {
 }
 
 /**
+ * A partial game edit in the shape the games table keeps.
+ *
+ * Only what the edit actually carries: a full toWireGame() would invent a
+ * `settings` object out of undefined fields and overwrite the division,
+ * formation and field size the game was played at with nulls.
+ */
+export function toWireGameUpdates(updates = {}) {
+    const wire = {};
+
+    for (const key of ['name', 'date', 'notes', 'captains', 'players']) {
+        if (updates[key] !== undefined) wire[key] = updates[key];
+    }
+
+    // The client holds the per-quarter lineup as `quarters`; the column is
+    // `lineup`. Mapping it here means the offline queue's replay goes through
+    // the same translation as a live edit.
+    if (updates.quarters !== undefined) wire.lineup = updates.quarters;
+
+    const { ageDivision, division, formation, fieldPlayers } = updates;
+    if (ageDivision !== undefined || division !== undefined ||
+        formation !== undefined || fieldPlayers !== undefined) {
+        wire.settings = {
+            ...(updates.settings || {}),
+            ageDivision: ageDivision ?? division,
+            formation,
+            fieldPlayers
+        };
+    } else if (updates.settings !== undefined) {
+        wire.settings = updates.settings;
+    }
+
+    return wire;
+}
+
+/**
  * Update a game
  */
 export async function updateGame(gameId, updates) {
     try {
-        return await api.put(`/api/games/${gameId}`, updates);
+        return await api.put(`/api/games/${gameId}`, toWireGameUpdates(updates));
     } catch (error) {
         return { success: false, error: error.message };
     }

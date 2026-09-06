@@ -287,6 +287,50 @@ quarter of the minimum, then took the first three. Only players actually at the
 minimum are behind now, and ties break on who has been on the field most, then
 on name — the same input gives the same answer whatever order the roster is in.
 
+### Correcting a game after it was played
+
+What was planned and what happened are rarely the same match: someone does not
+turn up, the armband changes hands, a keeper swaps out at half time. So a saved
+game's squad, captains and per-quarter lineup are editable, not only its name,
+date and notes.
+
+Everything a game records about a player is *derived*. The engine writes
+`quartersPlayed`, `quartersSitting`, `positionsPlayed`, `offensiveQuarters`,
+`defensiveQuarters` and `goalieQuarter` onto the snapshot, and
+`calculatePlayerStats` reads those and never the quarters. An edited lineup
+saved without recomputing them would show the coach a corrected game and go on
+counting the planned one. `recalculateGamePlayers` in
+`src/modules/game-edit.js` is what derives them again, and its bookkeeping
+mirrors `generateQuarterLineup` field for field — Keeper counts as a defensive
+quarter and records the quarter it fell in — so a hand-edited game and a
+generated one are the same shape and count the same way.
+
+An absence records nothing rather than four sat quarters: `calculatePlayerStats`
+counts a game towards a player only when the game names them, and a player who
+was not there did not sit either. Marking someone absent therefore also empties
+the slots they were penciled into and takes the armband off them, since a
+snapshot still carrying `isCaptain` credits a captain game for a match they
+missed. Nobody may hold two positions in one quarter — `assignToSlot` clears
+the other one — or that quarter is counted twice against one afternoon.
+
+The rotation warnings are shown and never enforced. A match that broke the
+"everyone plays" rules is still what happened, and the record has to be able to
+say so.
+
+Reading a game and correcting one are the same screen, and it opens over the
+Season tab. Opening a game used to move the coach to the Roster tab and set the
+division, field size and formation to that game's — a lot to do to someone who
+wanted to look something up. Putting the lineup back on the field is still
+there, as `handleOpenGameOnField` behind a button that says so.
+
+On the wire, `toWireGameUpdates` in `cloud-storage.js` maps a *partial* edit:
+`quarters` to the `lineup` column, and `settings` only when the edit actually
+carries a division, formation or field size. Running an edit through the whole
+of `toWireGame` would build a settings object out of undefined fields, so
+changing the notes alone would blank the formation the game was played at. Both
+the live edit and the offline queue's replay go through `updateGame`, so the
+mapping happens once for both.
+
 ### Today is a calendar date, not a moment
 
 `new Date().toISOString()` is the UTC day, and every timezone this app is used

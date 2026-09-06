@@ -604,6 +604,81 @@ describe('PUT /api/games/:id validation', () => {
         expect(res.status).toBe(400);
         expect(query).toHaveBeenCalledTimes(2);
     });
+
+    test.each([
+        ['lineup', { lineup: 'Q1' }],
+        ['players', { players: { name: 'Ana' } }],
+        ['captains', { captains: [{ name: 'Ana' }] }],
+        ['settings', { settings: [] }],
+    ])('rejects a malformed %s', async (_field, body) => {
+        ownsResourceAs('coach');
+
+        const res = await request(buildApp(gameRoutes, ALICE))
+            .put('/api/games/game-1').send(body);
+
+        expect(res.status).toBe(400);
+        expect(query).toHaveBeenCalledTimes(2);
+    });
+});
+
+/**
+ * The match a game records, corrected after the fact.
+ *
+ * What was planned and what happened differ — someone does not turn up, the
+ * armband changes hands — so the lineup, the squad snapshot and the captains
+ * are editable and not only the name and the notes. The per-player rows are
+ * recomputed on the client from the corrected quarters and written with them:
+ * season stats read the snapshot and never the lineup, so a route that took
+ * one without the other would show a corrected game and go on counting the
+ * planned one.
+ */
+describe('PUT /api/games/:id — the match itself', () => {
+    const QUARTERS = [{ quarter: 1, positions: { Keeper: 'Ana' } }];
+    const SQUAD = [{ name: 'Ana', status: 'available', quartersPlayed: [1] }];
+
+    test('writes the lineup, the squad and the captains together', async () => {
+        ownsResourceAs('coach');
+
+        const res = await request(buildApp(gameRoutes, ALICE))
+            .put('/api/games/game-1')
+            .send({ lineup: QUARTERS, players: SQUAD, captains: ['Ana'] });
+
+        expect(res.status).toBe(200);
+        const [sql, values] = query.mock.calls[2];
+        expect(sql).toContain('lineup = $1');
+        expect(sql).toContain('player_snapshot = $2');
+        expect(sql).toContain('captains = $3');
+        expect(JSON.parse(values[0])).toEqual(QUARTERS);
+        expect(JSON.parse(values[1])).toEqual(SQUAD);
+        expect(values[2]).toEqual(['Ana']);
+        expect(values[3]).toBe('game-1');
+    });
+
+    test('an empty squad is a real edit, not a missing field', async () => {
+        ownsResourceAs('coach');
+
+        const res = await request(buildApp(gameRoutes, ALICE))
+            .put('/api/games/game-1').send({ players: [], captains: [] });
+
+        expect(res.status).toBe(200);
+        const [sql, values] = query.mock.calls[2];
+        expect(sql).toContain('player_snapshot');
+        expect(JSON.parse(values[0])).toEqual([]);
+        expect(values[1]).toEqual([]);
+    });
+
+    test('leaves the columns an edit did not name alone', async () => {
+        ownsResourceAs('coach');
+
+        await request(buildApp(gameRoutes, ALICE))
+            .put('/api/games/game-1').send({ notes: 'Won on penalties' });
+
+        const [sql] = query.mock.calls[2];
+        expect(sql).toContain('notes');
+        expect(sql).not.toContain('lineup');
+        expect(sql).not.toContain('player_snapshot');
+        expect(sql).not.toContain('settings');
+    });
 });
 
 /**
