@@ -65,17 +65,22 @@ export function SeasonTab({
     ? 0
     : Object.values(stats).reduce((n, s) => n + (s.midfieldQuarters || 0), 0);
 
-  // Who the armband is owed to: the available players tied at the squad's
-  // lowest captain count, which is exactly the set the generator draws next
-  // week's captains from. The banner above names the first three of them; the
-  // column marks all of them, because a table showing three 0s badged and
-  // three 0s not is a table the coach has to explain to themselves.
+  // Who the armband is owed to: the players tied at the squad's lowest captain
+  // count. The banner above names the first three of them; the column marks all
+  // of them, because a table showing three 0s badged and three 0s not is a
+  // table the coach has to explain to themselves.
+  //
+  // The whole roster, like the banner — `status` is what was set for the last
+  // game and it sticks, so filtering on it badged nobody on the very players
+  // the armband is most owed to, and left the banner naming a candidate the
+  // table below it declined to mark. Who is actually at this week's game is
+  // settled when the lineup is generated, not here.
   //
   // Nobody is due while nobody has worn it — before the first captain is
   // recorded the minimum is everyone, and badging the whole squad says
   // nothing.
   const captainCounts = players
-    .filter((p) => (!p.status || p.status === 'available') && stats[p.name])
+    .filter((p) => stats[p.name])
     .map((p) => ({ name: p.name, count: stats[p.name].captainGames || 0 }));
   const minCaptainGames = captainCounts.length > 0
     ? Math.min(...captainCounts.map((p) => p.count))
