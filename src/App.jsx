@@ -8,6 +8,7 @@ import { ScheduleTab } from '@/components/ScheduleTab';
 import { EvaluationTab } from '@/components/EvaluationTab';
 import { TeamModal } from '@/components/TeamModal';
 import { SaveGameModal } from '@/components/SaveGameModal';
+import { EditGameModal } from '@/components/EditGameModal';
 import { GameNotesModal } from '@/components/GameNotesModal';
 import { MatchdayDialog } from '@/components/MatchdayDialog';
 import { FixtureModal } from '@/components/FixtureModal';
@@ -184,6 +185,7 @@ export default function App() {
   const [matchdayFixture, setMatchdayFixture] = useState(null);
   const [rosterImportData, setRosterImportData] = useState(null);
   const [scheduleImportData, setScheduleImportData] = useState(null);
+  const [editingGame, setEditingGame] = useState(null);
   const [notesModalGame, setNotesModalGame] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
@@ -1255,6 +1257,20 @@ export default function App() {
     });
   };
 
+  const handleUpdateGame = (gameId, updates) => {
+    setGameHistory((prev) => {
+      const updated = prev.map((g) => (g.id === gameId ? { ...g, ...updates } : g));
+      safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (currentUser && currentTeam) {
+      pushGameUpdate(gameId, updates).catch(() => {});
+    }
+
+    toast.success('Game updated');
+  };
+
   const handleSaveNotes = (gameId, notes) => {
     setGameHistory((prev) => {
       const updated = prev.map((g) => (g.id === gameId ? { ...g, notes } : g));
@@ -1545,6 +1561,7 @@ export default function App() {
             onExportStats={handleExportSeasonStats}
             onClearHistory={handleClearSeasonHistory}
             onDeleteGame={handleDeleteGame}
+            onEditGame={(game) => setEditingGame(game)}
             onOpenNotes={(game) => setNotesModalGame(game)}
             onViewGame={(game) => {
               const ageDivision = game.ageDivision || game.division || '10U';
@@ -1689,6 +1706,13 @@ export default function App() {
         game={notesModalGame}
         onClose={() => setNotesModalGame(null)}
         onSaveNotes={handleSaveNotes}
+      />
+
+      <EditGameModal
+        isOpen={Boolean(editingGame)}
+        game={editingGame}
+        onClose={() => setEditingGame(null)}
+        onSave={handleUpdateGame}
       />
 
       <InviteModal

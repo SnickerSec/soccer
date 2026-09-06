@@ -116,4 +116,54 @@ test.describe('Game history', () => {
         await expect(page.locator('#notesModal')).toBeHidden();
         await expect(page.locator('.game-history-item .game-notes')).toHaveCount(0);
     });
+
+    test('edit game modal opens with prefilled name, date, and notes', async ({ page }) => {
+        await saveGameAt(page, { division: '10U', name: 'vs Lions', date: '2026-03-21' });
+
+        await page.click('#season-tab-btn');
+        await page.locator('.game-history-item button[data-action="edit-game"]').first().click();
+
+        await expect(page.locator('#editGameModal')).toBeVisible();
+        await expect(page.locator('#editGameName')).toHaveValue('vs Lions');
+        await expect(page.locator('#editGameDate')).toHaveValue('2026-03-21');
+        await expect(page.locator('#editGameNotes')).toHaveValue('');
+    });
+
+    test('saving edited game updates name, date, and notes in the UI and storage', async ({ page }) => {
+        await saveGameAt(page, { division: '10U', name: 'vs Lions', date: '2026-03-21' });
+
+        await page.click('#season-tab-btn');
+        await page.locator('.game-history-item button[data-action="edit-game"]').first().click();
+
+        await page.fill('#editGameName', 'vs Tigers (3-1)');
+        await page.fill('#editGameDate', '2026-03-28');
+        await page.fill('#editGameNotes', 'Great second half comeback');
+        await page.click('#confirmEditGame');
+
+        await expect(page.locator('#editGameModal')).toBeHidden();
+        await expect(page.locator('.game-history-item .game-name')).toHaveText('vs Tigers (3-1)');
+        await expect(page.locator('.game-history-item .game-date')).toContainText('Mar 28, 2026');
+        await expect(page.locator('.game-history-item .game-notes')).toHaveText('Great second half comeback');
+
+        // Check local storage persistence
+        const historyJson = await page.evaluate(() => localStorage.getItem('ayso_lineup_history'));
+        expect(historyJson).toBeTruthy();
+        const history = JSON.parse(historyJson || '[]');
+        expect(history[0].name).toBe('vs Tigers (3-1)');
+        expect(history[0].date).toBe('2026-03-28');
+        expect(history[0].notes).toBe('Great second half comeback');
+    });
+
+    test('cancelling edit game leaves the game untouched', async ({ page }) => {
+        await saveGameAt(page, { division: '10U', name: 'vs Lions', date: '2026-03-21' });
+
+        await page.click('#season-tab-btn');
+        await page.locator('.game-history-item button[data-action="edit-game"]').first().click();
+
+        await page.fill('#editGameName', 'Discarded Name Change');
+        await page.click('#cancelEditGame');
+
+        await expect(page.locator('#editGameModal')).toBeHidden();
+        await expect(page.locator('.game-history-item .game-name')).toHaveText('vs Lions');
+    });
 });

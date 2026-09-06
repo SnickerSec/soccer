@@ -213,7 +213,7 @@ router.put('/api/games/:id', requireAuth, async (req, res) => {
                 return res.status(400).json({ success: false, error: 'Game date must be a valid date' });
             }
             setClauses.push(`game_date = $${paramIndex++}`);
-            values.push(updates.date);
+            values.push(updates.date || null);
         }
 
         if (setClauses.length > 0) {

@@ -1246,6 +1246,15 @@ small {
     background: hsl(var(--primary) / 0.85);
 }
 
+.btn-edit-game {
+    background: var(--accent-blue);
+    color: white;
+}
+
+.btn-edit-game:hover {
+    background: hsl(var(--primary) / 0.85);
+}
+
 .btn-delete-game {
     background: var(--accent-red);
     color: white;
@@ -3140,6 +3149,7 @@ button,
 .btn-copy,
 .btn-share,
 .btn-view-game,
+.btn-edit-game,
 .btn-notes-game,
 .file-label {
     background: hsl(var(--secondary));
@@ -3158,6 +3168,7 @@ button,
 .btn-copy:hover:not(:disabled),
 .btn-share:hover:not(:disabled),
 .btn-view-game:hover:not(:disabled),
+.btn-edit-game:hover:not(:disabled),
 .btn-notes-game:hover:not(:disabled),
 .file-label:hover {
     background: hsl(var(--accent));

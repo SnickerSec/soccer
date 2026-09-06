@@ -20,6 +20,7 @@ import {
   Trophy,
   Users,
   Eye,
+  Pencil,
 } from 'lucide-react';
 import { calculatePlayerStats, getLineupRecommendations } from '@/modules/season-stats';
 import { parseLocalDate } from '@/modules/schedule';
@@ -47,6 +48,7 @@ export function SeasonTab({
   onExportStats,
   onClearHistory,
   onDeleteGame,
+  onEditGame,
   onOpenNotes,
   onViewGame,
 }) {
@@ -216,7 +218,7 @@ export function SeasonTab({
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 game-date">
                         <Calendar className="h-3 w-3" /> {formatDisplayDate(game.date)}
                       </span>
                       {game.notes && (
@@ -238,6 +240,18 @@ export function SeasonTab({
                     >
                       <Eye className="h-3.5 w-3.5" />
                       View
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-action="edit-game"
+                      onClick={() => onEditGame && onEditGame(game)}
+                      className="h-8 px-2.5 text-xs flex items-center gap-1 btn-edit-game"
+                      title="Edit game"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
                     </Button>
                     <Button
                       type="button"
