@@ -444,7 +444,7 @@ export function SeasonTab({
                   the same way rest and the gloves are, and this is the count
                   that balancing reads. */}
               {captainDue.size > 0 && (
-                <p className="pt-3 text-[11px] text-muted-foreground" id="captainBalanceNote">
+                <p className="pt-3 text-center text-[11px] text-muted-foreground" id="captainBalanceNote">
                   Highlighted captain counts are the players due the armband: the generator gives it
                   to whoever has worn it least.
                 </p>

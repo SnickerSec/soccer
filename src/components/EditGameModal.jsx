@@ -183,7 +183,7 @@ export function EditGameModal({ isOpen, game, players = [], onClose, onSave, onO
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <ScrollArea className="flex-1 pr-3 py-1">
+          <ScrollArea className="flex-1 min-h-0 pr-3 py-1">
             <div className="space-y-5 py-2">
             <div className="space-y-4">
               <div className="space-y-1.5">
