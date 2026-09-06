@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   UploadCloud,
   CheckCircle2,
@@ -81,105 +82,116 @@ export function RosterImportModal({
           </Badge>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4 py-2">
-          {/* Import Mode Radio selection */}
-          <div className="p-3 rounded-lg border bg-muted/20 space-y-2">
-            <span className="text-xs font-bold text-foreground block">
-              Import Destination:
-            </span>
-            <div className="flex flex-wrap items-center gap-4 text-xs">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="importMode"
-                  value="replace"
-                  checked={importMode === 'replace'}
-                  onChange={() => setImportMode('replace')}
-                  className="accent-primary"
-                />
-                <span>Replace current roster</span>
-              </label>
+        <ScrollArea className="flex-1 min-h-0 pr-3">
+          <div className="space-y-4 py-2">
+            {/* Import Mode Radio selection */}
+            <div className="p-3 rounded-lg border bg-muted/20 space-y-2">
+              <span className="text-xs font-bold text-foreground block">
+                Import Destination:
+              </span>
+              <div className="flex flex-wrap items-center gap-4 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="replace"
+                    checked={importMode === 'replace'}
+                    onChange={() => setImportMode('replace')}
+                    className="accent-primary"
+                  />
+                  <span>Replace current roster</span>
+                </label>
 
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="importMode"
-                  value="append"
-                  checked={importMode === 'append'}
-                  onChange={() => setImportMode('append')}
-                  className="accent-primary"
-                />
-                <span>Append / Merge with existing roster</span>
-              </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="append"
+                    checked={importMode === 'append'}
+                    onChange={() => setImportMode('append')}
+                    className="accent-primary"
+                  />
+                  <span>Append / Merge with existing roster</span>
+                </label>
+              </div>
             </div>
+
+            {/* Player Selection List Header */}
+            <div className="flex items-center justify-between px-1">
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="text-xs font-semibold text-primary hover:underline flex items-center gap-1.5 cursor-pointer"
+              >
+                <Checkbox
+                  checked={selectedIndices.length === players.length}
+                  onCheckedChange={toggleSelectAll}
+                  className="h-4 w-4"
+                />
+                Select All ({players.length})
+              </button>
+
+              <span className="text-xs text-muted-foreground font-medium">
+                {selectedIndices.length} of {players.length} players selected
+              </span>
+            </div>
+
+            {/* Players Table / List */}
+            <ScrollArea className="border rounded-lg max-h-64 bg-card">
+              <div className="divide-y divide-border">
+                {players.map((p, idx) => {
+                  const isChecked = selectedIndices.includes(idx);
+                  return (
+                    <div
+                      key={idx}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => togglePlayer(idx)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          togglePlayer(idx);
+                        }
+                      }}
+                      className={`flex items-center justify-between p-2.5 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        isChecked ? 'bg-primary/5 hover:bg-primary/10' : 'opacity-60 hover:bg-muted/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={() => togglePlayer(idx)}
+                          className="h-4 w-4"
+                        />
+                        <span className="font-semibold text-foreground truncate">
+                          {p.name}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {p.number && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                            #{p.number}
+                          </Badge>
+                        )}
+                        {p.position && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+                            {p.position}
+                          </Badge>
+                        )}
+                        {p.rating != null && (
+                          <span className="text-[11px] text-amber-500 font-bold">
+                            ⭐ {p.rating}/5
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
           </div>
-
-          {/* Player Selection List Header */}
-          <div className="flex items-center justify-between px-1">
-            <button
-              type="button"
-              onClick={toggleSelectAll}
-              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1.5 cursor-pointer"
-            >
-              <Checkbox
-                checked={selectedIndices.length === players.length}
-                onCheckedChange={toggleSelectAll}
-                className="h-4 w-4"
-              />
-              Select All ({players.length})
-            </button>
-
-            <span className="text-xs text-muted-foreground font-medium">
-              {selectedIndices.length} of {players.length} players selected
-            </span>
-          </div>
-
-          {/* Players Table / List */}
-          <div className="border rounded-lg divide-y divide-border max-h-64 overflow-y-auto bg-card">
-            {players.map((p, idx) => {
-              const isChecked = selectedIndices.includes(idx);
-              return (
-                <div
-                  key={idx}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => togglePlayer(idx)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      togglePlayer(idx);
-                    }
-                  }}
-                  className={`flex items-center justify-between p-2.5 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    isChecked ? 'bg-primary/5 hover:bg-primary/10' : 'opacity-60 hover:bg-muted/30'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Checkbox
-                      checked={isChecked}
-                      onCheckedChange={() => togglePlayer(idx)}
-                      className="h-4 w-4"
-                    />
-                    <span className="font-semibold text-foreground truncate">{p.name}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {p.number != null && (
-                      <Badge variant="outline" className="text-[10px] font-bold">
-                        #{p.number}
-                      </Badge>
-                    )}
-                    {p.rating != null && (
-                      <span className="text-[11px] text-amber-500 font-bold">
-                        ⭐ {p.rating}/5
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        </ScrollArea>
 
         <DialogFooter className="pt-3 border-t flex flex-row items-center justify-between">
           <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs">

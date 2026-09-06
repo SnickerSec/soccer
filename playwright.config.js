@@ -1,6 +1,8 @@
 // @ts-check
 import { defineConfig } from '@playwright/test';
 
+const PORT = process.env.PORT || '3000';
+
 export default defineConfig({
     testDir: './tests/e2e',
     fullyParallel: true,
@@ -9,12 +11,12 @@ export default defineConfig({
     workers: process.env.CI ? 1 : undefined,
     reporter: 'list',
     use: {
-        baseURL: 'http://localhost:3000',
+        baseURL: `http://localhost:${PORT}`,
         trace: 'on-first-retry',
     },
     webServer: {
-        command: 'npm start',
-        url: 'http://localhost:3000',
+        command: `PORT=${PORT} npm start`,
+        url: `http://localhost:${PORT}`,
         // Never adopt a server that happens to be on the port already.
         //
         // This repo is worked on in git worktrees, and `npm start` in any of

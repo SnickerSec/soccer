@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Sparkles,
   Shield,
@@ -148,7 +149,8 @@ export function CustomFormationModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4 py-2">
+        <ScrollArea className="flex-1 min-h-0 py-2 pr-3">
+          <div className="space-y-4">
           {/* Top Form Controls */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
@@ -321,34 +323,37 @@ export function CustomFormationModal({
               <span className="text-xs font-bold text-muted-foreground">
                 Saved Custom Formations ({customList.length})
               </span>
-              <div className="space-y-1.5 max-h-28 overflow-y-auto">
-                {customList.map((f) => (
-                  <div
-                    key={`${f.fieldSize}-${f.name}`}
-                    className="flex items-center justify-between p-2 rounded-lg border bg-card text-xs"
-                  >
-                    <div>
-                      <span className="font-bold text-foreground">{f.name}</span>
-                      <span className="text-muted-foreground ml-2">
-                        ({f.fieldSize}v{f.fieldSize} • {f.positions?.join(', ')})
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(f.name, f.fieldSize)}
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                      title="Delete formation"
+              <ScrollArea className="max-h-28 pr-2">
+                <div className="space-y-1.5">
+                  {customList.map((f) => (
+                    <div
+                      key={`${f.fieldSize}-${f.name}`}
+                      className="flex items-center justify-between p-2 rounded-lg border bg-card text-xs"
                     >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+                      <div>
+                        <span className="font-bold text-foreground">{f.name}</span>
+                        <span className="text-muted-foreground ml-2">
+                          ({f.fieldSize}v{f.fieldSize} • {f.positions?.join(', ')})
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(f.name, f.fieldSize)}
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        title="Delete formation"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           )}
         </div>
+      </ScrollArea>
 
         <DialogFooter className="pt-3 border-t flex flex-row items-center justify-between">
           <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs">

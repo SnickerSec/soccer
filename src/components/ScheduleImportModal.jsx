@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   CalendarPlus,
   MapPin,
@@ -86,163 +87,167 @@ export function ScheduleImportModal({
           </Badge>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4 py-2">
-          {/* A full-calendar export holds practices and team events too; only
-              the matches are imported, and the coach is told what was left. */}
-          {skipped > 0 && (
-            <p className="text-xs text-muted-foreground px-1">
-              {skipped} non-match {skipped === 1 ? 'event was' : 'events were'} skipped
-              (practices, team events).
-            </p>
-          )}
+        <ScrollArea className="flex-1 min-h-0 pr-3">
+          <div className="space-y-4 py-2">
+            {/* A full-calendar export holds practices and team events too; only
+                the matches are imported, and the coach is told what was left. */}
+            {skipped > 0 && (
+              <p className="text-xs text-muted-foreground px-1">
+                {skipped} non-match {skipped === 1 ? 'event was' : 'events were'} skipped
+                (practices, team events).
+              </p>
+            )}
 
-          {/* Import Mode Radio selection */}
-          <div className="p-3 rounded-lg border bg-muted/20 space-y-2">
-            <span className="text-xs font-bold text-foreground block">
-              Import Action:
-            </span>
-            <div className="flex flex-wrap items-center gap-4 text-xs">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="scheduleImportMode"
-                  value="merge"
-                  checked={importMode === 'merge'}
-                  onChange={() => setImportMode('merge')}
-                  className="accent-primary"
-                />
-                <span className="font-medium">Merge with current schedule (recommended)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="scheduleImportMode"
-                  value="replace"
-                  checked={importMode === 'replace'}
-                  onChange={() => setImportMode('replace')}
-                  className="accent-primary"
-                />
-                <span className="font-medium">Replace existing schedule</span>
-              </label>
+            {/* Import Mode Radio selection */}
+            <div className="p-3 rounded-lg border bg-muted/20 space-y-2">
+              <span className="text-xs font-bold text-foreground block">
+                Import Action:
+              </span>
+              <div className="flex flex-wrap items-center gap-4 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleImportMode"
+                    value="merge"
+                    checked={importMode === 'merge'}
+                    onChange={() => setImportMode('merge')}
+                    className="accent-primary"
+                  />
+                  <span className="font-medium">Merge with current schedule (recommended)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleImportMode"
+                    value="replace"
+                    checked={importMode === 'replace'}
+                    onChange={() => setImportMode('replace')}
+                    className="accent-primary"
+                  />
+                  <span className="font-medium">Replace existing schedule</span>
+                </label>
+              </div>
             </div>
-          </div>
 
-          {/* Action Bar */}
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="select-all-schedule"
-                checked={
-                  selectedIndices.length === fixtures.length && fixtures.length > 0
-                }
-                onCheckedChange={toggleSelectAll}
-              />
-              <label
-                htmlFor="select-all-schedule"
-                className="text-xs font-semibold cursor-pointer select-none"
-              >
-                Select All ({selectedIndices.length}/{fixtures.length} matches)
-              </label>
-            </div>
-          </div>
-
-          {/* List of Fixtures */}
-          <div className="border rounded-lg divide-y bg-background max-h-80 overflow-y-auto">
-            {fixtures.map((fixture, idx) => {
-              const isSelected = selectedIndices.includes(idx);
-              const formattedDate = formatMatchDate(fixture.gameDate, fixture.gameTime, 'long');
-
-              return (
-                <div
-                  key={fixture.id || idx}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => toggleFixture(idx)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      toggleFixture(idx);
-                    }
-                  }}
-                  className={`p-3 flex items-start gap-3 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    isSelected ? 'bg-primary/5' : 'opacity-60 bg-muted/10'
-                  } hover:bg-muted/30`}
+            {/* Action Bar */}
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="select-all-schedule"
+                  checked={
+                    selectedIndices.length === fixtures.length && fixtures.length > 0
+                  }
+                  onCheckedChange={toggleSelectAll}
+                />
+                <label
+                  htmlFor="select-all-schedule"
+                  className="text-xs font-semibold cursor-pointer select-none"
                 >
-                  <div className="pt-0.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => toggleFixture(idx)}
-                    />
-                  </div>
+                  Select All ({selectedIndices.length}/{fixtures.length} matches)
+                </label>
+              </div>
+            </div>
 
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="font-bold text-sm text-foreground flex items-center gap-2">
-                        <span>{fixture.opponent || 'Opponent'}</span>
-                        <Badge
-                          variant={fixture.homeAway === 'away' ? 'outline' : 'secondary'}
-                          className="text-[10px] uppercase font-bold py-0 h-4"
-                        >
-                          {fixture.homeAway === 'away' ? 'Away' : 'Home'}
-                        </Badge>
+            {/* List of Fixtures */}
+            <ScrollArea className="border rounded-lg bg-background max-h-80">
+              <div className="divide-y">
+                {fixtures.map((fixture, idx) => {
+                  const isSelected = selectedIndices.includes(idx);
+                  const formattedDate = formatMatchDate(fixture.gameDate, fixture.gameTime, 'long');
+
+                  return (
+                    <div
+                      key={fixture.id || idx}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleFixture(idx)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleFixture(idx);
+                        }
+                      }}
+                      className={`p-3 flex items-start gap-3 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        isSelected ? 'bg-primary/5' : 'opacity-60 bg-muted/10'
+                      } hover:bg-muted/30`}
+                    >
+                      <div className="pt-0.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleFixture(idx)}
+                        />
                       </div>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Match #{idx + 1}
-                      </span>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-                      <span className="flex items-center gap-1 font-medium text-foreground">
-                        <Clock className="h-3.5 w-3.5 text-primary" />
-                        {formattedDate}
-                      </span>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-bold text-sm text-foreground flex items-center gap-2">
+                            <span>{fixture.opponent || 'Opponent'}</span>
+                            <Badge
+                              variant={fixture.homeAway === 'away' ? 'outline' : 'secondary'}
+                              className="text-[10px] uppercase font-bold py-0 h-4"
+                            >
+                              {fixture.homeAway === 'away' ? 'Away' : 'Home'}
+                            </Badge>
+                          </div>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Match #{idx + 1}
+                          </span>
+                        </div>
 
-                      {fixture.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {fixture.location}
-                        </span>
-                      )}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+                          <span className="flex items-center gap-1 font-medium text-foreground">
+                            <Clock className="h-3.5 w-3.5 text-primary" />
+                            {formattedDate}
+                          </span>
 
-                      {fixture.jerseyColor && (
-                        <span className="flex items-center gap-1">
-                          <Shirt className="h-3.5 w-3.5 text-muted-foreground" />
-                          {fixture.jerseyColor}
-                        </span>
-                      )}
-                    </div>
+                          {fixture.location && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                              {fixture.location}
+                            </span>
+                          )}
 
-                    {/* Volunteers preview if parsed */}
-                    {(fixture.snackParent || fixture.fruitParent || fixture.refereeDuty || fixture.fieldSetup) && (
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        {fixture.snackParent && (
-                          <span className="inline-flex items-center gap-1 text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
-                            <Cookie className="h-3 w-3" /> Snack: {fixture.snackParent}
-                          </span>
-                        )}
-                        {fixture.fruitParent && (
-                          <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded">
-                            <Apple className="h-3 w-3" /> Fruit: {fixture.fruitParent}
-                          </span>
-                        )}
-                        {fixture.refereeDuty && (
-                          <span className="inline-flex items-center gap-1 text-[11px] bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
-                            <Flag className="h-3 w-3" /> Ref: {fixture.refereeDuty}
-                          </span>
-                        )}
-                        {fixture.fieldSetup && (
-                          <span className="inline-flex items-center gap-1 text-[11px] bg-purple-500/10 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded">
-                            <Wrench className="h-3 w-3" /> Setup: {fixture.fieldSetup}
-                          </span>
+                          {fixture.jerseyColor && (
+                            <span className="flex items-center gap-1">
+                              <Shirt className="h-3.5 w-3.5 text-muted-foreground" />
+                              {fixture.jerseyColor}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Volunteers preview if parsed */}
+                        {(fixture.snackParent || fixture.fruitParent || fixture.refereeDuty || fixture.fieldSetup) && (
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            {fixture.snackParent && (
+                              <span className="inline-flex items-center gap-1 text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
+                                <Cookie className="h-3 w-3" /> Snack: {fixture.snackParent}
+                              </span>
+                            )}
+                            {fixture.fruitParent && (
+                              <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded">
+                                <Apple className="h-3 w-3" /> Fruit: {fixture.fruitParent}
+                              </span>
+                            )}
+                            {fixture.refereeDuty && (
+                              <span className="inline-flex items-center gap-1 text-[11px] bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
+                                <Flag className="h-3 w-3" /> Ref: {fixture.refereeDuty}
+                              </span>
+                            )}
+                            {fixture.fieldSetup && (
+                              <span className="inline-flex items-center gap-1 text-[11px] bg-purple-500/10 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded">
+                                <Wrench className="h-3 w-3" /> Setup: {fixture.fieldSetup}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
           </div>
-        </div>
+        </ScrollArea>
 
         <DialogFooter className="pt-3 border-t flex flex-col-reverse sm:flex-row items-center justify-between gap-2">
           <Button variant="outline" size="sm" onClick={onClose}>

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Star, ExternalLink, TriangleAlert } from 'lucide-react';
 import { toDateOnly } from '@/modules/schedule';
 import { getPositionsForFormation } from '@/modules/formations';
@@ -182,7 +183,8 @@ export function EditGameModal({ isOpen, game, players = [], onClose, onSave, onO
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto space-y-5 py-3 pr-1">
+          <ScrollArea className="flex-1 pr-3 py-1">
+            <div className="space-y-5 py-2">
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="editGameName" className="text-xs text-muted-foreground">
@@ -369,7 +371,8 @@ export function EditGameModal({ isOpen, game, players = [], onClose, onSave, onO
                 )}
               </>
             )}
-          </div>
+            </div>
+          </ScrollArea>
 
           <DialogFooter className="pt-3 border-t flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2">
             {onOpenOnField ? (

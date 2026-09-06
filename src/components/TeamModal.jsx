@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -287,7 +288,8 @@ export function TeamModal({
         {/* View 1: Teams List */}
         {view === 'list' && (
           <div className="space-y-4 py-2" id="teamListView">
-            <div className="space-y-2 max-h-64 overflow-y-auto" id="teamList">
+            <ScrollArea className="max-h-64 pr-2" id="teamList">
+              <div className="space-y-2">
               {teams.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">
                   No teams found. Create your first team below.
@@ -347,7 +349,8 @@ export function TeamModal({
                   );
                 })
               )}
-            </div>
+              </div>
+            </ScrollArea>
 
             <Button
               type="button"
@@ -430,44 +433,46 @@ export function TeamModal({
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Team Members
               </h4>
-              <div className="space-y-1.5 max-h-36 overflow-y-auto" id="memberList">
-                {members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/40 text-xs"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={member.avatarUrl} alt="" />
-                        <AvatarFallback>
-                          {(member.displayName || member.email || 'U').charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="truncate">
-                        <p className="font-medium text-foreground truncate">
-                          {member.displayName || member.email}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground capitalize">
-                          {member.role}
-                        </p>
+              <ScrollArea className="max-h-36 pr-2" id="memberList">
+                <div className="space-y-1.5">
+                  {members.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between p-2 rounded-md bg-muted/40 text-xs"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={member.avatarUrl} alt="" />
+                          <AvatarFallback>
+                            {(member.displayName || member.email || 'U').charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="truncate">
+                          <p className="font-medium text-foreground truncate">
+                            {member.displayName || member.email}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground capitalize">
+                            {member.role}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {selectedTeam.role === 'owner' && member.role !== 'owner' && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveMember(member.id)}
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        title="Remove member"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                      {selectedTeam.role === 'owner' && member.role !== 'owner' && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveMember(member.id)}
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          title="Remove member"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
 
             {/* Invite Section */}

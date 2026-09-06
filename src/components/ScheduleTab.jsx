@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Calendar,
   Clock,
@@ -454,7 +455,7 @@ export function ScheduleTab({
             </div>
           </CardHeader>
           <CardContent className="p-4">
-            <div className="overflow-x-auto">
+            <ScrollArea className="w-full">
               <table className="w-full text-xs text-left">
                 <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b">
                   <tr>
@@ -506,7 +507,8 @@ export function ScheduleTab({
                   )}
                 </tbody>
               </table>
-            </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </CardContent>
         </Card>
       )}

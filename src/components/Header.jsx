@@ -12,6 +12,7 @@ import {
   Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { syncStatusPresentation } from '@/modules/account-menu';
 
 export function Header({
@@ -302,31 +303,33 @@ export function Header({
                 <div className="text-[11px] text-muted-foreground px-2 pt-1 pb-1 font-semibold uppercase tracking-wider">
                   Teams
                 </div>
-                <div className="max-h-40 overflow-y-auto space-y-0.5" id="accountTeamList" role="menu">
-                  {teams.length === 0 ? (
-                    <div className="account-empty p-2 text-xs text-muted-foreground">No teams yet</div>
-                  ) : (
-                    teams.map((team) => {
-                      const isCurrent = currentTeam?.id === team.id;
-                      return (
-                        <button
-                          key={team.id}
-                          type="button"
-                          role="menuitemcheckbox"
-                          aria-checked={isCurrent ? "true" : "false"}
-                          onClick={() => handleTeamClick(team.id)}
-                          className="account-team account-item w-full text-left p-2 flex items-center justify-between text-xs hover:bg-muted/50 rounded transition-colors cursor-pointer"
-                        >
-                          <div className="flex flex-col truncate pr-2">
-                            <span className="font-medium text-foreground truncate">{team.name}</span>
-                            <span className="text-[10px] text-muted-foreground capitalize">{team.role || 'coach'}</span>
-                          </div>
-                          {isCurrent && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
+                <ScrollArea className="max-h-40 pr-1" id="accountTeamList" role="menu">
+                  <div className="space-y-0.5">
+                    {teams.length === 0 ? (
+                      <div className="account-empty p-2 text-xs text-muted-foreground">No teams yet</div>
+                    ) : (
+                      teams.map((team) => {
+                        const isCurrent = currentTeam?.id === team.id;
+                        return (
+                          <button
+                            key={team.id}
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={isCurrent ? "true" : "false"}
+                            onClick={() => handleTeamClick(team.id)}
+                            className="account-team account-item w-full text-left p-2 flex items-center justify-between text-xs hover:bg-muted/50 rounded transition-colors cursor-pointer"
+                          >
+                            <div className="flex flex-col truncate pr-2">
+                              <span className="font-medium text-foreground truncate">{team.name}</span>
+                              <span className="text-[10px] text-muted-foreground capitalize">{team.role || 'coach'}</span>
+                            </div>
+                            {isCurrent && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
 
                 <div className="border-t my-1" />
 

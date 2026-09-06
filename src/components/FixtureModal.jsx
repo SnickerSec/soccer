@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Calendar,
   Clock,
@@ -137,15 +138,17 @@ export function FixtureModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card text-foreground">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-4 sm:p-6 bg-card text-foreground">
+        <DialogHeader className="pb-3 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
             <Calendar className="h-5 w-5 text-primary" />
             {fixture ? 'Edit Match Fixture' : 'Schedule New Match'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <ScrollArea className="flex-1 min-h-0 pr-3">
+            <div className="space-y-4 pt-2">
           {/* Opponent & Home/Away */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2 space-y-1.5">
@@ -393,6 +396,8 @@ export function FixtureModal({
               </div>
             </div>
           )}
+            </div>
+          </ScrollArea>
 
           <DialogFooter className="pt-3 border-t flex flex-row items-center justify-between sm:justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>

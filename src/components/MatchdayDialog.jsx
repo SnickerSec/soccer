@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Play,
   Pause,
@@ -261,7 +262,8 @@ export function MatchdayDialog({
         </DialogHeader>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto space-y-4 py-2">
+        <ScrollArea className="flex-1 min-h-0 py-2 pr-3">
+          <div className="space-y-4">
           {/* Quarter Tabs & Clock Hero */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-xl border bg-muted/20 items-center">
             {/* Scoreboard */}
@@ -453,7 +455,8 @@ export function MatchdayDialog({
                 <h4 className="text-xs font-bold tracking-tight flex items-center gap-1.5">
                   <Users className="h-3.5 w-3.5 text-primary" /> Active Field Roster
                 </h4>
-                <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+                <ScrollArea className="max-h-44 pr-2">
+                  <div className="space-y-1">
                   {Object.entries(positions).map(([pos, pVal]) => {
                     const pName = typeof pVal === 'string' ? pVal : pVal?.name || 'TBD';
                     const isCapt = captains.includes(pName);
@@ -489,7 +492,8 @@ export function MatchdayDialog({
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+                </ScrollArea>
 
                 {/* Selected Player Action Modal / Bar */}
                 {selectedFieldPlayer && (
@@ -571,21 +575,24 @@ export function MatchdayDialog({
               <h4 className="text-xs font-bold tracking-tight flex items-center gap-1.5 text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" /> Match Event Log
               </h4>
-              <div className="space-y-1 max-h-24 overflow-y-auto">
-                {events.map((e) => (
-                  <div key={e.id} className="text-xs flex items-center gap-2 text-muted-foreground">
-                    <Badge variant="outline" className="text-[10px] px-1 py-0 font-bold">
-                      Q{e.quarter} • {e.minute}'
-                    </Badge>
-                    <span className="text-foreground">
-                      {e.type === 'goal' ? `⚽ Goal scored by ${e.player}` : e.description}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <ScrollArea className="max-h-24 pr-2">
+                <div className="space-y-1">
+                  {events.map((e) => (
+                    <div key={e.id} className="text-xs flex items-center gap-2 text-muted-foreground">
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 font-bold">
+                        Q{e.quarter} • {e.minute}'
+                      </Badge>
+                      <span className="text-foreground">
+                        {e.type === 'goal' ? `⚽ Goal scored by ${e.player}` : e.description}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           )}
-        </div>
+          </div>
+        </ScrollArea>
 
         {/* Footer */}
         <DialogFooter className="pt-3 border-t flex flex-row items-center justify-between">

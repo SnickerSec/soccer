@@ -12,6 +12,7 @@ import {
   User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { formationHasMidfieldLine } from '@/modules/formations';
 
 export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHistory = [] }) {
@@ -136,20 +137,23 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
         </div>
 
         {/* Player Selector Dropdown / Badges */}
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0">
-          {playerNames.map((name) => (
-            <Button
-              key={name}
-              type="button"
-              variant={selectedPlayer === name ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedPlayer(name)}
-              className="h-7 px-2.5 text-xs whitespace-nowrap cursor-pointer"
-            >
-              {name}
-            </Button>
-          ))}
-        </div>
+        <ScrollArea className="max-w-full pb-1 sm:pb-0">
+          <div className="flex items-center gap-1.5 pb-1">
+            {playerNames.map((name) => (
+              <Button
+                key={name}
+                type="button"
+                variant={selectedPlayer === name ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedPlayer(name)}
+                className="h-7 px-2.5 text-xs whitespace-nowrap cursor-pointer"
+              >
+                {name}
+              </Button>
+            ))}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </CardHeader>
 
       <CardContent className="p-4 space-y-4">
