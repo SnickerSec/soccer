@@ -288,12 +288,34 @@ test.describe('Correcting a played game', () => {
         // take it off everyone who has it, then give it to someone who does not.
         const worn = page.locator('.game-squad-row:has(button[aria-pressed="true"])');
         const dropped = await worn.first().getAttribute('data-player');
+
+        // Each row is waited out before the set is counted again. `count()` is a
+        // single query with no retry, and a React re-render does not land
+        // synchronously, so a loop that clicked `first()` and immediately
+        // re-counted could click the same row twice — putting the armband back
+        // on — and then exit on a count that had not caught up. It failed 4 runs
+        // in 12 under parallel load, and the game still had its old captain.
         while ((await worn.count()) > 0) {
-            await worn.first().locator('button[data-action="toggle-captain"]').click();
+            const row = worn.first();
+            const name = await row.getAttribute('data-player');
+            await row.locator('button[data-action="toggle-captain"]').click();
+            await expect(
+                page.locator(`.game-squad-row[data-player="${name}"] button[data-action="toggle-captain"]`)
+            ).toHaveAttribute('aria-pressed', 'false');
         }
 
-        const incoming = page.locator('.game-squad-row').first();
+        // Someone who did not already have it. `.game-squad-row` first() could be
+        // the very player the armband had just been taken off, and the test then
+        // handed it straight back and asserted it had gone.
+        //
+        // Whether that happened was luck, not timing: the demo roster is shuffled
+        // and the engine picks with Math.random(), so who wears the armband — and
+        // so whether the first row is one of them — differs every run. It failed
+        // about 2 runs in 12 whatever the worker count, which is why it read as
+        // parallel flakiness and passed whenever it was re-run on its own.
+        const incoming = page.locator(`.game-squad-row:not([data-player="${dropped}"])`).first();
         const player = await incoming.getAttribute('data-player');
+        expect(player).not.toBe(dropped);
         await incoming.locator('button[data-action="toggle-captain"]').click();
         await expect(incoming.locator('button[data-action="toggle-captain"]')).toHaveAttribute(
             'aria-pressed',
@@ -315,7 +337,7 @@ test.describe('Correcting a played game', () => {
         expect(saved.isCaptain).toBe(true);
         expect(saved.captains).toContain(player);
         // And the player it came from no longer counts a captain game for it.
-        expect(saved.formerIsCaptain).toBe(false);
+        expect(saved.formerIsCaptain, `${dropped} should have lost the armband to ${player}`).toBe(false);
         expect(saved.captains).not.toContain(dropped);
     });
 });
