@@ -27,22 +27,20 @@ test.describe('Header controls', () => {
         expect(errors).toEqual([]);
     });
 
-    test('undo and redo track roster changes', async ({ page }) => {
+    test('undo and redo buttons are removed and keyboard shortcuts work', async ({ page }) => {
         await page.goto('/');
 
-        await expect(page.locator('#undoBtn')).toBeDisabled();
-        await expect(page.locator('#redoBtn')).toBeDisabled();
+        await expect(page.locator('#undoBtn')).toHaveCount(0);
+        await expect(page.locator('#redoBtn')).toHaveCount(0);
 
         await page.fill('#playerName', 'Test Player');
         await page.click('#addPlayer');
         await expect(page.locator('#presentPlayerCount')).toHaveText('1 Present');
-        await expect(page.locator('#undoBtn')).toBeEnabled();
 
-        await page.click('#undoBtn');
+        await page.keyboard.press('Control+z');
         await expect(page.locator('#presentPlayerCount')).toHaveText('0 Present');
-        await expect(page.locator('#redoBtn')).toBeEnabled();
 
-        await page.click('#redoBtn');
+        await page.keyboard.press('Control+y');
         await expect(page.locator('#presentPlayerCount')).toHaveText('1 Present');
     });
 });

@@ -54,7 +54,6 @@ test.describe('Icons', () => {
         expect(notHidden).toBe(0);
 
         await expect(page.locator('#themeToggle')).toHaveAttribute('aria-label', /theme/i);
-        await expect(page.locator('#undoBtn')).toHaveAttribute('aria-label', /undo/i);
     });
 
     test('icons still render with no network', async ({ page, context }) => {
@@ -66,7 +65,7 @@ test.describe('Icons', () => {
 
         // The sprite is precached, so a visible icon still has a painted box.
         // The toggle holds both a moon and a sun; only one is shown at a time.
-        const box = await page.locator('#undoBtn svg.icon').boundingBox();
+        const box = await page.locator('#themeToggle .theme-icon-dark svg.icon').boundingBox();
         expect(box?.width).toBeGreaterThan(0);
         expect(box?.height).toBeGreaterThan(0);
 

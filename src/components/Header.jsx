@@ -3,8 +3,6 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-  Undo2,
-  Redo2,
   Sun,
   Moon,
   Settings,
@@ -18,10 +16,6 @@ import { syncStatusPresentation } from '@/modules/account-menu';
 export function Header({
   activeTab = 'roster',
   onTabChange,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
   currentUser,
   currentTeam,
   teams = [],
@@ -172,34 +166,7 @@ export function Header({
 
         {/* Header Controls */}
         <div className="header-controls flex items-center justify-end gap-2 shrink-0">
-          {/* Undo / Redo */}
           <div className="flex items-center gap-1 border-r pr-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              id="undoBtn"
-              onClick={onUndo}
-              disabled={!canUndo}
-              title="Undo last change (Ctrl+Z)"
-              aria-label="Undo last change"
-            >
-              <svg className="icon w-4 h-4" aria-hidden="true">
-                <use href="/assets/icons.svg#icon-undo" />
-              </svg>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              id="redoBtn"
-              onClick={onRedo}
-              disabled={!canRedo}
-              title="Redo last change (Ctrl+Y)"
-              aria-label="Redo last change"
-            >
-              <svg className="icon w-4 h-4" aria-hidden="true">
-                <use href="/assets/icons.svg#icon-redo" />
-              </svg>
-            </Button>
             <Button
               variant="ghost"
               size="icon"

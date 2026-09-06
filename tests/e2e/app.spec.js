@@ -67,8 +67,8 @@ test.describe('Shinguard', () => {
 
     test('header controls exist', async ({ page }) => {
         await expect(page.locator('#themeToggle')).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('#undoBtn')).toBeVisible();
-        await expect(page.locator('#redoBtn')).toBeVisible();
+        await expect(page.locator('#undoBtn')).toHaveCount(0);
+        await expect(page.locator('#redoBtn')).toHaveCount(0);
     });
 
     test('can clear all players', async ({ page }) => {

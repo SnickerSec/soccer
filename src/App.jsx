@@ -1504,10 +1504,6 @@ export default function App() {
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
         currentUser={currentUser}
         currentTeam={currentTeam}
         teams={teams}
