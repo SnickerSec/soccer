@@ -133,6 +133,26 @@ test.describe('Team dialog: create and edit', () => {
         expect(put.name).toBe('Tigers United');
         await expectAppStillMounted(page);
     });
+
+    test('shows an error toast when loading team members fails', async ({ page }) => {
+        await page.route('**/api/teams/team-1/members', (route) =>
+            route.fulfill({
+                status: 500,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    success: false,
+                    error: 'Failed to load team members',
+                }),
+            }));
+
+        await signIn(page, [{ id: 'team-1', name: 'Tigers', role: 'owner', ageDivision: '10U' }]);
+        await page.evaluate(async () => {
+            await window.lineupGenerator.showTeamDetails('team-1');
+        });
+        await expect(page.locator('#teamDetailsView')).toBeVisible();
+        await expect(page.getByText('Failed to load team members')).toBeVisible();
+        await expectAppStillMounted(page);
+    });
 });
 
 /**

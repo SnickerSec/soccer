@@ -463,9 +463,13 @@ export default function App() {
         const teamId = getCurrentTeamId();
         const active = res.data.find((t) => t.id === teamId) || res.data[0];
         setCurrentTeamState(active || null);
+      } else if (!res.success) {
+        console.error('Failed to load teams:', res.error);
+        toast.error(res.error || 'Failed to load teams');
       }
     } catch (e) {
       console.error('Failed to load teams:', e);
+      toast.error('Failed to load teams');
     }
   }, []);
 
@@ -1381,9 +1385,12 @@ export default function App() {
             setFixtures((prev) =>
               prev.map((f) => (f.id === newFixture.id ? res.data : f))
             );
+          } else if (!res.success && !res.queued) {
+            toast.error(res.error || 'Failed to sync match to cloud');
           }
         } catch (e) {
           console.error('Failed to save cloud fixture:', e);
+          toast.error('Failed to sync match to cloud');
         }
       }
     }
@@ -1473,12 +1480,20 @@ export default function App() {
     safeSetToStorage(CONSTANTS.STORAGE_KEYS.SCHEDULE, JSON.stringify(finalFixtures));
 
     if (currentUser && currentTeam) {
+      let syncFailed = false;
       for (const fix of importedFixtures) {
         try {
-          await pushFixture(fix);
+          const res = await pushFixture(fix);
+          if (!res.success && !res.queued) {
+            syncFailed = true;
+          }
         } catch (e) {
           console.error('Failed to sync imported fixture:', e);
+          syncFailed = true;
         }
+      }
+      if (syncFailed) {
+        toast.error('Some imported matches could not be synced to cloud');
       }
     }
   };

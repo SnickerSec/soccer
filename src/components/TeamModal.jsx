@@ -88,9 +88,12 @@ export function TeamModal({
       const res = await getTeamMembers(team.id);
       if (res.success) {
         setMembers(res.data || []);
+      } else {
+        toast.error(res.error || 'Failed to load team members');
       }
     } catch (e) {
       console.error('Failed to load team members:', e);
+      toast.error('Failed to load team members');
     }
   };
 
