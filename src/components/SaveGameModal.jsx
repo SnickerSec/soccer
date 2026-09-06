@@ -9,10 +9,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { todayLocalDate } from '@/modules/schedule';
 
 export function SaveGameModal({ isOpen, onClose, onSave }) {
   const [gameName, setGameName] = useState('');
-  const [gameDate, setGameDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [gameDate, setGameDate] = useState(todayLocalDate);
 
   const handleSubmit = (e) => {
     e.preventDefault();

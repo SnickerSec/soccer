@@ -229,6 +229,13 @@ function createEmptyStats() {
     };
 }
 
+/**
+ * Averages are quarters divided by games, so two players who have sat the same
+ * amount can differ in the last bits of a float. Compared exactly, one of them
+ * silently drops out of a list they are tied for.
+ */
+const TIE_EPSILON = 1e-9;
+
 export function getLineupRecommendations(arg1, arg2, arg3) {
     let players, savedGames;
 
@@ -273,6 +280,7 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
             noKeeper: player.noKeeper,
             gamesPlayed,
             avgSitting: gamesPlayed > 0 ? s.totalSitting / gamesPlayed : 0,
+            avgQuarters: gamesPlayed > 0 ? s.totalQuarters / gamesPlayed : 0,
             gkCount: s.goalkeeperQuarters,
             captainCount: s.captainGames || 0,
             offenseQtrs: s.offensiveQuarters,
@@ -282,18 +290,33 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
         };
     });
 
-    // Players who should sit more (lowest sitting averages)
-    const bySitting = [...playerData].sort((a, b) => a.avgSitting - b.avgSitting);
-    const minSitting = bySitting[0]?.avgSitting || 0;
+    // Players who should sit more (lowest sitting averages).
+    //
+    // The tie-break is not decoration. A squad that has played two even games
+    // is tied almost everywhere, and every list here then took whichever three
+    // the roster happened to name first — so the same three players were
+    // recommended for everything, week after week, and the coach was reading
+    // roster order dressed up as advice. Ties are settled by who has been on
+    // the field most, then by name so the same input gives the same answer.
+    const byNeed = (primary) => (a, b) =>
+        primary(a, b) || b.avgQuarters - a.avgQuarters || a.name.localeCompare(b.name);
+
+    // Only players actually at the minimum are behind on rest. The old
+    // tolerance of half a quarter swept in players who had already sat a full
+    // game more than the least-rested, and named them as the ones to rest.
+    const bySitting = [...playerData]
+        .filter(p => p.gamesPlayed > 0)
+        .sort(byNeed((a, b) => a.avgSitting - b.avgSitting));
+    const minSitting = bySitting[0]?.avgSitting ?? 0;
     recommendations.shouldSit = bySitting
-        .filter(p => p.gamesPlayed > 0 && p.avgSitting <= minSitting + 0.5)
+        .filter(p => p.avgSitting <= minSitting + TIE_EPSILON)
         .slice(0, 3)
         .map(p => ({ name: p.name, avgSitting: p.avgSitting.toFixed(1), gamesPlayed: p.gamesPlayed }));
 
     // Players who should be goalkeeper
     const byGK = [...playerData]
         .filter(p => !p.noKeeper && p.gamesPlayed > 0)
-        .sort((a, b) => a.gkCount - b.gkCount);
+        .sort(byNeed((a, b) => a.gkCount - b.gkCount));
     const minGK = byGK[0]?.gkCount || 0;
     recommendations.shouldKeep = byGK
         .filter(p => p.gkCount <= minGK)
@@ -303,7 +326,7 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
     // Players who should be captain
     const byCaptain = [...playerData]
         .filter(p => p.gamesPlayed > 0)
-        .sort((a, b) => a.captainCount - b.captainCount);
+        .sort(byNeed((a, b) => a.captainCount - b.captainCount));
     const minCaptain = byCaptain[0]?.captainCount || 0;
     recommendations.shouldCaptain = byCaptain
         .filter(p => p.captainCount <= minCaptain)

@@ -255,6 +255,47 @@ broke was reopening a synced game, which found no quarters and fell back to a
 default formation. Games saved before the fix stored those columns empty and
 cannot be recovered — they reopen empty.
 
+### What a saved game records about the squad
+
+A game's `players` snapshot is the only record of who was there. The lineup
+engine is handed the available players and nothing else, so saving its
+`playerStats` verbatim recorded a full turnout every time: `calculatePlayerStats`
+counts a game towards a player only when the game names them, so nobody was
+ever absent, every attendance in the Season tab read 100%, the Squad Attendance
+Rate could not read anything else, and "Returning from Absence" could never
+fire.
+
+Captains went the same way for the same reason. They live in their own state
+rather than on the roster rows, so no snapshot carried `isCaptain`,
+`captainGames` stayed 0 for the whole squad, and the balancing in
+`handleGenerateLineup` that picks next week's captains from whoever has worn
+the armband least was reading that zero.
+
+`gameRosterSnapshot` in App is what the save records now: every player on the
+roster, with the engine's per-quarter stats merged in for the ones who took the
+field, their status, and the armband. The saved game also carries `captains`,
+which the column and the route had always been there to hold.
+
+Old games cannot be repaired — who was on the roster the day they were played
+is not recoverable — so they still report a full turnout.
+
+A tie in the Season tab's recommendations used to be settled by roster order.
+Two even games leave a squad tied almost everywhere, so the same three names
+were recommended for everything, week after week, and rest priority named
+players who had already sat the most: the filter admitted anyone within half a
+quarter of the minimum, then took the first three. Only players actually at the
+minimum are behind now, and ties break on who has been on the field most, then
+on name — the same input gives the same answer whatever order the roster is in.
+
+### Today is a calendar date, not a moment
+
+`new Date().toISOString()` is the UTC day, and every timezone this app is used
+in is behind it. A game ended on a Saturday afternoon was dated Sunday, so it
+landed in Game History under the wrong date and in the wrong place in the
+season. `todayLocalDate` in `src/modules/schedule.js` is what dates a game, in
+the save dialog and at the end of a match. It goes with `toDateOnly` and
+`parseLocalDate`: these are plain calendar dates the whole way through.
+
 ### The domain
 
 The app is `shinguard.app`. It was `aysoroster.com`, which is gone: the

@@ -26,6 +26,21 @@ export function parseLocalDate(dateStr) {
 }
 
 /**
+ * Today as the coach's calendar reads it, 'YYYY-MM-DD'.
+ *
+ * `new Date().toISOString()` is the UTC day, and everywhere this app is used
+ * is behind UTC — so a game ended on a Saturday afternoon was filed as Sunday,
+ * and turned up in Game History under the wrong date and in the wrong place in
+ * the season. These are plain calendar dates, the same as every other date on
+ * the wire; they are never a moment in time.
+ */
+export function todayLocalDate() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
  * Format a match date and optional time into a friendly display string.
  * e.g., "Sat, Sep 12, 2026" or "Sat, Sep 12 • 9:00 AM"
  */

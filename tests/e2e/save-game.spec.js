@@ -28,8 +28,12 @@ test.describe('Save Game', () => {
         await expect(page.locator('#saveGameModal')).toBeVisible();
         expect(promptShown).toBe(false);
 
-        // The modal defaults the date to today
-        const today = new Date().toISOString().split('T')[0];
+        // The modal defaults the date to today as the coach's calendar reads
+        // it. toISOString() here would be the UTC day, which is tomorrow for
+        // anyone west of Greenwich for part of every evening.
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
         await expect(page.locator('#saveGameDate')).toHaveValue(today);
     });
 

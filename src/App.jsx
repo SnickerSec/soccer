@@ -1148,6 +1148,44 @@ export default function App() {
     setIsSaveGameOpen(true);
   };
 
+  /**
+   * Who was on the roster for a game, and what each of them did in it.
+   *
+   * The engine is only ever handed the available players, so `playerStats`
+   * holds the ones who took the field. Saving that alone made every game look
+   * like a full turnout: calculatePlayerStats counts a game towards a player's
+   * attendance only when the game names them, so nobody was ever recorded
+   * absent, every row of the Season tab read 100%, Squad Attendance Rate could
+   * not be anything else, and "Returning from Absence" could never fire.
+   *
+   * Captains were lost the same way. They live in their own state rather than
+   * on the roster rows, so no snapshot ever carried `isCaptain`, `captainGames`
+   * stayed 0 for the whole squad, and Captain Candidates was the first three
+   * names on the roster every week — which is also what the balancing in
+   * handleGenerateLineup was reading.
+   */
+  const gameRosterSnapshot = () => {
+    const played = new Map(
+      (lineup?.playerStats || []).map((p) => [p.name, p])
+    );
+    const roster = (playersRef.current && playersRef.current.length > 0)
+      ? playersRef.current
+      : players;
+
+    return roster.map((player) => ({
+      ...player,
+      quartersPlayed: [],
+      quartersSitting: [],
+      positionsPlayed: [],
+      offensiveQuarters: 0,
+      defensiveQuarters: 0,
+      goalieQuarter: null,
+      ...(played.get(player.name) || {}),
+      status: player.status || 'available',
+      isCaptain: captains.includes(player.name),
+    }));
+  };
+
   const handleSaveGame = ({ name, date }) => {
     if (!lineup) return;
 
@@ -1160,7 +1198,8 @@ export default function App() {
       formation: lineup.formation || settingsRef.current.formation,
       fieldPlayers: lineup.fieldPlayers || settingsRef.current.fieldPlayers,
       quarters: lineup.quarters,
-      players: lineup.playerStats || players,
+      players: gameRosterSnapshot(),
+      captains: [...captains],
       notes: '',
       createdAt: new Date().toISOString(),
     };

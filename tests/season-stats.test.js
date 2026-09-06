@@ -319,6 +319,75 @@ describe('getLineupRecommendations', () => {
     });
 });
 
+describe('recommendations do not fall back on roster order', () => {
+    // Two even games leave a squad tied almost everywhere. What separated the
+    // players named from the ones left out used to be nothing but their place
+    // in the roster, so the same three were recommended for everything.
+    const squad = ['Brady', 'Henry', 'Ephraim', 'Kamu', 'Jordan']
+        .map(name => ({ name, status: 'available', noKeeper: false }));
+
+    /** One game, with each named player sitting the quarters given. */
+    const game = (id, sitting) => ({
+        id,
+        name: `Game ${id}`,
+        players: squad.map(p => {
+            const sat = sitting[p.name] || [];
+            const played = [1, 2, 3, 4].filter(q => !sat.includes(q));
+            return {
+                name: p.name,
+                status: 'available',
+                quartersPlayed: played,
+                quartersSitting: sat,
+                positionsPlayed: played.map(q => ({ quarter: q, position: 'Left Back' })),
+            };
+        }),
+    });
+
+    const games = [
+        game(1, { Brady: [], Henry: [2], Ephraim: [], Kamu: [3], Jordan: [4] }),
+        game(2, { Brady: [3], Henry: [1], Ephraim: [2], Kamu: [4], Jordan: [1] }),
+    ];
+
+    test('rest priority names only the players who have sat least', () => {
+        const stats = calculatePlayerStats(squad, games);
+        const rest = getLineupRecommendations(squad, games, stats).shouldSit;
+
+        // Brady and Ephraim sat once across two games; everyone else sat twice.
+        expect(rest.map(r => r.name).sort()).toEqual(['Brady', 'Ephraim']);
+    });
+
+    test('a player who has sat more than the minimum is not a rest priority', () => {
+        const stats = calculatePlayerStats(squad, games);
+        const rest = getLineupRecommendations(squad, games, stats).shouldSit;
+
+        expect(rest.find(r => r.name === 'Henry')).toBeUndefined();
+    });
+
+    test('players tied on everything are ordered by name, not by the roster', () => {
+        // Every one of these sat exactly once, so only the tie-break separates
+        // them. Reversing the roster must not reverse the answer.
+        const even = ['Zoe', 'Ana', 'Mo'].map(name => ({ name, status: 'available' }));
+        const evenGame = {
+            id: 9,
+            name: 'Even',
+            players: even.map(p => ({
+                name: p.name,
+                status: 'available',
+                quartersPlayed: [1, 2, 3],
+                quartersSitting: [4],
+                positionsPlayed: [1, 2, 3].map(q => ({ quarter: q, position: 'Striker' })),
+            })),
+        };
+
+        const forward = getLineupRecommendations(even, [evenGame]);
+        const reversed = getLineupRecommendations([...even].reverse(), [evenGame]);
+
+        expect(forward.shouldSit.map(r => r.name)).toEqual(['Ana', 'Mo', 'Zoe']);
+        expect(reversed.shouldSit.map(r => r.name)).toEqual(forward.shouldSit.map(r => r.name));
+        expect(reversed.shouldCaptain.map(r => r.name)).toEqual(forward.shouldCaptain.map(r => r.name));
+    });
+});
+
 describe('the 3-3 that used to have a midfield', () => {
     // Left/Center/Right Mid were the 3-3's middle line before it was redefined
     // as Left Forward / Striker / Right Forward. The same three slots.

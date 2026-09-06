@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { FieldVisualization } from '@/components/FieldVisualization';
 import { playWhistleSound } from '@/modules/whistle-audio';
+import { todayLocalDate } from '@/modules/schedule';
 import { toast } from 'sonner';
 
 export function MatchdayDialog({
@@ -200,7 +201,7 @@ export function MatchdayDialog({
     if (onSaveGame) {
       onSaveGame({
         name: `vs ${opponentName || 'Opponent'} (${homeScore}-${awayScore})`,
-        date: fixture?.gameDate || new Date().toISOString().split('T')[0],
+        date: fixture?.gameDate || todayLocalDate(),
       });
     }
     toast.success('Match completed and game saved!');
