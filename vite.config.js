@@ -26,6 +26,21 @@ function updateServiceWorkerPlugin() {
         fs.writeFileSync(swPath, sw);
         console.log('Injected Vite bundle assets into dist/sw.js:', assetMatches);
       }
+
+      // Move generated sourcemaps out of dist/assets so they are preserved for
+      // local debugging and error symbolication without being served in production.
+      const assetsDir = path.join(distDir, 'assets');
+      const sourcemapsDir = path.resolve(__dirname, '.sourcemaps');
+      if (fs.existsSync(assetsDir)) {
+        const maps = fs.readdirSync(assetsDir).filter((f) => f.endsWith('.map'));
+        if (maps.length > 0) {
+          fs.mkdirSync(sourcemapsDir, { recursive: true });
+          for (const mapFile of maps) {
+            fs.renameSync(path.join(assetsDir, mapFile), path.join(sourcemapsDir, mapFile));
+          }
+          console.log(`Preserved ${maps.length} sourcemap(s) in .sourcemaps/ (excluded from dist/)`);
+        }
+      }
     },
   };
 }
@@ -53,7 +68,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: 'hidden',
     rollupOptions: {
       output: {
         manualChunks(id) {

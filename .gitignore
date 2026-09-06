@@ -15,3 +15,7 @@ public/vendor/
 
 # Jest coverage output
 coverage/
+
+# Local build artifacts
+.sourcemaps/
+*.map
