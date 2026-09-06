@@ -44,8 +44,19 @@ export function GameSettings({
 
   return (
     <Card className="settings-section shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
-        <div>
+      {/*
+        The button is the app's primary action and its label must not leave its
+        box. In a plain `flex justify-between` row it did: the title block kept
+        its natural width, the Button — a shrinkable flex item — was squeezed
+        below its content width, and because the label is `nowrap` with visible
+        overflow the text spilled outside the blue background rather than
+        clipping. It escaped by 21px at 320, 13px at 375 and 10px at 390.
+
+        So the button does not shrink and the title block does, and below `sm`
+        they stack rather than compete for a width neither fits in.
+      */}
+      <CardHeader className="flex flex-col items-start gap-3 space-y-0 pb-4 border-b sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <CardTitle className="text-base font-semibold">Game Settings</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
             Configure division, field size, and tactical formation
@@ -56,7 +67,7 @@ export function GameSettings({
           id="generateLineup"
           size="default"
           onClick={onGenerateLineup}
-          className="flex items-center gap-1.5 shadow-sm"
+          className="flex w-full shrink-0 items-center justify-center gap-1.5 shadow-sm sm:w-auto"
           aria-label="Generate lineup based on current players and settings"
         >
           {isGenerating ? (
