@@ -36,7 +36,7 @@ import { CONSTANTS } from '@/constants';
  * Putting the lineup back on the field is still available, as a button that
  * says so.
  */
-export function EditGameModal({ isOpen, game, onClose, onSave, onOpenOnField }) {
+export function EditGameModal({ isOpen, game, players = [], onClose, onSave, onOpenOnField }) {
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -44,12 +44,26 @@ export function EditGameModal({ isOpen, game, onClose, onSave, onOpenOnField }) 
   const [captains, setCaptains] = useState([]);
   const [quarters, setQuarters] = useState([]);
 
-  // The squad as it was that day. A game saved before player snapshots were
-  // recorded has none, and there is nothing to edit but the details.
-  const squad = useMemo(
-    () => (Array.isArray(game?.players) ? game.players : []),
-    [game]
-  );
+  // The squad as it was that day. If a game only recorded players who took the field
+  // (legacy saves), include any current roster players who were absent so the coach
+  // can see their status and edit them.
+  const squad = useMemo(() => {
+    const recorded = Array.isArray(game?.players) ? game.players : [];
+    const recordedNames = new Set(recorded.map((p) => p.name));
+    const missing = (players || [])
+      .filter((p) => !recordedNames.has(p.name))
+      .map((p) => ({
+        ...p,
+        status: 'absent',
+        quartersPlayed: [],
+        quartersSitting: [],
+        positionsPlayed: [],
+        offensiveQuarters: 0,
+        defensiveQuarters: 0,
+        goalieQuarter: null,
+      }));
+    return [...recorded, ...missing];
+  }, [game, players]);
 
   const positions = useMemo(() => {
     if (!game) return [];
@@ -68,7 +82,7 @@ export function EditGameModal({ isOpen, game, onClose, onSave, onOpenOnField }) 
     setNotes(game.notes || '');
     setStatuses(
       Object.fromEntries(
-        (game.players || []).map((p) => [p.name, p.status || 'available'])
+        squad.map((p) => [p.name, p.status || 'available'])
       )
     );
     setCaptains(

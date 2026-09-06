@@ -1724,6 +1724,7 @@ export default function App() {
       <EditGameModal
         isOpen={Boolean(editingGame)}
         game={editingGame}
+        players={players}
         onClose={() => setEditingGame(null)}
         onSave={handleUpdateGame}
         onOpenOnField={handleOpenGameOnField}

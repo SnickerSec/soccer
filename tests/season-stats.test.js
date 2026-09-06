@@ -591,3 +591,112 @@ describe('currentPlayerPositions', () => {
         expect(currentPlayerPositions(midfielders)).toBe(game.players);
     });
 });
+
+describe('legacy games and omitted player stats', () => {
+    const fullSquad = [
+        'Brady', 'Henry', 'Ephraim', 'Amos', 'Kamu',
+        'Jordan', 'Brees', 'Kevin', 'Elias', 'Savior',
+    ].map(name => ({ name, status: 'available', noKeeper: false }));
+
+    const legacyGame1 = {
+        id: 'game-1',
+        name: 'vs Shaffer, Game 1',
+        date: '2026-08-29',
+        // 8 players recorded; Amos and Savior were missing from the snapshot
+        players: [
+            'Brady', 'Henry', 'Ephraim', 'Kamu',
+            'Jordan', 'Brees', 'Kevin', 'Elias',
+        ].map(name => ({
+            name,
+            status: 'available',
+            quartersPlayed: [1, 2, 3],
+            quartersSitting: [4],
+            positionsPlayed: [{ quarter: 1, position: 'Left Back' }],
+        })),
+        captains: ['Brady'],
+    };
+
+    const modernGame2 = {
+        id: 'game-2',
+        name: 'Game 2',
+        date: '2026-09-05',
+        // All 10 players recorded; Amos played, Savior was marked absent
+        players: [
+            ...['Brady', 'Henry', 'Ephraim', 'Amos', 'Kamu', 'Jordan', 'Brees', 'Kevin', 'Elias'].map(name => ({
+                name,
+                status: 'available',
+                quartersPlayed: [1, 2, 3],
+                quartersSitting: [4],
+                positionsPlayed: [{ quarter: 1, position: 'Left Back' }],
+            })),
+            {
+                name: 'Savior',
+                status: 'absent',
+                quartersPlayed: [],
+                quartersSitting: [],
+                positionsPlayed: [],
+            },
+        ],
+        captains: ['Brees'],
+    };
+
+    test('counts unrecorded squad players with history as absent for legacy games', () => {
+        const stats = calculatePlayerStats(fullSquad, [legacyGame1, modernGame2]);
+
+        // Amos played Game 2, missing from Game 1 -> 1 attended, 1 absent out of 2
+        expect(stats.Amos.gamesOnRoster).toBe(2);
+        expect(stats.Amos.gamesAttended).toBe(1);
+        expect(stats.Amos.gamesAbsent).toBe(1);
+
+        // Savior absent Game 2, missing from Game 1 -> 0 attended, 2 absent out of 2
+        expect(stats.Savior.gamesOnRoster).toBe(2);
+        expect(stats.Savior.gamesAttended).toBe(0);
+        expect(stats.Savior.gamesAbsent).toBe(2);
+
+        // Brady played both games
+        expect(stats.Brady.gamesOnRoster).toBe(2);
+        expect(stats.Brady.gamesAttended).toBe(2);
+        expect(stats.Brady.gamesAbsent).toBe(0);
+
+        // Overall squad attendance rate: 8 attended in game 1 + 9 attended in game 2 = 17 / (10 players * 2) = 85%
+        const totalRosterSpots = Object.values(stats).reduce((sum, s) => sum + s.gamesOnRoster, 0);
+        const totalAttended = Object.values(stats).reduce((sum, s) => sum + s.gamesAttended, 0);
+        expect(totalRosterSpots).toBe(20);
+        expect(totalAttended).toBe(17);
+        expect(Math.round((totalAttended / totalRosterSpots) * 100)).toBe(85);
+    });
+
+    test('does not assign absences to players who never appeared in any game', () => {
+        const withNewKid = [...fullSquad, { name: 'NewKid', status: 'available' }];
+        const stats = calculatePlayerStats(withNewKid, [legacyGame1, modernGame2]);
+
+        expect(stats.NewKid.gamesOnRoster).toBe(0);
+        expect(stats.NewKid.gamesAbsent).toBe(0);
+        expect(stats.NewKid.gamesAttended).toBe(0);
+    });
+
+    test('returningFromAbsence sorts players with most absences first', () => {
+        const stats = calculatePlayerStats(fullSquad, [legacyGame1, modernGame2]);
+        const recs = getLineupRecommendations(fullSquad, [legacyGame1, modernGame2], stats);
+
+        expect(recs.returningFromAbsence).toBeDefined();
+        // Savior has 2 missed games, Amos has 1 missed game
+        expect(recs.returningFromAbsence[0]).toEqual({ name: 'Savior', gamesAbsent: 2 });
+        expect(recs.returningFromAbsence[1]).toEqual({ name: 'Amos', gamesAbsent: 1 });
+    });
+
+    test('falls back to game.captains only when player.isCaptain is undefined', () => {
+        const legacyGameWithoutPlayerIsCaptain = {
+            id: 'legacy-capt',
+            name: 'Legacy Captain Game',
+            players: [
+                { name: 'Brady', status: 'available', quartersPlayed: [1] },
+                { name: 'Henry', status: 'available', quartersPlayed: [1] },
+            ],
+            captains: ['Brady'],
+        };
+        const stats = calculatePlayerStats(fullSquad, [legacyGameWithoutPlayerIsCaptain]);
+        expect(stats.Brady.captainGames).toBe(1);
+        expect(stats.Henry.captainGames).toBe(0);
+    });
+});

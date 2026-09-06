@@ -211,7 +211,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-black">{pStat.offenseQuarters || 0} Qtrs</span>
+                  <span className="text-sm font-black">{pStat.offenseQuarters || 0} {(pStat.offenseQuarters || 0) === 1 ? 'Qtr' : 'Qtrs'}</span>
                   <span className="text-[10px] block opacity-80">({offPct}%)</span>
                 </div>
               </div>
@@ -229,7 +229,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                     <span className="text-xs font-bold">Midfield Zone</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-sm font-black">{pStat.midfieldQuarters || 0} Qtrs</span>
+                    <span className="text-sm font-black">{pStat.midfieldQuarters || 0} {(pStat.midfieldQuarters || 0) === 1 ? 'Qtr' : 'Qtrs'}</span>
                     <span className="text-[10px] block opacity-80">({midPct}%)</span>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-black">{pStat.defenseQuarters || 0} Qtrs</span>
+                  <span className="text-sm font-black">{pStat.defenseQuarters || 0} {(pStat.defenseQuarters || 0) === 1 ? 'Qtr' : 'Qtrs'}</span>
                   <span className="text-[10px] block opacity-80">({defPct}%)</span>
                 </div>
               </div>
@@ -266,7 +266,7 @@ export function PlayerHeatmapCard({ formation, players = [], stats = {}, gameHis
                   <span className="text-xs font-bold">Goalkeeper</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-black">{pStat.keeperQuarters || 0} Qtrs</span>
+                  <span className="text-sm font-black">{pStat.keeperQuarters || 0} {(pStat.keeperQuarters || 0) === 1 ? 'Qtr' : 'Qtrs'}</span>
                   <span className="text-[10px] block opacity-80">({gkPct}%)</span>
                 </div>
               </div>

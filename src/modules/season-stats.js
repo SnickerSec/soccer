@@ -99,9 +99,24 @@ export function calculatePlayerStats(players = [], savedGames = []) {
 
     const gamesList = Array.isArray(savedGames) ? savedGames : [];
 
+    // Squad players who appear in at least one saved game's snapshot.
+    // A player never recorded in any game (e.g. newly added to the roster or a
+    // rename target before migration) was not on the roster for past games and
+    // should not accumulate unrecorded absences.
+    const playersWithHistory = new Set();
+    gamesList.forEach(g => {
+        (g.players || []).forEach(p => {
+            if (p && p.name) playersWithHistory.add(p.name);
+        });
+    });
+
     // Aggregate stats from saved games
     gamesList.forEach((game) => {
-        (game.players || []).forEach(player => {
+        const gamePlayers = Array.isArray(game.players) ? game.players : [];
+        const recordedNames = new Set();
+
+        gamePlayers.forEach(player => {
+            recordedNames.add(player.name);
             if (!stats[player.name]) {
                 stats[player.name] = createEmptyStats();
             }
@@ -130,8 +145,16 @@ export function calculatePlayerStats(players = [], savedGames = []) {
             s.totalSitting += qSitting;
             s.sittingQuarters = s.totalSitting;
 
-            // Track captain assignments from player snapshot
-            if (player.isCaptain) {
+            // Track captain assignments from player snapshot or game-level captains fallback
+            const isCaptain = player.isCaptain !== undefined
+                ? Boolean(player.isCaptain)
+                : Boolean(
+                    player.status === 'available' && (
+                        (Array.isArray(game.captains) && game.captains.includes(player.name)) ||
+                        game.captain === player.name
+                    )
+                );
+            if (isCaptain) {
                 s.captainGames++;
             }
 
@@ -197,6 +220,20 @@ export function calculatePlayerStats(players = [], savedGames = []) {
                 s.lastGameSatQuarters = player.quartersSitting || [];
             }
         });
+
+        // For any tracked squad player with game history not in this game's player snapshot,
+        // they were on the roster for the season but omitted from this legacy game's active snapshot.
+        if (gamePlayers.length > 0) {
+            (players || []).forEach(player => {
+                if (playersWithHistory.has(player.name) && !recordedNames.has(player.name)) {
+                    const s = stats[player.name];
+                    if (s) {
+                        s.gamesOnRoster++;
+                        s.gamesAbsent++;
+                    }
+                }
+            });
+        }
     });
 
     return stats;
@@ -371,6 +408,11 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
         .filter(p => {
             const s = stats[p.name];
             return s && s.gamesAbsent > 0;
+        })
+        .sort((a, b) => {
+            const absA = stats[a.name]?.gamesAbsent || 0;
+            const absB = stats[b.name]?.gamesAbsent || 0;
+            return absB - absA || a.name.localeCompare(b.name);
         })
         .slice(0, 3)
         .map(p => ({
