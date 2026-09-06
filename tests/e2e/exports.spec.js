@@ -113,8 +113,12 @@ test.describe('Exports', () => {
 
         // ...and their games actually counted, rather than the zeros the
         // mismatched field names used to produce
-        const [, gamesPlayed, quartersPlayed] = row.split(',').map((c) => c.replace(/"/g, ''));
+        const [, gamesPlayed, captainMatches, quartersPlayed] = row.split(',').map((c) => c.replace(/"/g, ''));
         expect(gamesPlayed).toBe('1');
         expect(Number(quartersPlayed)).toBeGreaterThan(0);
+        // The armband is a season stat like the rest, so it is in the export
+        // as well as the table above the button
+        expect(file.body).toContain('Captain Matches');
+        expect(Number(captainMatches)).toBeGreaterThanOrEqual(0);
     });
 });

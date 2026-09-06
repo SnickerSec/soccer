@@ -114,6 +114,8 @@ test.describe('An absence survives the save', () => {
         // settled once the lineup exists.
         const captain = await page.locator('.captain-checkbox:checked').first().getAttribute('data-player');
         expect(captain).toBeTruthy();
+        const benched = await page.locator('.captain-checkbox:not(:checked)').first().getAttribute('data-player');
+        expect(benched).toBeTruthy();
 
         await page.locator('.action-buttons-inline [data-action="saveGame"]').click();
         await page.fill('#saveGameName', 'vs Athletic');
@@ -124,5 +126,64 @@ test.describe('An absence survives the save', () => {
         const heatmap = page.locator('#playerDevelopmentHeatmap');
         await heatmap.getByRole('button', { name: captain, exact: true }).click();
         await expect(heatmap).toContainText('⭐ 1');
+
+        // And in the Captain column of the statistics table, which is the
+        // count the generator balances the armband on. Column 4: Player,
+        // Attendance, Games, Captain.
+        const table = page.locator('#playerStatsTable');
+        await expect(table.getByRole('columnheader', { name: 'Captain' })).toBeVisible();
+        const captainRow = table.locator('tbody tr').filter({ hasText: captain }).first();
+        await expect(captainRow.locator('td').nth(3)).toHaveText(/1/);
+
+        // Somebody who did not wear it reads 0 rather than inheriting the count
+        const benchedRow = table.locator('tbody tr').filter({ hasText: benched }).first();
+        await expect(benchedRow.locator('td').nth(3)).toHaveText(/0/);
+    });
+});
+
+// The armband is a tracked season stat, and the point of tracking it is that
+// the generator hands it to whoever has worn it least. Two players wearing it
+// every week is exactly what the count in the Captain column exists to stop.
+test.describe('The armband is balanced across the squad', () => {
+    test('four games spread it over the squad rather than repeating a pair', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+
+        const squad = await page.locator('.captain-checkbox').count();
+        expect(squad).toBeGreaterThan(4);
+
+        const checkedCaptains = () =>
+            page.locator('.captain-checkbox:checked').evaluateAll(
+                (els) => els.map((el) => el.getAttribute('data-player'))
+            );
+
+        let previous = [];
+        for (let game = 1; game <= 4; game++) {
+            await page.click('#generateLineup');
+            await expect(page.locator('.action-buttons-inline')).toBeVisible({ timeout: 20000 });
+
+            // Whoever wore it last week has one more than the players who have
+            // not, so this week's draw has to move on from them.
+            await expect
+                .poll(async () => (await checkedCaptains()).filter((n) => previous.includes(n)), { timeout: 20000 })
+                .toEqual([]);
+            previous = await checkedCaptains();
+
+            await page.locator('.action-buttons-inline [data-action="saveGame"]').click();
+            await page.fill('#saveGameName', `Game ${game}`);
+            await page.click('#confirmSaveGame');
+            await expect(page.locator('#saveGameModal')).toBeHidden();
+        }
+
+        // And the Captain column says so: eight armbands over four games, and
+        // nobody has worn it twice while a team-mate has never worn it.
+        await page.click('#season-tab-btn');
+        const counts = await page
+            .locator('#playerStatsTable tbody tr td:nth-child(4)')
+            .evaluateAll((cells) => cells.map((c) => Number((c.textContent || '').replace(/[^0-9]/g, ''))));
+
+        expect(counts.length).toBe(squad);
+        expect(counts.reduce((a, b) => a + b, 0)).toBe(8);
+        expect(Math.max(...counts)).toBe(1);
     });
 });

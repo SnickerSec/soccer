@@ -212,16 +212,18 @@ export function seasonStatsCsv(stats, { midfieldLine = true } = {}) {
     const backsAndForwards = !midfieldLine;
 
     const header = backsAndForwards
-        ? ['Player', 'Games Played', 'Quarters Played', 'Keeper', 'Backs', 'Forwards', 'Sitting']
-        : ['Player', 'Games Played', 'Quarters Played', 'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'];
+        ? ['Player', 'Games Played', 'Captain Matches', 'Quarters Played',
+           'Keeper', 'Backs', 'Forwards', 'Sitting']
+        : ['Player', 'Games Played', 'Captain Matches', 'Quarters Played',
+           'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'];
 
     const lines = [csvRow(header)];
 
     for (const { name, s, byBucket } of rows) {
         lines.push(csvRow(backsAndForwards
-            ? [name, s.gamesPlayed || 0, s.totalQuarters || 0,
+            ? [name, s.gamesPlayed || 0, s.captainGames || 0, s.totalQuarters || 0,
                byBucket.keeper, byBucket.defense, byBucket.offense, s.totalSitting || 0]
-            : [name, s.gamesPlayed || 0, s.totalQuarters || 0,
+            : [name, s.gamesPlayed || 0, s.captainGames || 0, s.totalQuarters || 0,
                byBucket.keeper, byBucket.defense, byBucket.midfield, byBucket.offense, s.totalSitting || 0]
         ));
     }

@@ -280,6 +280,7 @@ describe('seasonStatsCsv', () => {
     const stats = {
         'Ana Ruiz': {
             gamesPlayed: 3,
+            captainGames: 2,
             totalQuarters: 9,
             totalSitting: 3,
             positions: { Keeper: 2, 'Left Back': 3, 'Center Mid': 2, Striker: 2 }
@@ -292,7 +293,7 @@ describe('seasonStatsCsv', () => {
 
     test('heads the columns it fills', () => {
         expect(cells(seasonStatsCsv(stats), 0)).toEqual([
-            'Player', 'Games Played', 'Quarters Played',
+            'Player', 'Games Played', 'Captain Matches', 'Quarters Played',
             'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'
         ]);
     });
@@ -300,40 +301,53 @@ describe('seasonStatsCsv', () => {
     test('a 3-3 team gets Backs and Forwards, and no column of midfield zeros', () => {
         const threeThree = {
             'Ana Ruiz': {
-                gamesPlayed: 2, totalQuarters: 8, totalSitting: 0,
+                gamesPlayed: 2, captainGames: 1, totalQuarters: 8, totalSitting: 0,
                 positions: { Keeper: 1, 'Left Back': 3, Striker: 2, 'Right Forward': 2 }
             }
         };
 
         expect(cells(seasonStatsCsv(threeThree, { midfieldLine: false }), 0)).toEqual([
-            'Player', 'Games Played', 'Quarters Played',
+            'Player', 'Games Played', 'Captain Matches', 'Quarters Played',
             'Keeper', 'Backs', 'Forwards', 'Sitting'
         ]);
 
         // Keeper 1, Backs 3, Forwards 4 (Striker + Right Forward), Sitting 0
         expect(cells(seasonStatsCsv(threeThree, { midfieldLine: false }), 1))
-            .toEqual(['Ana Ruiz', '2', '8', '1', '3', '4', '0']);
+            .toEqual(['Ana Ruiz', '2', '1', '8', '1', '3', '4', '0']);
     });
 
     test('defaults to the midfield column when the caller says nothing', () => {
         expect(cells(seasonStatsCsv(stats), 0)).toEqual([
-            'Player', 'Games Played', 'Quarters Played',
+            'Player', 'Games Played', 'Captain Matches', 'Quarters Played',
             'Keeper', 'Defense', 'Midfield', 'Offense', 'Sitting'
         ]);
     });
 
     test('reads the fields calculatePlayerStats actually returns', () => {
-        const [name, games, quarters, , , , , sitting] = cells(seasonStatsCsv(stats), 1);
+        const [name, games, captain, quarters, , , , , sitting] = cells(seasonStatsCsv(stats), 1);
 
         expect(name).toBe('Ana Ruiz');
         expect(games).toBe('3');
+        expect(captain).toBe('2');
         expect(quarters).toBe('9');
         expect(sitting).toBe('3');
     });
 
+    /**
+     * The armband is balanced across the season, so the export has to carry
+     * the count the balancing reads — not only the on-screen table.
+     */
+    test('a player who has never worn the armband exports a zero', () => {
+        const [, , captain] = cells(seasonStatsCsv({
+            'Bo Nkemi': { gamesPlayed: 4, totalQuarters: 12, positions: {} }
+        }), 1);
+
+        expect(captain).toBe('0');
+    });
+
     /** Bucketed the way the lineup engine classifies a position. */
     test('splits the positions played into keeper, defence, midfield and attack', () => {
-        const [, , , keeper, defense, midfield, offense] = cells(seasonStatsCsv(stats), 1);
+        const [, , , , keeper, defense, midfield, offense] = cells(seasonStatsCsv(stats), 1);
 
         expect(keeper).toBe('2');
         expect(defense).toBe('3');
@@ -345,11 +359,11 @@ describe('seasonStatsCsv', () => {
         const [name, ...rest] = cells(seasonStatsCsv({ 'Bo Nkemi': {} }), 1);
 
         expect(name).toBe('Bo Nkemi');
-        expect(rest).toEqual(['0', '0', '0', '0', '0', '0', '0']);
+        expect(rest).toEqual(['0', '0', '0', '0', '0', '0', '0', '0']);
     });
 
     test('counts an unfamiliar position as attacking rather than dropping it', () => {
-        const [, , , keeper, defense, midfield, offense] =
+        const [, , , , keeper, defense, midfield, offense] =
             cells(seasonStatsCsv({ Ana: { positions: { Sweeper: 1, Winger: 2 } } }), 1);
 
         expect([keeper, defense, midfield]).toEqual(['0', '0', '0']);
@@ -359,7 +373,7 @@ describe('seasonStatsCsv', () => {
     test('quotes a name that would otherwise break the columns', () => {
         const csv = seasonStatsCsv({ 'Ruiz, Ana': { gamesPlayed: 1, positions: {} } });
 
-        expect(csv.split('\n')[1]).toBe('"Ruiz, Ana","1","0","0","0","0","0","0"');
+        expect(csv.split('\n')[1]).toBe('"Ruiz, Ana","1","0","0","0","0","0","0","0"');
     });
 
     test('doubles a quote inside a name, so the row keeps its columns', () => {

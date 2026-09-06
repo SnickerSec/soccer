@@ -279,6 +279,16 @@ which the column and the route had always been there to hold.
 Old games cannot be repaired — who was on the roster the day they were played
 is not recoverable — so they still report a full turnout.
 
+The armband is a season stat like the quarters and the gloves, so the Season
+tab's Player Statistics table has a Captain column and the CSV a "Captain
+Matches" one. What the column marks is the balancing: the available players
+tied at the squad's lowest count are the ones `handleGenerateLineup` draws
+next week's captains from, and they are badged — all of them, not the first
+three the recommendations banner has room to name. Nobody is badged until
+somebody has worn it, since a minimum everybody is tied at says nothing.
+`tests/e2e/attendance-tracking.spec.js` saves four games and asserts the eight
+armbands land on eight different players.
+
 A tie in the Season tab's recommendations used to be settled by roster order.
 Two even games leave a squad tied almost everywhere, so the same three names
 were recommended for everything, week after week, and rest priority named

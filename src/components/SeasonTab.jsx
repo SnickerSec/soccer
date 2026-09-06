@@ -65,6 +65,30 @@ export function SeasonTab({
     ? 0
     : Object.values(stats).reduce((n, s) => n + (s.midfieldQuarters || 0), 0);
 
+  // Who the armband is owed to: the available players tied at the squad's
+  // lowest captain count, which is exactly the set the generator draws next
+  // week's captains from. The banner above names the first three of them; the
+  // column marks all of them, because a table showing three 0s badged and
+  // three 0s not is a table the coach has to explain to themselves.
+  //
+  // Nobody is due while nobody has worn it — before the first captain is
+  // recorded the minimum is everyone, and badging the whole squad says
+  // nothing.
+  const captainCounts = players
+    .filter((p) => (!p.status || p.status === 'available') && stats[p.name])
+    .map((p) => ({ name: p.name, count: stats[p.name].captainGames || 0 }));
+  const minCaptainGames = captainCounts.length > 0
+    ? Math.min(...captainCounts.map((p) => p.count))
+    : 0;
+  const maxCaptainGames = captainCounts.length > 0
+    ? Math.max(...captainCounts.map((p) => p.count))
+    : 0;
+  const captainDue = new Set(
+    maxCaptainGames > minCaptainGames
+      ? captainCounts.filter((p) => p.count === minCaptainGames).map((p) => p.name)
+      : []
+  );
+
   const totalRosterSpots = Object.values(stats).reduce((acc, s) => acc + (s.gamesOnRoster || 0), 0);
   const totalAttended = Object.values(stats).reduce((acc, s) => acc + (s.gamesAttended || 0), 0);
   const squadAttendancePct = totalRosterSpots > 0 ? Math.round((totalAttended / totalRosterSpots) * 100) : 100;
@@ -299,6 +323,7 @@ export function SeasonTab({
                     <TableHead className="w-[180px]">Player</TableHead>
                     <TableHead className="text-center">Attendance</TableHead>
                     <TableHead className="text-center">Games</TableHead>
+                    <TableHead className="text-center">Captain</TableHead>
                     <TableHead className="text-center">Quarters</TableHead>
                     <TableHead className="text-center">GK</TableHead>
                     <TableHead className="text-center">{is33Formation ? 'Backs' : 'Defense'}</TableHead>
@@ -333,6 +358,29 @@ export function SeasonTab({
                         )}
                       </TableCell>
                       <TableCell className="text-center text-xs">{playerStat.gamesPlayed || 0}</TableCell>
+                      {/* The armband is a season stat like any other, and the
+                          generator hands it to whoever has worn it least — so
+                          the coach has to be able to see the count it is
+                          balancing. Players it would pick next are marked. */}
+                      <TableCell className="text-center text-xs">
+                        {captainDue.has(playerName) ? (
+                          <Badge
+                            variant="warning"
+                            className="text-[10px] px-1.5 py-0"
+                            title="Due the armband: fewest captain matches on the squad"
+                          >
+                            {playerStat.captainGames || 0}
+                          </Badge>
+                        ) : (
+                          <span className={cn(
+                            (playerStat.captainGames || 0) > 0
+                              ? 'font-medium text-amber-500'
+                              : 'text-muted-foreground'
+                          )}>
+                            {playerStat.captainGames || 0}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center text-xs font-semibold text-primary">
                         {playerStat.quartersPlayed || 0}
                       </TableCell>
@@ -349,6 +397,16 @@ export function SeasonTab({
                   ))}
                 </TableBody>
               </Table>
+
+              {/* A badge on a number needs saying once. The armband is balanced
+                  the same way rest and the gloves are, and this is the count
+                  that balancing reads. */}
+              {captainDue.size > 0 && (
+                <p className="pt-3 text-[11px] text-muted-foreground" id="captainBalanceNote">
+                  Highlighted captain counts are the players due the armband: the generator gives it
+                  to whoever has worn it least.
+                </p>
+              )}
 
               {/* The midfield column is gone with the midfield line, but those
                   quarters were played. Reported here so GK + Backs + Forwards
