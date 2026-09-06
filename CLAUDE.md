@@ -279,6 +279,15 @@ which the column and the route had always been there to hold.
 Old games cannot be repaired — who was on the roster the day they were played
 is not recoverable — so they still report a full turnout.
 
+The armband lives in `captains` and nowhere else. A roster row carries an
+`isCaptain` only as of the last time the roster was persisted, and the engine
+hands its copies of those rows through to the lineup as `playerStats` — so the
+Player Summary, which read that field, went on naming the pair from before the
+generation while the quarter cards beside it, which read `captains`, named the
+one it had just picked. Anything showing the armband reads `captains`; a
+lineup does not get a copy of its own, because a second place for a name to
+live is a second answer to who is wearing it.
+
 The armband is a season stat like the quarters and the gloves, so the Season
 tab's Player Statistics table has a Captain column and the CSV a "Captain
 Matches" one. What the column marks is the balancing: the available players

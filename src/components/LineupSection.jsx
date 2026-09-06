@@ -687,7 +687,17 @@ export function LineupSection({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {playerStats.map((player) => {
-                    const cells = summaryCells(player);
+                    // `captains` is where the armband lives; the roster rows
+                    // carry an `isCaptain` only as of the last time they were
+                    // persisted, and the engine hands its copies of them
+                    // straight through to here. Generating picks a fresh pair,
+                    // so reading that field named the previous one — while the
+                    // quarter cards above, which read `captains`, named the new
+                    // one.
+                    const cells = summaryCells({
+                      ...player,
+                      isCaptain: captains.includes(player.name),
+                    });
                     return (
                       <tr key={player.name} className="hover:bg-muted/30 transition-colors">
                         <td className="px-3 py-2">

@@ -124,6 +124,34 @@ test.describe('Player summary table', () => {
         expect(label).toMatch(/^Must rest at least one quarter for .+/);
     });
 
+    /**
+     * Generating hands the armband to whoever has worn it least, and the
+     * roster picks that up at once. The summary used to read `isCaptain` off
+     * the engine's copies of the roster rows — a field written when the roster
+     * was last persisted — so it named the previous pair, or nobody.
+     */
+    test('the captain column names the armband this generation handed out', async ({ page }) => {
+        await generate(page);
+
+        const rosterCaptains = await page.evaluate(() =>
+            [...document.querySelectorAll('.captain-checkbox')]
+                .filter(box => box.checked)
+                .map(box => box.getAttribute('aria-label')
+                    .replace(/^Select /, '').replace(/ as captain$/, '')));
+
+        const summaryCaptains = await page.evaluate(() =>
+            [...document.querySelectorAll('.player-summary tbody tr')]
+                .filter(row => row.children[3].textContent.includes('Yes'))
+                .map(row => row.children[2].textContent.trim()));
+
+        expect(rosterCaptains).toHaveLength(2);
+        expect(summaryCaptains).toHaveLength(2);
+        // The summary labels a player "Name #7"; the roster names them plainly
+        for (const name of rosterCaptains) {
+            expect(summaryCaptains.some(label => label.startsWith(name))).toBe(true);
+        }
+    });
+
     test('the column headers are scoped, so a row reads correctly', async ({ page }) => {
         await generate(page);
 
