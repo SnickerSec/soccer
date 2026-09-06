@@ -297,6 +297,15 @@ quarter of the minimum, then took the first three. Only players actually at the
 minimum are behind now, and ties break on who has been on the field most, then
 on name — the same input gives the same answer whatever order the roster is in.
 
+A player who has missed every game so far is the exception, and was hidden
+twice over. The gloves and the armband are owed to whoever has had fewest
+turns, so a `gamesPlayed > 0` filter took out the player owed most: he had
+nought of each because he had never been there, and the only line naming him
+was "Returning from Absence". That filter is gone from both lists, and such a
+player leads a tie rather than trailing it — ordering on quarters played sorts
+someone with no quarters last. It stays on rest priority alone: a player who
+has sat nothing because he has played nothing must not be told to sit.
+
 ### Correcting a game after it was played
 
 What was planned and what happened are rarely the same match: someone does not

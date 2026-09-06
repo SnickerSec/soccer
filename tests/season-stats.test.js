@@ -330,12 +330,54 @@ describe('getLineupRecommendations', () => {
 
         const recommendations = getLineupRecommendations(players, mockSavedGames, stats);
 
-        // Henry and Amos are the only two on nought.
-        expect(recommendations.shouldKeep.map(p => p.name).sort()).toEqual(['Amos', 'Henry']);
+        // Henry, Amos and Savior are the three on nought. Savior has played
+        // no games at all, which is not a reason to leave him out: it is the
+        // reason he has never kept.
+        expect(recommendations.shouldKeep.map(p => p.name).sort()).toEqual(['Amos', 'Henry', 'Savior']);
         expect(recommendations.shouldKeep.every(p => p.gkCount === 0)).toBe(true);
 
         // And Amos's own missed game is reported rather than swallowed.
         expect(recommendations.returningFromAbsence.map(p => p.name)).toContain('Amos');
+    });
+
+    /**
+     * The same squad, read again after two more weeks of the same complaint:
+     * Savior had missed every game of the season, and the only line in the
+     * banner that named him was the one saying he had missed them. He has
+     * nought keeper quarters and nought captain games like anyone who has
+     * never had a turn, so he belongs at the front of both lists — and he is
+     * put there, since ordering a tie by quarters played would otherwise sort
+     * the player with no quarters last.
+     */
+    test('a player who has missed every game is named for the gloves and the armband', () => {
+        const table = [
+            // name,      games, qtrs, gk, cap, sit, absences
+            ['Brady',   2, 7, 1, 1, 1, 0],
+            ['Ephraim', 2, 7, 1, 1, 1, 0],
+            ['Kamu',    2, 6, 1, 1, 2, 0],
+            ['Jordan',  2, 6, 1, 1, 2, 0],
+            ['Savior',  0, 0, 0, 0, 0, 2],
+        ];
+        const players = table.map(([name]) => ({ name, noKeeper: false, status: 'available' }));
+        const stats = {};
+        for (const [name, games, qtrs, gk, cap, sit, absences] of table) {
+            stats[name] = {
+                ...emptyStats(),
+                gamesPlayed: games, totalQuarters: qtrs, totalSitting: sit,
+                goalkeeperQuarters: gk, keeperQuarters: gk,
+                captainGames: cap, gamesAbsent: absences,
+            };
+        }
+
+        const recommendations = getLineupRecommendations(players, mockSavedGames, stats);
+
+        expect(recommendations.shouldKeep.map(p => p.name)).toEqual(['Savior']);
+        expect(recommendations.shouldCaptain.map(p => p.name)).toEqual(['Savior']);
+        expect(recommendations.returningFromAbsence.map(p => p.name)).toContain('Savior');
+
+        // Rest is the one list he stays out of. He has sat nothing because he
+        // has played nothing, and resting him is the advice backwards.
+        expect(recommendations.shouldSit.map(p => p.name)).not.toContain('Savior');
     });
 
     test('noKeeper still excludes a player from the goalkeeper list only', () => {

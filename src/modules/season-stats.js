@@ -350,12 +350,26 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
     // recommended for everything, week after week, and the coach was reading
     // roster order dressed up as advice. Ties are settled by who has been on
     // the field most, then by name so the same input gives the same answer.
+    //
+    // A player with no games yet is the exception. Their `avgQuarters` is 0
+    // because nothing has been recorded, not because they barely play, and
+    // ordering on it puts the player the rotation owes most at the back of a
+    // tie they are at the very front of. They go first, and the average
+    // settles everyone else.
     const byNeed = (primary) => (a, b) =>
-        primary(a, b) || b.avgQuarters - a.avgQuarters || a.name.localeCompare(b.name);
+        primary(a, b) ||
+        (b.gamesPlayed === 0) - (a.gamesPlayed === 0) ||
+        b.avgQuarters - a.avgQuarters ||
+        a.name.localeCompare(b.name);
 
     // Only players actually at the minimum are behind on rest. The old
     // tolerance of half a quarter swept in players who had already sat a full
     // game more than the least-rested, and named them as the ones to rest.
+    //
+    // The `gamesPlayed` floor stays on this one list. A player with no games
+    // has sat nothing, but that is missing data rather than a player who never
+    // rests, and telling a coach to rest someone who has not played yet is the
+    // advice exactly backwards.
     const bySitting = [...playerData]
         .filter(p => p.gamesPlayed > 0)
         .sort(byNeed((a, b) => a.avgSitting - b.avgSitting));
@@ -365,9 +379,17 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
         .slice(0, 3)
         .map(p => ({ name: p.name, avgSitting: p.avgSitting.toFixed(1), gamesPlayed: p.gamesPlayed }));
 
-    // Players who should be goalkeeper
+    // Players who should be goalkeeper.
+    //
+    // No `gamesPlayed` floor here, or on the captain list below. A player who
+    // has missed every game so far has nought keeper quarters and nought
+    // captain games, and those are true counts, not absent ones — they are the
+    // player the rotation owes the gloves and the armband most. Filtering them
+    // out is the same mistake as reading today's `status`, one layer down: the
+    // squad that found it had a player who had missed both games of the season
+    // and was named in nothing but "Returning from Absence".
     const byGK = [...playerData]
-        .filter(p => !p.noKeeper && p.gamesPlayed > 0)
+        .filter(p => !p.noKeeper)
         .sort(byNeed((a, b) => a.gkCount - b.gkCount));
     const minGK = byGK[0]?.gkCount || 0;
     recommendations.shouldKeep = byGK
@@ -377,7 +399,6 @@ export function getLineupRecommendations(arg1, arg2, arg3) {
 
     // Players who should be captain
     const byCaptain = [...playerData]
-        .filter(p => p.gamesPlayed > 0)
         .sort(byNeed((a, b) => a.captainCount - b.captainCount));
     const minCaptain = byCaptain[0]?.captainCount || 0;
     recommendations.shouldCaptain = byCaptain
