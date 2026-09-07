@@ -69,6 +69,7 @@ import {
   pushGameUpdate,
   pushGameDelete,
   pushFixture,
+  pushFixturesBulk,
   pushFixtureUpdate,
   pushFixtureDelete,
   pushSettings,
@@ -605,6 +606,7 @@ export default function App() {
         const found = list.find((t) => t.id === id) || (id ? { id } : null);
         currentTeamRef.current = found;
         setCurrentTeamState(found);
+        if (id) setCurrentTeam(id);
       },
       updateAuthUI: (user) => {
         testAuthUserRef.current = user;
@@ -1490,8 +1492,10 @@ export default function App() {
 
   const handleConfirmScheduleImport = async (importedFixtures, mode = 'merge') => {
     let finalFixtures = [];
+    let toSync = [];
     if (mode === 'replace') {
       finalFixtures = [...importedFixtures];
+      toSync = [...importedFixtures];
     } else {
       const isDuplicate = (incoming, existing) => {
         const d1 = incoming.gameDate || '';
@@ -1508,6 +1512,7 @@ export default function App() {
       );
 
       finalFixtures = [...fixtures, ...uniqueNew];
+      toSync = uniqueNew;
     }
 
     finalFixtures.sort((a, b) => {
@@ -1520,20 +1525,27 @@ export default function App() {
     setFixtures(finalFixtures);
     safeSetToStorage(CONSTANTS.STORAGE_KEYS.SCHEDULE, JSON.stringify(finalFixtures));
 
-    if (currentUser && currentTeam) {
-      let syncFailed = false;
-      for (const fix of importedFixtures) {
-        try {
-          const res = await pushFixture(fix);
-          if (!res.success && !res.queued) {
-            syncFailed = true;
+    if (currentUser && currentTeam && toSync.length > 0) {
+      try {
+        const res = await pushFixturesBulk(toSync);
+        if (res?.success && Array.isArray(res.data)) {
+          const idMap = new Map();
+          res.data.forEach((saved, index) => {
+            const localId = toSync[index]?.id;
+            if (localId && saved?.id) {
+              idMap.set(localId, saved.id);
+            }
+          });
+          if (idMap.size > 0) {
+            setFixtures((prev) =>
+              prev.map((f) => (idMap.has(f.id) ? { ...f, id: idMap.get(f.id) } : f))
+            );
           }
-        } catch (e) {
-          console.error('Failed to sync imported fixture:', e);
-          syncFailed = true;
+        } else if (!res?.success && !res?.queued) {
+          toast.error(res?.error || 'Some imported matches could not be synced to cloud');
         }
-      }
-      if (syncFailed) {
+      } catch (e) {
+        console.error('Failed to sync imported fixtures:', e);
         toast.error('Some imported matches could not be synced to cloud');
       }
     }

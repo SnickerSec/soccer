@@ -25,6 +25,7 @@ let gameDeleteResult;
 let fixtureResult;
 let fixtureUpdateResult;
 let fixtureDeleteResult;
+let bulkFixturesResult;
 /** What the server's schedule holds, for the pull sync() now makes. */
 let serverFixtures;
 /** How the server says the team plays, and what it does with a write. */
@@ -103,7 +104,7 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
     bulkImportGames: async () => ({ success: true }),
     bulkImportFixtures: async (teamId, fixtures) => {
         calls.push(`push:bulkImportFixtures:${fixtures.map(f => f.opponent).join(',')}`);
-        return { success: true, data: fixtures };
+        return bulkFixturesResult(fixtures);
     },
     getTeamSettings: async () => {
         calls.push('pull:getTeamSettings');
@@ -132,6 +133,7 @@ let pushGame;
 let pushGameUpdate;
 let pushGameDelete;
 let pushFixture;
+let pushFixturesBulk;
 let pushFixtureUpdate;
 let pushFixtureDelete;
 let pushSettings;
@@ -163,6 +165,9 @@ const queuedGameDelete = (id) =>
 
 const queuedFixture = (fixture) =>
     ({ entityType: 'fixtures', action: 'save', data: fixture, timestamp: 3 });
+
+const queuedFixturesBulk = (fixtures) =>
+    ({ entityType: 'fixtures', action: 'bulk_save', data: fixtures, timestamp: 3 });
 
 const queuedFixtureUpdate = (id, updates) =>
     ({ entityType: 'fixtures', action: 'update', data: { id, updates }, timestamp: 3 });
@@ -208,6 +213,10 @@ beforeEach(async () => {
     gameUpdateResult = () => ({ success: true });
     gameDeleteResult = () => ({ success: true });
     fixtureResult = (fixture) => ({ success: true, data: { ...fixture, id: 'cloud-fix-1' } });
+    bulkFixturesResult = (fixtures) => ({
+        success: true,
+        data: fixtures.map((f, i) => ({ ...f, id: `cloud-bulk-${i + 1}` }))
+    });
     fixtureUpdateResult = () => ({ success: true });
     fixtureDeleteResult = () => ({ success: true });
     serverFixtures = () => ({ success: true, data: [] });
@@ -219,7 +228,7 @@ beforeEach(async () => {
     globalThis.navigator = { onLine: true };
     ({
         initSync, sync, processQueue, pushGame, pushGameUpdate, pushGameDelete,
-        pushFixture, pushFixtureUpdate, pushFixtureDelete, pushSettings
+        pushFixture, pushFixturesBulk, pushFixtureUpdate, pushFixtureDelete, pushSettings
     } = await loadSync());
 });
 
@@ -692,6 +701,151 @@ describe('pushFixture', () => {
         const result = await freshPushFixture({ opponent: 'Rovers' });
 
         expect(result).toEqual({ success: false, error: 'No team selected' });
+    });
+});
+
+/**
+ * Bulk fixture syncing for calendar and schedule imports.
+ *
+ * An imported schedule typically contains 10-20 games. Rather than issuing
+ * 10-20 sequential HTTP requests that could fail mid-way on patchy cellular,
+ * pushFixturesBulk pushes the entire batch atomically, or queues it if offline.
+ */
+describe('pushFixturesBulk', () => {
+    beforeEach(signInWithTeam);
+
+    test('offline, matches are queued as bulk_save rather than dropped', async () => {
+        globalThis.navigator = { onLine: false };
+
+        const result = await pushFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        expect(result).toEqual({ success: true, queued: true });
+        expect(calls).toEqual([]);
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({
+                entityType: 'fixtures',
+                action: 'bulk_save',
+                data: [
+                    { id: 'local-1', opponent: 'Rovers' },
+                    { id: 'local-2', opponent: 'United' }
+                ]
+            })
+        ]);
+    });
+
+    test('online, it pushes the whole batch in one call and adopts server ids', async () => {
+        setLocalFixtures([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        const result = await pushFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        expect(result.success).toBe(true);
+        expect(result.data).toHaveLength(2);
+        expect(calls).toEqual(['push:bulkImportFixtures:Rovers,United']);
+        expect(remainingQueue()).toEqual([]);
+        expect(localFixtures()).toEqual([
+            expect.objectContaining({ id: 'cloud-bulk-1', opponent: 'Rovers' }),
+            expect.objectContaining({ id: 'cloud-bulk-2', opponent: 'United' })
+        ]);
+    });
+
+    test('the queued bulk import reaches the server on the next drain', async () => {
+        setLocalFixtures([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        globalThis.navigator = { onLine: false };
+        await pushFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        globalThis.navigator = { onLine: true };
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(calls).toEqual(['push:bulkImportFixtures:Rovers,United']);
+        expect(remainingQueue()).toEqual([]);
+        expect(localFixtures()).toEqual([
+            expect.objectContaining({ id: 'cloud-bulk-1', opponent: 'Rovers' }),
+            expect.objectContaining({ id: 'cloud-bulk-2', opponent: 'United' })
+        ]);
+    });
+
+    test('a refused bulk import stays queued', async () => {
+        bulkFixturesResult = () => ({ success: false, error: 'Server error' });
+        queueEntries(queuedFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(0);
+        expect(remainingQueue()).toHaveLength(1);
+    });
+
+    test('an offline edit to a bulk-imported fixture folds into the queued bulk_save', async () => {
+        globalThis.navigator = { onLine: false };
+        setLocalFixtures([
+            { id: 'local-1', opponent: 'Rovers', gameTime: '09:00' },
+            { id: 'local-2', opponent: 'United', gameTime: '10:30' }
+        ]);
+
+        await pushFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers', gameTime: '09:00' },
+            { id: 'local-2', opponent: 'United', gameTime: '10:30' }
+        ]);
+
+        const updateResult = await pushFixtureUpdate('local-1', { gameTime: '11:00' });
+        expect(updateResult).toEqual({ success: true, queued: true });
+
+        const queue = remainingQueue();
+        expect(queue).toHaveLength(1);
+        expect(queue[0].data[0].gameTime).toBe('11:00');
+    });
+
+    test('an offline delete of a bulk-imported fixture drops it from the queued bulk_save', async () => {
+        globalThis.navigator = { onLine: false };
+        setLocalFixtures([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        await pushFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        const deleteResult = await pushFixtureDelete('local-1');
+        expect(deleteResult).toEqual({ success: true, queued: false });
+
+        const queue = remainingQueue();
+        expect(queue).toHaveLength(1);
+        expect(queue[0].data).toEqual([{ id: 'local-2', opponent: 'United' }]);
+    });
+
+    test('without a team there is nothing to push to', async () => {
+        const { pushFixturesBulk: freshPushBulk } = await loadSync();
+
+        const result = await freshPushBulk([{ opponent: 'Rovers' }]);
+
+        expect(result).toEqual({ success: false, error: 'No team selected' });
+    });
+
+    test('empty array returns success immediately', async () => {
+        const result = await pushFixturesBulk([]);
+        expect(result).toEqual({ success: true, data: [] });
+        expect(calls).toEqual([]);
     });
 });
 

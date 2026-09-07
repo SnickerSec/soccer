@@ -151,6 +151,68 @@ END:VCALENDAR`;
     await expect(page.locator('#schedule-tab')).toContainText('Firebirds');
     await expect(page.locator('#schedule-tab')).toContainText('Cobras');
   });
+
+  test('syncs imported matches to cloud via atomic bulk endpoint', async ({ page }) => {
+    let bulkCallCount = 0;
+    let singleCallCount = 0;
+    let bulkPayload = null;
+
+    const user = { id: 'user-1', email: 'coach@example.com', displayName: 'Coach' };
+    const team = { id: 'team-1', name: 'Tigers', role: 'owner' };
+    const json = (body) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+
+    await page.route('**/api/auth/me', (r) => r.fulfill(json({ success: true, data: user })));
+    await page.route('**/api/csrf-token', (r) => r.fulfill(json({ token: 'test-token' })));
+    await page.route('**/api/teams', (r) => r.fulfill(json({ success: true, data: [team] })));
+    await page.route('**/api/settings', (r) => r.fulfill(json({ success: true, data: { default_team_id: team.id } })));
+    await page.route('**/api/teams/*/settings', (r) => r.fulfill(json({ success: true, data: {} })));
+    await page.route('**/api/teams/*/players', (r) => r.fulfill(json({ success: true, data: [] })));
+    await page.route('**/api/teams/*/games', (r) => r.fulfill(json({ success: true, data: [] })));
+    await page.route('**/api/teams/*/fixtures', async (route) => {
+      if (route.request().method() === 'POST') {
+        singleCallCount++;
+      }
+      return route.fulfill(json({ success: true, data: [] }));
+    });
+
+    await page.route('**/api/teams/team-1/fixtures/bulk', async (route) => {
+      bulkCallCount++;
+      bulkPayload = route.request().postDataJSON();
+      return route.fulfill(json({
+        success: true,
+        data: (bulkPayload?.fixtures || []).map((f, i) => ({ ...f, id: `server-bulk-${i + 1}` }))
+      }));
+    });
+
+    await page.goto('/');
+    await page.click('#schedule-tab-btn');
+
+    const csvContent = `Date,Time,Opponent,Home/Away,Location / Field
+2026-10-03,08:30,Eagles,Home,Field 1
+2026-10-10,10:00,Hawks,Away,Field 2`;
+
+    await page.locator('#scheduleFileInput').setInputFiles({
+      name: 'matches.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(csvContent, 'utf-8'),
+    });
+
+    await expect(page.locator('#scheduleImportModal')).toBeVisible();
+
+    const [bulkResponse] = await Promise.all([
+      page.waitForResponse('**/api/teams/team-1/fixtures/bulk'),
+      page.click('#confirmScheduleImportBtn')
+    ]);
+    expect(bulkResponse.status()).toBe(200);
+
+    await expect(page.locator('#scheduleImportModal')).not.toBeVisible();
+
+    expect(bulkCallCount).toBe(1);
+    expect(singleCallCount).toBe(0);
+    expect(bulkPayload?.fixtures).toHaveLength(2);
+    expect(bulkPayload.fixtures[0].opponent).toBe('Eagles');
+    expect(bulkPayload.fixtures[1].opponent).toBe('Hawks');
+  });
 });
 
 /**

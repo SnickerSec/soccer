@@ -393,12 +393,26 @@ function writeLocalGames(games) {
  */
 function editQueuedSave(entityType, id, updates) {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
-    const entry = queue.find(item =>
-        item.entityType === entityType && item.action === 'save' && item.data?.id === id
-    );
-    if (!entry) return false;
+    let found = false;
 
-    entry.data = { ...entry.data, ...updates };
+    for (const item of queue) {
+        if (item.entityType !== entityType) continue;
+        if (item.action === 'save' && item.data?.id === id) {
+            item.data = { ...item.data, ...updates };
+            found = true;
+            break;
+        }
+        if (item.action === 'bulk_save' && Array.isArray(item.data)) {
+            const idx = item.data.findIndex(d => d?.id === id);
+            if (idx >= 0) {
+                item.data[idx] = { ...item.data[idx], ...updates };
+                found = true;
+                break;
+            }
+        }
+    }
+    if (!found) return false;
+
     safeSetToStorage('ayso_sync_queue', JSON.stringify(queue));
     return true;
 }
@@ -412,10 +426,31 @@ function editQueuedSave(entityType, id, updates) {
  */
 function dropQueuedSave(entityType, id) {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
-    const remaining = queue.filter(item => !(
-        item.entityType === entityType && item.data?.id === id
-    ));
-    if (remaining.length === queue.length) return false;
+    let modified = false;
+    const remaining = [];
+
+    for (const item of queue) {
+        if (item.entityType !== entityType) {
+            remaining.push(item);
+            continue;
+        }
+        if (item.action === 'save' && item.data?.id === id) {
+            modified = true;
+            continue;
+        }
+        if (item.action === 'bulk_save' && Array.isArray(item.data)) {
+            const filtered = item.data.filter(d => d?.id !== id);
+            if (filtered.length !== item.data.length) {
+                modified = true;
+                if (filtered.length > 0) {
+                    remaining.push({ ...item, data: filtered });
+                }
+                continue;
+            }
+        }
+        remaining.push(item);
+    }
+    if (!modified) return false;
 
     safeSetToStorage('ayso_sync_queue', JSON.stringify(remaining));
     return true;
@@ -600,6 +635,59 @@ export async function pushFixture(fixture) {
         if (!result.success) {
             updateStatus(SYNC_STATUS.ERROR);
             return result;
+        }
+
+        lastSyncTime = new Date();
+        updateStatus(SYNC_STATUS.SYNCED);
+        return result;
+    } catch (error) {
+        updateStatus(SYNC_STATUS.ERROR);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Bulk push fixtures to cloud, or queue them until there is a connection.
+ *
+ * An imported schedule (from .ics or CSV) typically contains 10-20 games.
+ * Pushing them in a serial loop one-by-one makes 10-20 network round trips
+ * over cellular and risks partial sync if the connection drops mid-flight.
+ *
+ * This pushes the entire batch in a single atomic request via bulkImportFixtures,
+ * or queues them for replay on the next drain.
+ */
+export async function pushFixturesBulk(fixtures) {
+    if (!Array.isArray(fixtures) || fixtures.length === 0) {
+        return { success: true, data: [] };
+    }
+
+    if (!currentTeamId) {
+        return { success: false, error: 'No team selected' };
+    }
+
+    if (!navigator.onLine || !await isAuthenticated()) {
+        queueChange('fixtures', 'bulk_save', fixtures);
+        return { success: true, queued: true };
+    }
+
+    updateStatus(SYNC_STATUS.SYNCING);
+
+    try {
+        const result = await bulkImportFixtures(currentTeamId, fixtures);
+
+        if (!result.success) {
+            updateStatus(SYNC_STATUS.ERROR);
+            return result;
+        }
+
+        // Adopt server-assigned IDs for the fixtures in local storage
+        if (Array.isArray(result.data)) {
+            result.data.forEach((saved, index) => {
+                const localId = fixtures[index]?.id;
+                if (localId && saved?.id) {
+                    adoptFixtureId(localId, saved);
+                }
+            });
         }
 
         lastSyncTime = new Date();
@@ -887,6 +975,21 @@ export async function processQueue() {
                     // name a row the server has heard of — without it they
                     // 404, and the pull hands the match back.
                     adoptFixtureId(item.data?.id, result.data);
+                    processed++;
+                } else {
+                    remaining.push(item);
+                }
+            } else if (item.entityType === 'fixtures' && item.action === 'bulk_save') {
+                const result = await bulkImportFixtures(currentTeamId, item.data);
+                if (result.success) {
+                    if (Array.isArray(result.data)) {
+                        result.data.forEach((saved, index) => {
+                            const localId = item.data[index]?.id;
+                            if (localId && saved?.id) {
+                                adoptFixtureId(localId, saved);
+                            }
+                        });
+                    }
                     processed++;
                 } else {
                     remaining.push(item);
