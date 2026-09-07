@@ -119,7 +119,10 @@ export function SeasonTab({
 
   const totalRosterSpots = Object.values(stats).reduce((acc, s) => acc + (s.gamesOnRoster || 0), 0);
   const totalAttended = Object.values(stats).reduce((acc, s) => acc + (s.gamesAttended || 0), 0);
-  const squadAttendancePct = totalRosterSpots > 0 ? Math.round((totalAttended / totalRosterSpots) * 100) : 100;
+  // null, not 100, before a game has been saved: a squad that has played
+  // nothing has not turned up in full, it has not been measured. The tile read
+  // "100% Squad Attendance Rate" directly above "0 Total Games Saved".
+  const squadAttendancePct = totalRosterSpots > 0 ? Math.round((totalAttended / totalRosterSpots) * 100) : null;
 
   return (
     <div className="space-y-6">
@@ -160,9 +163,13 @@ export function SeasonTab({
             </div>
             <div>
               <div className="text-2xl font-bold tracking-tight" id="squadAttendanceRate">
-                {squadAttendancePct}%
+                {squadAttendancePct === null ? '—' : `${squadAttendancePct}%`}
               </div>
-              <div className="text-xs text-muted-foreground">Squad Attendance Rate</div>
+              <div className="text-xs text-muted-foreground">
+                {squadAttendancePct === null
+                  ? 'Squad Attendance Rate (no games saved yet)'
+                  : 'Squad Attendance Rate'}
+              </div>
             </div>
           </CardContent>
         </Card>

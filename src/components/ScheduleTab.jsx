@@ -318,10 +318,19 @@ export function ScheduleTab({
             </div>
             <div>
               <div className="text-2xl font-bold tracking-tight">
-                {volunteerStats.snackCoveragePct}%
+                {volunteerStats.snackCoveragePct === null ? '—' : `${volunteerStats.snackCoveragePct}%`}
               </div>
               <div className="text-xs text-muted-foreground">
-                Snack Coverage ({fixtures.length - volunteerStats.unassignedSnackFixtures}/{fixtures.length || 1} assigned)
+                {/*
+                  * totalGames, not fixtures.length: the percentage above is over
+                  * the matches that count, and a canceled one is not among them,
+                  * so the label would otherwise disagree with the number beside
+                  * it. The `|| 1` this replaced rendered "0/1 assigned" under a
+                  * 100% that came from an empty season.
+                  */}
+                {volunteerStats.snackCoveragePct === null
+                  ? 'Snack Coverage (no matches scheduled)'
+                  : `Snack Coverage (${volunteerStats.totalGames - volunteerStats.unassignedSnackFixtures}/${volunteerStats.totalGames} assigned)`}
               </div>
             </div>
           </CardContent>

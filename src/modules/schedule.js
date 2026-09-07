@@ -351,8 +351,14 @@ export function calculateVolunteerStats(fixtures = [], players = []) {
     const unassignedPlayers = activeList.filter((s) => s.totalDuties === 0);
 
     const totalGames = validFixtures.length;
-    const snackCoveragePct = totalGames > 0 ? Math.round(((totalGames - unassignedSnackFixtures) / totalGames) * 100) : 100;
-    const fruitCoveragePct = totalGames > 0 ? Math.round(((totalGames - unassignedFruitFixtures) / totalGames) * 100) : 100;
+
+    // null, not 100, when there is no match to cover. A season with nothing in
+    // it is unmeasured, not fully staffed, and the tile used to read
+    // "100% Snack Coverage (0/1 assigned)" — a contradiction on one line, on
+    // the first screen a new team sees. A coach who reads that does not go and
+    // chase the rota. Callers render the empty case rather than a number.
+    const snackCoveragePct = totalGames > 0 ? Math.round(((totalGames - unassignedSnackFixtures) / totalGames) * 100) : null;
+    const fruitCoveragePct = totalGames > 0 ? Math.round(((totalGames - unassignedFruitFixtures) / totalGames) * 100) : null;
 
     return {
         statsByPlayer: stats,

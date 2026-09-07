@@ -152,3 +152,61 @@ END:VCALENDAR`;
     await expect(page.locator('#schedule-tab')).toContainText('Cobras');
   });
 });
+
+/**
+ * The volunteer coverage tile. It used to fall back to 100% when there was no
+ * match to cover, so a team that had just been created was told its snack rota
+ * was complete — under a label that read "0/1 assigned" in the same breath.
+ * That is the first screen a new coach sees, and it is the one that decides
+ * whether they go and chase parents.
+ */
+test.describe('Volunteer coverage on an empty schedule', () => {
+  test('shows no figure at all rather than claiming full coverage', async ({ page }) => {
+    await page.goto('/');
+    await page.click('#schedule-tab-btn');
+    await expect(page.locator('#schedule-tab')).toBeVisible();
+
+    const panel = page.locator('#schedule-tab');
+    await expect(panel).toContainText('Snack Coverage (no matches scheduled)');
+    await expect(panel).not.toContainText('100%');
+    // The contradiction the fallback produced, gone with the `|| 1` behind it.
+    await expect(panel).not.toContainText('0/1 assigned');
+  });
+
+  test('reports a real percentage once the season has matches in it', async ({ page }) => {
+    const ics = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Shinguard//Coverage Test//EN
+BEGIN:VEVENT
+UID:cov-1@ayso.test
+DTSTART:20260912T090000Z
+SUMMARY:Thunder vs Lightning
+DESCRIPTION:Snack: Alice
+END:VEVENT
+BEGIN:VEVENT
+UID:cov-2@ayso.test
+DTSTART:20260919T090000Z
+SUMMARY:Thunder vs Sharks
+END:VEVENT
+END:VCALENDAR`;
+
+    await page.goto('/');
+    await page.click('#schedule-tab-btn');
+    await page.locator('#scheduleFileInput').setInputFiles({
+      name: 'coverage.ics',
+      mimeType: 'text/calendar',
+      buffer: Buffer.from(ics, 'utf-8'),
+    });
+
+    const modal = page.locator('#scheduleImportModal');
+    await expect(modal).toBeVisible();
+    await page.click('#confirmScheduleImportBtn');
+    await expect(modal).not.toBeVisible();
+
+    // One of the two matches has a snack parent, and the label counts the same
+    // matches the percentage is taken over.
+    const panel = page.locator('#schedule-tab');
+    await expect(panel).toContainText('50%');
+    await expect(panel).toContainText('Snack Coverage (1/2 assigned)');
+  });
+});

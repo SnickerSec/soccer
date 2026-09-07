@@ -36,10 +36,14 @@ test.describe('Season Attendance & Absentee Tracking', () => {
         const seasonTab = page.locator('button[role="tab"]').filter({ hasText: 'Season' });
         await seasonTab.click();
 
-        // Verify Squad Attendance Rate summary card
+        // Verify Squad Attendance Rate summary card. No game has been saved in
+        // this test, so there is nothing to take a rate over: the tile shows an
+        // em-dash and says why. It used to read 100%, which is what this
+        // assertion used to accept.
         const attendanceRate = page.locator('#squadAttendanceRate');
         await expect(attendanceRate).toBeVisible();
-        await expect(attendanceRate).toContainText('%');
+        await expect(attendanceRate).toHaveText('—');
+        await expect(page.locator('#season-tab')).toContainText('no games saved yet');
 
         expect(errors).toEqual([]);
     });

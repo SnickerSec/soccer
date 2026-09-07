@@ -236,6 +236,35 @@ describe('calculateVolunteerStats', () => {
         expect(stats.snackCoveragePct).toBe(67);
         expect(stats.fruitCoveragePct).toBe(67);
     });
+
+    /*
+     * An empty season is unmeasured, not fully covered. These used to fall back
+     * to 100, so a team with no matches yet was told its snack rota was
+     * complete — on the first screen it sees, beside a "0/1 assigned" label the
+     * percentage flatly contradicted.
+     */
+    test('reports no coverage figure at all when there is no match to cover', () => {
+        const stats = calculateVolunteerStats([], [{ name: 'Alex' }]);
+
+        expect(stats.totalGames).toBe(0);
+        expect(stats.snackCoveragePct).toBeNull();
+        expect(stats.fruitCoveragePct).toBeNull();
+    });
+
+    test('a canceled match is not a match left uncovered', () => {
+        const fixtures = [
+            { gameDate: '2026-09-12', opponent: 'Tigers', snackParent: 'Alex', fruitParent: 'Alex', status: 'upcoming' },
+            { gameDate: '2026-09-19', opponent: 'Lions', snackParent: '', fruitParent: '', status: 'canceled' }
+        ];
+
+        const stats = calculateVolunteerStats(fixtures, [{ name: 'Alex' }]);
+
+        // The canceled one is out of the denominator, so the one real match
+        // being covered is full coverage rather than half of it.
+        expect(stats.totalGames).toBe(1);
+        expect(stats.snackCoveragePct).toBe(100);
+        expect(stats.fruitCoveragePct).toBe(100);
+    });
 });
 
 describe('exportScheduleCsv', () => {
