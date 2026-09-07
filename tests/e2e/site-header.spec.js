@@ -133,6 +133,37 @@ test.describe('Site header', () => {
         }
     });
 
+    /*
+     * The controls at the right end change width the moment a coach signs in:
+     * a "Sign in with Google" button is replaced by a 32px avatar. A flex row
+     * gave the tabs whatever space those two left over, so the tablist slid
+     * right by half that difference on sign-in. The columns are what hold it.
+     */
+    test('the tabs stay centred when signing in changes the controls', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.goto('/');
+
+        const offsetFromCentre = () => page.evaluate(() => {
+            const tabs = document.querySelector('.site-nav [role="tablist"]').getBoundingClientRect();
+            const row = document.querySelector('.site-header-inner').getBoundingClientRect();
+            return (tabs.left + tabs.right) / 2 - (row.left + row.right) / 2;
+        });
+
+        expect(Math.abs(await offsetFromCentre())).toBeLessThan(1);
+
+        await page.evaluate(() => {
+            window.lineupGenerator.updateAuthUI({
+                id: 'user-1',
+                email: 'coach@example.com',
+                displayName: 'Coach Taylor',
+                avatarUrl: ''
+            });
+        });
+        await expect(page.locator('#accountTrigger')).toBeVisible();
+
+        expect(Math.abs(await offsetFromCentre())).toBeLessThan(1);
+    });
+
     test('exactly one h1 per page', async ({ page }) => {
         await page.goto('/');
         await expect(page.locator('h1')).toHaveCount(1);

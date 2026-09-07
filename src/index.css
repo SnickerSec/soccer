@@ -171,6 +171,28 @@
   }
 }
 
+/* The header is three columns, not a flex row.
+ *
+ * `justify-between` shares the leftover space between whatever happens to sit
+ * either side of the tabs, and the right end changes width at sign-in: a "Sign
+ * in with Google" button is replaced by a 32px avatar. So the tablist slid
+ * 66px to the right the moment a coach signed in, on a 1280px screen.
+ *
+ * Equal 1fr side columns put it on the row's centre line whatever they hold.
+ * Each still falls back to its content width before anything is clipped, so a
+ * narrow window shrinks the sides rather than overlapping them.
+ *
+ * 1025px, not Tailwind's `lg:`, because the block below is `max-width: 1024px`
+ * and both would apply at exactly 1024 — where this would win and undo the
+ * stacking there.
+ */
+@media (min-width: 1025px) {
+  .site-header-inner {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+  }
+}
+
 @media (max-width: 1024px) {
   .site-header-inner {
     flex-wrap: wrap !important;
