@@ -340,13 +340,19 @@ export function SeasonTab({
           they act on the table under them — one exports it, the other empties
           it — and at the foot of the tab they were a long scroll away from it.
 
-          Same shape as the Game Settings header: the buttons stack under the
-          title below `sm` rather than squeezing it, since "Clear All History"
-          and "Export Stats (CSV)" do not fit beside a title on a phone.
+          Same shape as the Game Settings header: the buttons drop under the
+          title below `sm` rather than squeezing it, since the full labels do
+          not fit beside a title on a phone.
+
+          On that row they share the width evenly (`flex-1`) and wear short
+          labels, because "Export Stats (CSV)" and "Clear All History" at full
+          length wrap to a second and third line on a phone. The full label
+          stays as the accessible name, so the button reads the same to a
+          screen reader whichever text is showing.
         */}
         <CardHeader className="flex flex-col items-start gap-3 space-y-0 py-3 px-4 border-b bg-muted/20 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <CardTitle className="text-sm font-semibold">Player Statistics</CardTitle>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0 sm:flex-wrap sm:justify-end">
             {canEditRoster && (
               <Button
                 type="button"
@@ -355,10 +361,12 @@ export function SeasonTab({
                 id="editRosterFromSeason"
                 aria-haspopup="dialog"
                 onClick={() => setIsEditingRoster(true)}
-                className="flex items-center gap-1.5 text-xs"
+                aria-label="Edit Roster"
+                className="flex flex-1 items-center justify-center gap-1.5 text-xs sm:flex-none"
               >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit Roster
+                <Pencil className="h-3.5 w-3.5 shrink-0" />
+                <span className="sm:hidden">Roster</span>
+                <span className="hidden sm:inline">Edit Roster</span>
               </Button>
             )}
 
@@ -369,10 +377,12 @@ export function SeasonTab({
               id="exportSeasonStats"
               onClick={onExportStats}
               disabled={gameHistory.length === 0}
-              className="flex items-center gap-1.5 text-xs"
+              aria-label="Export Stats (CSV)"
+              className="flex flex-1 items-center justify-center gap-1.5 text-xs sm:flex-none"
             >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              Export Stats (CSV)
+              <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+              <span className="sm:hidden">Export</span>
+              <span className="hidden sm:inline">Export Stats (CSV)</span>
             </Button>
 
             {gameHistory.length > 0 && (
@@ -382,10 +392,12 @@ export function SeasonTab({
                 size="sm"
                 id="clearSeasonHistory"
                 onClick={onClearHistory}
-                className="flex items-center gap-1.5 text-xs"
+                aria-label="Clear All History"
+                className="flex flex-1 items-center justify-center gap-1.5 text-xs sm:flex-none"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                Clear All History
+                <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                <span className="sm:hidden">Clear</span>
+                <span className="hidden sm:inline">Clear All History</span>
               </Button>
             )}
           </div>

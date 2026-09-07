@@ -1556,7 +1556,14 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="container max-w-6xl mx-auto px-4 py-6 flex-1 space-y-8" id="main-content">
+      {/*
+        No `space-y` here: main's children are the four tab panels and exactly
+        one is ever visible, so the utility only put a 2rem margin above
+        whichever of the last three was showing — the Lineup panel, being
+        first, never got one. That read as a gap at the top of Season,
+        Schedule and Evaluation and nowhere else.
+      */}
+      <main className="container max-w-6xl mx-auto px-4 py-6 flex-1" id="main-content">
         {/* Roster Tab Panel */}
         <div
           id="roster-tab"
