@@ -187,6 +187,20 @@ could remove the last one refuse: `DELETE .../members/:memberId` and
 `DELETE .../membership`, the latter being how any member leaves a team on their
 own.
 
+### Creating a team before there is an account
+
+The Create Team button on the Lineup tab is shown signed out as well: a coach
+with no account is precisely the one with no team, and hiding it left the
+feature reachable only from the account menu, which is itself only there once
+signed in.
+
+Signing in is a whole-page redirect to Google, so the intent has to outlive the
+component. `handleCreateTeam` writes `shinguard_pending_create_team` to
+sessionStorage and starts the sign-in; the effect watching `currentUser` reads
+that flag once, removes it, and opens the dialog on the create form. Removing
+it on read is the point — otherwise every later sign-in in that tab would
+reopen the dialog.
+
 ### Signing in must not cost the team its roster
 
 `PUT .../players` replaces a team's whole roster, so an empty list deletes
@@ -346,7 +360,7 @@ The rotation warnings are shown and never enforced. A match that broke the
 say so.
 
 Reading a game and correcting one are the same screen, and it opens over the
-Season tab. Opening a game used to move the coach to the Roster tab and set the
+Season tab. Opening a game used to move the coach to the Lineup tab and set the
 division, field size and formation to that game's — a lot to do to someone who
 wanted to look something up. Putting the lineup back on the field is still
 there, as `handleOpenGameOnField` behind a button that says so.
@@ -575,6 +589,25 @@ into dark because the laptop is. `PUT /api/settings` used to substitute
 defaults for whatever the body left out, so recording which team was last
 opened — which happens on every team switch — put a coach who works in light
 back into dark; every column keeps its stored value now.
+
+### One roster editor, two places
+
+The first tab is called Lineup — generating one is what the app is for — and
+the roster it edits is also editable from the Season tab, which is where a
+misspelt name or a player who has left is actually noticed. Both render
+`src/components/RosterEditor.jsx`: the add form, the player rows and the
+ratings dialog, writing through the same handlers in App. A second copy of a
+row that sets jersey numbers, the armband and availability would be a second
+answer to what a roster row does.
+
+Both tab panels are in the DOM at once, so the editor takes an `idPrefix`. The
+Lineup tab keeps the bare ids (`playerName`, `playerList`, …) that the e2e
+suite selects on and the Season dialog prefixes them, since a duplicate id
+matches whichever the browser reaches first.
+
+The Season dialog has no Save. Every control writes through as it is touched,
+exactly as on the Lineup tab, so there is nothing to commit — only a Done that
+closes it.
 
 ### Renaming a player
 

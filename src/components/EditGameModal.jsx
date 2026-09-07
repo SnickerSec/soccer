@@ -32,7 +32,7 @@ import { CONSTANTS } from '@/constants';
  * not turn up, the armband changes hands, a keeper swaps out at half time — so
  * the squad and the quarters are editable here and not only the name and the
  * notes. It opens over the Season tab and stays there: reading a game used to
- * mean being moved to the Roster tab with the team's settings changed to that
+ * mean being moved to the Lineup tab with the team's settings changed to that
  * game's, which is a lot to do to someone who wanted to look something up.
  * Putting the lineup back on the field is still available, as a button that
  * says so.

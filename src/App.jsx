@@ -127,6 +127,13 @@ function readStoredSettings() {
   );
 }
 
+/**
+ * Creating a team needs an account, and signing in is a whole-page redirect to
+ * Google — so the intent has to outlive this component. The flag is read once
+ * and removed, so a later reload does not reopen the dialog on its own.
+ */
+const PENDING_CREATE_TEAM_KEY = 'shinguard_pending_create_team';
+
 export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState('roster');
@@ -538,6 +545,40 @@ export default function App() {
     };
     setupAuth();
   }, [refreshTeams, adoptSettings, adoptRemoteTheme]);
+
+  const openCreateTeamDialog = useCallback(() => {
+    setTeamModalInitialTeamId(null);
+    setTeamModalInitialView('create');
+    setIsTeamModalOpen(true);
+  }, []);
+
+  // The button is there whether or not anyone is signed in — a coach with no
+  // account is precisely the one with no team — so signed out it starts the
+  // sign-in and leaves a note to open the dialog once the redirect lands back.
+  const handleCreateTeam = useCallback(() => {
+    if (currentUser) {
+      openCreateTeamDialog();
+      return;
+    }
+    try {
+      sessionStorage.setItem(PENDING_CREATE_TEAM_KEY, '1');
+    } catch {
+      // A browser that refuses session storage still gets the sign-in.
+    }
+    signInWithGoogle();
+  }, [currentUser, openCreateTeamDialog]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let pending = false;
+    try {
+      pending = sessionStorage.getItem(PENDING_CREATE_TEAM_KEY) === '1';
+      if (pending) sessionStorage.removeItem(PENDING_CREATE_TEAM_KEY);
+    } catch {
+      pending = false;
+    }
+    if (pending) openCreateTeamDialog();
+  }, [currentUser, openCreateTeamDialog]);
 
   // Expose lineupGenerator on window for tests and integration
   useEffect(() => {
@@ -1265,7 +1306,7 @@ export default function App() {
    * Put a saved game's lineup back on the field.
    *
    * This is what opening a game from the Season tab used to do on its own, and
-   * it is a lot: it moves the coach to the Roster tab and sets the division,
+   * it is a lot: it moves the coach to the Lineup tab and sets the division,
    * field size and formation to that game's. Reading a game is now done where
    * the game is, and this happens only when the button that says so is pressed.
    */
@@ -1533,12 +1574,7 @@ export default function App() {
             onExportRoster={handleExportRoster}
             onClearAll={handleClearAll}
             onLoadDemo={handleLoadDemo}
-            currentUser={currentUser}
-            onCreateTeam={() => {
-              setTeamModalInitialTeamId(null);
-              setTeamModalInitialView('create');
-              setIsTeamModalOpen(true);
-            }}
+            onCreateTeam={handleCreateTeam}
           />
 
           {/* Game Settings */}
@@ -1603,11 +1639,17 @@ export default function App() {
             formation={settings?.formation}
             gameHistory={gameHistory}
             players={players}
+            captains={captains}
             onExportStats={handleExportSeasonStats}
             onClearHistory={handleClearSeasonHistory}
             onDeleteGame={handleDeleteGame}
             onOpenNotes={(game) => setNotesModalGame(game)}
             onViewGame={(game) => setEditingGame(game)}
+            onAddPlayer={handleAddPlayer}
+            onRemovePlayer={handleRemovePlayer}
+            onUpdatePlayer={handleUpdatePlayer}
+            onRenamePlayer={handleRenamePlayer}
+            onToggleCaptain={handleToggleCaptain}
           />
         </div>
 

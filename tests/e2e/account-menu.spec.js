@@ -182,12 +182,41 @@ test.describe('Create Team from the roster', () => {
         avatarUrl: ''
     };
 
-    test('the button is only there once signed in', async ({ page }) => {
+    test('the button is there signed out as well', async ({ page }) => {
         await page.goto('/');
-        await expect(page.locator('#createTeamFromRoster')).toHaveCount(0);
+        await expect(page.locator('#createTeamFromRoster')).toBeVisible();
 
         await page.evaluate((user) => window.lineupGenerator.updateAuthUI(user), USER);
         await expect(page.locator('#createTeamFromRoster')).toBeVisible();
+    });
+
+    test('signed out it starts the sign-in and asks for the dialog afterwards', async ({ page }) => {
+        await page.goto('/');
+        // The sign-in is a whole-page redirect to Google; the test stops it at
+        // the door and checks what the click left behind for the way back.
+        await page.route('**/auth/google', (route) =>
+            route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>google</body></html>' })
+        );
+
+        await page.click('#createTeamFromRoster');
+
+        await expect(page.locator('body')).toHaveText('google');
+        const pending = await page.evaluate(() => sessionStorage.getItem('shinguard_pending_create_team'));
+        expect(pending).toBe('1');
+    });
+
+    test('the dialog opens once the sign-in lands back', async ({ page }) => {
+        await page.goto('/');
+        await page.evaluate(() => sessionStorage.setItem('shinguard_pending_create_team', '1'));
+        await page.reload();
+
+        await page.evaluate((user) => window.lineupGenerator.updateAuthUI(user), USER);
+
+        await expect(page.locator('#teamModal')).toBeVisible();
+        await expect(page.locator('#teamModalTitle')).toHaveText('Create New Team');
+        // Read once: a later sign-in must not reopen it.
+        const pending = await page.evaluate(() => sessionStorage.getItem('shinguard_pending_create_team'));
+        expect(pending).toBe(null);
     });
 
     test('it opens the dialog on the create form, not the team list', async ({ page }) => {

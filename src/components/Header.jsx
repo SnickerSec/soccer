@@ -117,7 +117,7 @@ export function Header({
                 activeTab === 'roster' && "active bg-background text-foreground shadow font-semibold"
               )}
             >
-              Roster
+              Lineup
             </button>
             <button
               type="button"

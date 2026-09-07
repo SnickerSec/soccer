@@ -13,6 +13,7 @@ import {
 import {
   FileSpreadsheet,
   Trash2,
+  Pencil,
   Calendar,
   CalendarCheck,
   FileText,
@@ -24,6 +25,14 @@ import {
 import { calculatePlayerStats, getLineupRecommendations } from '@/modules/season-stats';
 import { parseLocalDate } from '@/modules/schedule';
 import { PlayerHeatmapCard } from './PlayerHeatmapCard';
+import { RosterEditor } from './RosterEditor';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { formationHasMidfieldLine } from '@/modules/formations';
 import { cn } from '@/lib/utils';
 
@@ -44,12 +53,26 @@ export function SeasonTab({
   formation,
   gameHistory = [],
   players = [],
+  captains = [],
   onExportStats,
   onClearHistory,
   onDeleteGame,
   onOpenNotes,
   onViewGame,
+  onAddPlayer,
+  onRemovePlayer,
+  onUpdatePlayer,
+  onRenamePlayer,
+  onToggleCaptain,
 }) {
+  // The season is where a coach notices a roster is wrong — a name spelt the
+  // way the league spelt it, a player who left, a jersey number swapped. The
+  // roster opens over this tab rather than sending them to the Lineup tab and
+  // back, and it is the same editor that tab renders, writing through the same
+  // handlers.
+  const [isEditingRoster, setIsEditingRoster] = useState(false);
+  const canEditRoster = Boolean(onAddPlayer && onUpdatePlayer);
+
   const stats = calculatePlayerStats(players, gameHistory);
   const recommendations = getLineupRecommendations(players, gameHistory, stats);
 
@@ -259,7 +282,7 @@ export function SeasonTab({
                   <div className="flex items-center gap-1.5 shrink-0">
                     {/* Reading a game and correcting one are the same screen,
                         and it opens over this tab rather than moving the coach
-                        to the Roster tab and changing the team's settings. */}
+                        to the Lineup tab and changing the team's settings. */}
                     <Button
                       type="button"
                       variant="outline"
@@ -324,6 +347,21 @@ export function SeasonTab({
         <CardHeader className="flex flex-col items-start gap-3 space-y-0 py-3 px-4 border-b bg-muted/20 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <CardTitle className="text-sm font-semibold">Player Statistics</CardTitle>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+            {canEditRoster && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                id="editRosterFromSeason"
+                aria-haspopup="dialog"
+                onClick={() => setIsEditingRoster(true)}
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit Roster
+              </Button>
+            )}
+
             <Button
               type="button"
               variant="secondary"
@@ -464,6 +502,44 @@ export function SeasonTab({
           )}
         </CardContent>
       </Card>
+
+      {/* Editing the roster is immediate — every control writes through as it
+          is touched, exactly as it does on the Lineup tab — so this dialog has
+          no Save, only a Done that closes it. */}
+      <Dialog open={isEditingRoster} onOpenChange={(open) => !open && setIsEditingRoster(false)}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col" id="seasonRosterModal">
+          <DialogHeader className="pb-2 border-b">
+            <DialogTitle className="text-base font-semibold">Edit Roster</DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 min-h-0 pr-3 py-1">
+            <div className="py-2">
+              <RosterEditor
+                players={players}
+                captains={captains}
+                onAddPlayer={onAddPlayer}
+                onRemovePlayer={onRemovePlayer}
+                onUpdatePlayer={onUpdatePlayer}
+                onRenamePlayer={onRenamePlayer}
+                onToggleCaptain={onToggleCaptain}
+                idPrefix="season"
+              />
+            </div>
+          </ScrollArea>
+
+          <div className="flex justify-end pt-3 border-t">
+            <Button
+              type="button"
+              size="sm"
+              id="seasonRosterDone"
+              onClick={() => setIsEditingRoster(false)}
+              className="text-xs"
+            >
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -167,7 +167,7 @@ export function EvaluationTab({ players = [], onUpdatePlayer }) {
         <CardContent className="p-0">
           {players.length === 0 ? (
             <div className="p-8 text-center text-xs text-muted-foreground evaluation-empty">
-              No players added yet. Add players in the Roster section to evaluate them.
+              No players added yet. Add players in the Lineup tab to evaluate them.
             </div>
           ) : (
             <div className="divide-y divide-border" id="evaluationPlayerList">
