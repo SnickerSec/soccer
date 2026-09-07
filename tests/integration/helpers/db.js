@@ -34,7 +34,13 @@ export const hasDb = Boolean(TEST_URL);
  * like a test database.
  */
 function assertSafeTarget(url) {
-    const name = new URL(url).pathname.replace(/^\//, '');
+    let name;
+    try {
+        name = new URL(url).pathname.replace(/^\//, '');
+    } catch {
+        const match = /\/([^/?#]+)(?:\?.*)?$/.exec(url);
+        name = match ? match[1] : '';
+    }
 
     if (!/test/i.test(name)) {
         throw new Error(
@@ -61,6 +67,7 @@ export const gameRoutes = hasDb ? (await import('../../../server/routes/games.js
 export const teamRoutes = hasDb ? (await import('../../../server/routes/teams.js')).default : null;
 export const inviteRoutes = hasDb ? (await import('../../../server/routes/invites.js')).default : null;
 export const settingsRoutes = hasDb ? (await import('../../../server/routes/settings.js')).default : null;
+export const fixtureRoutes = hasDb ? (await import('../../../server/routes/fixtures.js')).default : null;
 
 /**
  * Brings the test database up to date by running the migrations — the same
@@ -92,7 +99,7 @@ export async function applySchema() {
  */
 export async function truncateAll() {
     await pool.query(`
-        TRUNCATE players, games, team_members, teams, user_settings, profiles
+        TRUNCATE fixtures, players, games, team_members, teams, user_settings, profiles
         RESTART IDENTITY CASCADE
     `);
 }
@@ -132,6 +139,15 @@ export async function addMember(team, user, role) {
 export async function readRoster(team) {
     const { rows } = await pool.query(
         'SELECT * FROM players WHERE team_id = $1 ORDER BY sort_order ASC',
+        [team.id]
+    );
+    return rows;
+}
+
+/** The fixtures for a team as stored in PostgreSQL, sorted by date ASC. */
+export async function readFixtures(team) {
+    const { rows } = await pool.query(
+        'SELECT * FROM fixtures WHERE team_id = $1 ORDER BY game_date ASC, game_time ASC',
         [team.id]
     );
     return rows;

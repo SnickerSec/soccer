@@ -36,6 +36,9 @@ const REQUIRED_COLUMNS = {
         'status', 'preferred_positions', 'sort_order', 'overall_rating', 'positional_ratings'],
     games: ['id', 'team_id', 'name', 'game_date', 'notes', 'settings', 'lineup',
         'player_snapshot', 'captains', 'created_by', 'created_at'],
+    fixtures: ['id', 'team_id', 'game_date', 'game_time', 'opponent', 'location', 'home_away',
+        'jersey_color', 'snack_parent', 'fruit_parent', 'referee_duty', 'field_setup',
+        'status', 'notes', 'game_id', 'created_by', 'created_at', 'updated_at'],
     user_settings: ['user_id', 'theme', 'default_team_id', 'default_settings'],
     session: ['sid', 'sess', 'expire']
 };
@@ -182,6 +185,13 @@ describeDb('migrations', () => {
             [team.id, inviter.id]
         );
 
+        // Fixture was scheduled by inviter
+        const { rows: [fixture] } = await pool.query(
+            `INSERT INTO fixtures (team_id, opponent, game_date, created_by)
+             VALUES ($1, 'Lions', '2026-09-12', $2) RETURNING *`,
+            [team.id, inviter.id]
+        );
+
         // Deleting inviter profile should succeed and SET NULL on foreign keys
         await pool.query('DELETE FROM profiles WHERE id = $1', [inviter.id]);
 
@@ -196,6 +206,12 @@ describeDb('migrations', () => {
             [game.id]
         );
         expect(updatedGame.created_by).toBeNull();
+
+        const { rows: [updatedFixture] } = await pool.query(
+            'SELECT created_by FROM fixtures WHERE id = $1',
+            [fixture.id]
+        );
+        expect(updatedFixture.created_by).toBeNull();
 
         await pool.query('DELETE FROM profiles WHERE id = $1', [member.id]);
     });
