@@ -19,8 +19,8 @@ import {
   Star,
   Play,
   FileDown,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
+  MoreHorizontal,
   Smartphone,
 } from 'lucide-react';
 import {
@@ -55,6 +55,7 @@ export function LineupSection({
 }) {
   const [viewMode, setViewMode] = useState('all'); // 'all', 'table', 'pitch'
   const [mobileQuarter, setMobileQuarter] = useState('all'); // 'all', 1, 2, 3, 4
+  const [showAllActions, setShowAllActions] = useState(false); // phone only; see the bar below
   const [pendingSwap, setPendingSwap] = useState(null); // { quarter, position, player }
   const pendingSwapRef = useRef(null);
 
@@ -246,7 +247,19 @@ export function LineupSection({
         {getHintText()}
       </p>
 
-      {/* Sticky Action Buttons Bar */}
+      {/* Sticky matchday bar.
+       *
+       * Nine buttons wrapping at 390px, each clamped to 44px by the touch rule
+       * in index.css, made a 174px block — a fifth of an iPhone viewport, held
+       * there for all 7,296px of this page, and at the foot of it it covered
+       * the Player Summary's own header row.
+       *
+       * Only two of the nine are things a coach does with a game running, so
+       * on a phone only those two and the quarter selector stay out; Copy,
+       * Share, AYSO PDF, CSV, Text, Print and Regenerate collapse behind More.
+       * Above md every one of them is visible exactly as before — the desktop
+       * layout is dense on purpose and has the room.
+       */}
       <div className="action-buttons-inline sticky top-2 z-30 flex flex-wrap items-center gap-2 p-3 sm:p-4 rounded-lg border bg-card/95 backdrop-blur shadow-md action-buttons">
         <Button
           type="button"
@@ -268,7 +281,7 @@ export function LineupSection({
           id="copyLineup"
           data-action="copyLineup"
           onClick={onCopyLineup}
-          className="flex items-center gap-1.5 text-xs btn-copy"
+          className={cn("flex items-center gap-1.5 text-xs btn-copy", !showAllActions && "hidden md:flex")}
         >
           <Copy className="h-3.5 w-3.5" />
           Copy
@@ -281,7 +294,7 @@ export function LineupSection({
           id="shareLineup"
           data-action="shareLineup"
           onClick={onShareLineup}
-          className="dropdown-trigger flex items-center gap-1.5 text-xs btn-share cursor-pointer"
+          className={cn("dropdown-trigger flex items-center gap-1.5 text-xs btn-share cursor-pointer", !showAllActions && "hidden md:flex")}
         >
           <Share2 className="h-3.5 w-3.5" />
           Share
@@ -294,7 +307,7 @@ export function LineupSection({
           id="exportPdf"
           data-action="exportPdf"
           onClick={onExportPdf}
-          className="flex items-center gap-1.5 text-xs btn-pdf cursor-pointer"
+          className={cn("flex items-center gap-1.5 text-xs btn-pdf cursor-pointer", !showAllActions && "hidden md:flex")}
         >
           <FileDown className="h-3.5 w-3.5 text-primary" />
           AYSO PDF
@@ -307,7 +320,7 @@ export function LineupSection({
           id="exportCSV"
           data-action="exportCSV"
           onClick={onExportCSV}
-          className="flex items-center gap-1.5 text-xs btn-csv"
+          className={cn("flex items-center gap-1.5 text-xs btn-csv", !showAllActions && "hidden md:flex")}
         >
           <FileSpreadsheet className="h-3.5 w-3.5" />
           CSV
@@ -320,7 +333,7 @@ export function LineupSection({
           id="exportLineup"
           data-action="exportLineup"
           onClick={onExportText}
-          className="flex items-center gap-1.5 text-xs btn-export"
+          className={cn("flex items-center gap-1.5 text-xs btn-export", !showAllActions && "hidden md:flex")}
         >
           <FileText className="h-3.5 w-3.5" />
           Text
@@ -333,7 +346,7 @@ export function LineupSection({
           id="printLineup"
           data-action="printLineup"
           onClick={onPrintLineup}
-          className="flex items-center gap-1.5 text-xs btn-print"
+          className={cn("flex items-center gap-1.5 text-xs btn-print", !showAllActions && "hidden md:flex")}
         >
           <Printer className="h-3.5 w-3.5" />
           Print
@@ -345,7 +358,7 @@ export function LineupSection({
           size="sm"
           data-action="regenerateLineup"
           onClick={onRegenerate}
-          className="flex items-center gap-1.5 text-xs btn-regenerate"
+          className={cn("flex items-center gap-1.5 text-xs btn-regenerate", !showAllActions && "hidden md:flex")}
         >
           <RotateCcw className="h-3.5 w-3.5" />
           Regenerate
@@ -363,28 +376,42 @@ export function LineupSection({
           <Save className="h-3.5 w-3.5" />
           Save Game
         </Button>
-      </div>
 
-      {/* Mobile Quarter Selector / Swipe Toolbar */}
-      <div className="flex md:hidden items-center justify-between gap-2 p-2 rounded-lg border bg-muted/20">
         <Button
           type="button"
           variant="outline"
           size="sm"
-          onClick={handlePrevMobileQuarter}
-          className="h-7 w-7 p-0"
-          aria-label="Previous Quarter"
+          data-action="toggleActions"
+          aria-expanded={showAllActions}
+          aria-label={showAllActions ? 'Hide export and print actions' : 'Show export and print actions'}
+          onClick={() => setShowAllActions((open) => !open)}
+          className="flex md:hidden items-center gap-1.5 text-xs btn-more-actions"
         >
-          <ChevronLeft className="h-4 w-4" />
+          {showAllActions
+            ? <ChevronDown className="h-3.5 w-3.5" />
+            : <MoreHorizontal className="h-3.5 w-3.5" />}
+          More
         </Button>
 
-        <div className="flex items-center gap-1">
+        {/* The quarter selector, inside the sticky bar rather than below it.
+            It is what collapses this page from four stacked quarters to one,
+            and it used to sit at the top of a 7,296px scroll — so by the time
+            a coach could see the quarter they wanted, the control for picking
+            it was several screens behind them. w-full makes it a wrapped row
+            of the same flex container. */}
+        <div className="w-full flex md:hidden items-center gap-2 pt-2 border-t">
+        {/* The prev/next chevrons that used to bracket these chips are gone.
+            Five chips and two chevrons, each clamped to a 44px tap target,
+            came to 340px in a 332px row — and stepping through the quarters
+            one at a time is what the swipe on the grid below already does.
+            Picking a quarter is one tap either way. */}
+        <div className="flex flex-1 items-center gap-1">
           <Button
             type="button"
             variant={mobileQuarter === 'all' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setMobileQuarter('all')}
-            className="h-7 px-2 text-[11px] font-bold"
+            className="h-7 flex-1 px-2 text-[11px] font-bold"
           >
             All
           </Button>
@@ -395,23 +422,14 @@ export function LineupSection({
               variant={mobileQuarter === qNum ? 'default' : 'outline'}
               size="sm"
               onClick={() => setMobileQuarter(qNum)}
-              className="h-7 px-2 text-[11px] font-bold"
+              className="h-7 flex-1 px-2 text-[11px] font-bold"
             >
               Q{qNum}
             </Button>
           ))}
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleNextMobileQuarter}
-          className="h-7 w-7 p-0"
-          aria-label="Next Quarter"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+        </div>
       </div>
 
       {/* Quarters Display */}
@@ -670,15 +688,23 @@ export function LineupSection({
             <CardTitle className="text-sm font-semibold tracking-tight">Player Summary</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
+            {/* 1,113px of table in a 356px window on a phone. The name column
+                is pinned so the coach reading across a row can still see whose
+                row it is; everything else scrolls under it. The pinned cells
+                need an opaque background of their own — the thead's bg-muted/40
+                is a tint, and the columns would scroll visibly through it. */}
             <ScrollArea className="w-full">
               <table className="w-full text-xs">
                 <thead className="bg-muted/40 border-b">
                   <tr>
-                    {SUMMARY_HEADERS.map((header) => (
+                    {SUMMARY_HEADERS.map((header, hIdx) => (
                       <th
                         key={header}
                         scope="col"
-                        className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap"
+                        className={cn(
+                          "px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap",
+                          hIdx === 0 && "sticky left-0 z-20 bg-card border-r"
+                        )}
                       >
                         {header}
                       </th>
@@ -700,6 +726,9 @@ export function LineupSection({
                     });
                     return (
                       <tr key={player.name} className="hover:bg-muted/30 transition-colors">
+                        <td className="sticky left-0 z-10 bg-card border-r px-3 py-2 whitespace-nowrap font-medium">
+                          {cells[0]}
+                        </td>
                         <td className="px-3 py-2">
                           {/* The label, not the box, is the tap target. A bare
                               14px checkbox is unhittable on a phone and the cell
@@ -728,7 +757,7 @@ export function LineupSection({
                             />
                           </label>
                         </td>
-                        {cells.map((text, cIdx) => (
+                        {cells.slice(1).map((text, cIdx) => (
                           <td key={cIdx} className="px-3 py-2 whitespace-nowrap">
                             {text}
                           </td>

@@ -35,9 +35,14 @@ export function RosterTab({
 
   return (
     <div className="space-y-6">
-      {/* Import & Actions Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-lg border bg-card shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Import & Actions Bar.
+          A grid below sm:, not a wrap. Four buttons of four different
+          intrinsic widths wrapped into three ragged lines on a phone —
+          "Load Demo" and "Clear All" each alone on one. Equal columns fill
+          the width and read as a toolbar rather than as leftovers. Above sm:
+          it is the wrapping row it always was. */}
+      <div className="p-4 rounded-lg border bg-card shadow-sm">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <input
             type="file"
             ref={fileInputRef}
@@ -51,11 +56,14 @@ export function RosterTab({
             variant="secondary"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 text-xs"
+            className="flex w-full items-center justify-center gap-1.5 text-xs sm:w-auto sm:justify-start"
             id="importRosterButton"
           >
-            <Upload className="h-3.5 w-3.5" />
-            Import Roster (.csv / .txt / .json)
+            <Upload className="h-3.5 w-3.5 shrink-0" />
+            {/* The extension list is what made this button twice the width of
+                every other one, and a phone has no file picker where it helps. */}
+            <span className="sm:hidden">Import</span>
+            <span className="hidden sm:inline">Import Roster (.csv / .txt / .json)</span>
           </Button>
 
           {players.length > 0 && (
@@ -65,7 +73,7 @@ export function RosterTab({
               size="sm"
               onClick={onExportRoster}
               id="exportPlayers"
-              className="flex items-center gap-1.5 text-xs"
+              className="flex w-full items-center justify-center gap-1.5 text-xs sm:w-auto sm:justify-start"
             >
               <Download className="h-3.5 w-3.5" />
               Export Players
@@ -78,12 +86,11 @@ export function RosterTab({
             size="sm"
             onClick={onLoadDemo}
             id="demoButton"
-            className="flex items-center gap-1.5 text-xs"
+            className="flex w-full items-center justify-center gap-1.5 text-xs sm:w-auto sm:justify-start"
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             Load Demo
           </Button>
-        </div>
 
         {players.length > 0 && (
           <Button
@@ -92,12 +99,13 @@ export function RosterTab({
             size="sm"
             onClick={onClearAll}
             id="clearAll"
-            className="flex items-center gap-1.5 text-xs"
+            className="flex w-full items-center justify-center gap-1.5 text-xs sm:w-auto sm:justify-start"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Clear All
           </Button>
         )}
+        </div>
       </div>
 
       <RosterEditor

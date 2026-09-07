@@ -115,6 +115,81 @@ test.describe('Mobile tap targets', () => {
         });
     }
 
+    /**
+     * Nine buttons, each clamped to a 44px tap target by the touch rule in
+     * index.css, wrapped into a 174px sticky block — a fifth of an iPhone
+     * viewport, held there for all 7,296px of the lineup page, and at the foot
+     * of it covering the Player Summary's own header row. Only Live Match and
+     * Save Game are things a coach does with a game running; the rest collapse
+     * behind More.
+     */
+    test('the sticky lineup bar leaves the phone its screen', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#generateLineup');
+
+        const bar = await page.locator('.action-buttons-inline').boundingBox();
+        expect(bar.height).toBeLessThan(150);
+
+        // Collapsed: the export and print actions are behind More
+        await expect(page.locator('#exportPdf')).toBeHidden();
+        await expect(page.locator('#printLineup')).toBeHidden();
+        // The two matchday actions are not
+        await expect(page.locator('#openMatchday')).toBeVisible();
+        await expect(page.locator('#saveGame')).toBeVisible();
+
+        await page.getByRole('button', { name: /Show export and print actions/ }).click();
+        await expect(page.locator('#exportPdf')).toBeVisible();
+        await page.getByRole('button', { name: /Hide export and print actions/ }).click();
+        await expect(page.locator('#exportPdf')).toBeHidden();
+    });
+
+    /**
+     * The quarter selector is what collapses the lineup page from four stacked
+     * quarters to one. It used to sit above a 7,296px scroll, so by the time a
+     * coach could see the quarter they wanted, the control for picking it was
+     * several screens behind them.
+     */
+    test('the quarter selector stays reachable from the foot of the lineup', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#generateLineup');
+
+        const full = await page.evaluate(() => document.documentElement.scrollHeight);
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+
+        const q2 = page.getByRole('button', { name: 'Q2', exact: true }).first();
+        await expect(q2).toBeInViewport();
+        await q2.click();
+
+        const oneQuarter = await page.evaluate(() => document.documentElement.scrollHeight);
+        expect(oneQuarter).toBeLessThan(full);
+    });
+
+    /**
+     * 1,113px of table in a 356px window. Scrolling it right used to take the
+     * name column with it, leaving the coach reading a row of quarters with
+     * nothing saying whose row it was.
+     */
+    test('the player summary keeps the name column in view while it scrolls', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#generateLineup');
+
+        const nameCell = page.locator('.player-summary tbody tr td').first();
+        await nameCell.scrollIntoViewIfNeeded();
+        const before = (await nameCell.boundingBox()).x;
+
+        await page.locator('.player-summary table').evaluate((table) => {
+            const viewport = table.closest('[data-radix-scroll-area-viewport]') || table.parentElement;
+            viewport.scrollLeft = viewport.scrollWidth;
+        });
+
+        const after = await nameCell.boundingBox();
+        expect(Math.round(after.x)).toBe(Math.round(before));
+        await expect(nameCell).toBeInViewport();
+    });
+
     test('inputs are at least 16px so mobile Safari does not zoom on focus', async ({ page }) => {
         await page.goto('/');
         await page.click('#demoButton');

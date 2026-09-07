@@ -7,9 +7,16 @@
  * of them has an empty case that has to say something rather than nothing.
  */
 
-/** Columns, in order. */
+/** Columns, in order.
+ *
+ * Player leads, because the table is three times wider than a phone and the
+ * name column is the one pinned in place while the rest scrolls under it — a
+ * column that scrolls away takes with it the only thing saying whose row this
+ * is. The two rotation checkboxes follow it rather than lead it for the same
+ * reason: pinned name, then the two controls, is what fits on screen at rest.
+ */
 export const SUMMARY_HEADERS = [
-    'Rest', 'No Keeper', 'Player', 'Captain',
+    'Player', 'Rest', 'No Keeper', 'Captain',
     'Quarters Played', 'Quarters Resting', 'Defense/Offense', 'Positions'
 ];
 
@@ -69,6 +76,11 @@ function toggleCell(player, { className, title, label, checked, onChange }) {
 function buildRow(player, { onToggleRest, onToggleNoKeeper }) {
     const row = document.createElement('tr');
 
+    const cells = summaryCells(player);
+    const name = document.createElement('td');
+    name.textContent = cells[0];
+    row.appendChild(name);
+
     row.append(
         toggleCell(player, {
             className: 'rest-checkbox',
@@ -86,7 +98,7 @@ function buildRow(player, { onToggleRest, onToggleNoKeeper }) {
         })
     );
 
-    for (const text of summaryCells(player)) {
+    for (const text of cells.slice(1)) {
         const cell = document.createElement('td');
         cell.textContent = text;
         row.appendChild(cell);

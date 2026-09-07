@@ -259,8 +259,13 @@ export function RosterEditor({
                     </div>
                   </div>
 
-                  {/* Preferences & Status */}
-                  <div className="flex items-center gap-2 shrink-0">
+                  {/* Preferences & Status.
+                      On a phone this is the second line of a wrapped row, and
+                      at its intrinsic width it stopped about four fifths of
+                      the way across with dead space after the remove button.
+                      Full width and spread out, it reads as a row of controls
+                      belonging to the name above it. */}
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:justify-start">
                     {/* No Keeper Toggle */}
                     <Button
                       type="button"

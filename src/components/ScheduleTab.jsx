@@ -388,14 +388,17 @@ export function ScheduleTab({
             variant="outline"
             size="sm"
             onClick={() => setIsMatrixOpen(!isMatrixOpen)}
-            className="text-xs h-8 flex items-center gap-1.5"
+            className="text-xs h-8 flex w-full items-center justify-center gap-1.5 sm:w-auto sm:justify-start"
           >
             <Users className="h-3.5 w-3.5 text-primary" />
             {isMatrixOpen ? 'Hide Volunteer Matrix' : 'Volunteer Duty Matrix'}
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {/* The same ragged wrap the roster toolbar had: four buttons of four
+            widths on three lines, "Volunteer Duty Matrix" alone on the first.
+            Equal columns below sm:, the original wrapping row above it. */}
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <input
             type="file"
             ref={fileInputRef}
@@ -408,7 +411,7 @@ export function ScheduleTab({
             variant="outline"
             size="sm"
             onClick={handleUploadScheduleClick}
-            className="text-xs h-8 flex items-center gap-1.5"
+            className="text-xs h-8 flex w-full items-center justify-center gap-1.5 sm:w-auto sm:justify-start"
             title="Import season schedule from iCalendar (.ics) or CSV spreadsheet"
             id="importScheduleBtn"
           >
@@ -418,7 +421,7 @@ export function ScheduleTab({
             variant="outline"
             size="sm"
             onClick={handleDownloadSeasonIcs}
-            className="text-xs h-8 flex items-center gap-1.5"
+            className="text-xs h-8 flex w-full items-center justify-center gap-1.5 sm:w-auto sm:justify-start"
             title="Export full season schedule to Apple/Google Calendar"
           >
             <Calendar className="h-3.5 w-3.5" /> Export Calendar (.ics)
@@ -427,14 +430,14 @@ export function ScheduleTab({
             variant="outline"
             size="sm"
             onClick={handleExportCsv}
-            className="text-xs h-8 flex items-center gap-1.5"
+            className="text-xs h-8 flex w-full items-center justify-center gap-1.5 sm:w-auto sm:justify-start"
           >
             <FileSpreadsheet className="h-3.5 w-3.5" /> Export CSV
           </Button>
           <Button
             size="sm"
             onClick={onAddFixture}
-            className="text-xs h-8 flex items-center gap-1.5 font-semibold"
+            className="text-xs h-8 flex w-full items-center justify-center gap-1.5 font-semibold sm:w-auto sm:justify-start"
           >
             <Plus className="h-4 w-4" /> Add Match
           </Button>

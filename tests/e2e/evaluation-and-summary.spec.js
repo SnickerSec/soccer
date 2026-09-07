@@ -107,7 +107,9 @@ test.describe('Player summary table', () => {
         await generate(page);
 
         const firstRow = page.locator('.player-summary tbody tr').first();
-        const name = await firstRow.locator('td').nth(2).innerText();
+        // Player is the first column: it is the one pinned while the rest of
+        // the table scrolls under it on a phone
+        const name = await firstRow.locator('td').nth(0).innerText();
         await firstRow.locator('.rest-checkbox').check();
 
         const stored = await page.evaluate(() =>
@@ -142,7 +144,7 @@ test.describe('Player summary table', () => {
         const summaryCaptains = await page.evaluate(() =>
             [...document.querySelectorAll('.player-summary tbody tr')]
                 .filter(row => row.children[3].textContent.includes('Yes'))
-                .map(row => row.children[2].textContent.trim()));
+                .map(row => row.children[0].textContent.trim()));
 
         expect(rosterCaptains).toHaveLength(2);
         expect(summaryCaptains).toHaveLength(2);
