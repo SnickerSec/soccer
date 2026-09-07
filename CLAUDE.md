@@ -550,9 +550,18 @@ leaves `roster_version` alone — changing a formation must not reject a roster
 edit another coach is in the middle of.
 
 `pushSettings` in `src/modules/sync.js` is the way to change them: local first,
-then the server, then the queue with no signal, like a game or a match. There
-is no merge and no version — four fields the whole team shares, last write
-wins. What the queue does differently is fold: one entry per team, replaced
+then the server, then the queue, like a game or a match. There is no merge and
+no version — four fields the whole team shares, last write wins.
+
+"Then the queue" was read as `navigator.onLine` alone, and this was the one
+push here that queued on nothing else. The commoner case at a field is a phone
+that has a bar of LTE, believes it is online, and watches the request die: the
+change was written to the device and nowhere else, and since `sync()` replaces
+local settings with the server's copy outright, the next pull handed the
+formation back the way it was — to a coach who had been looking at the new one
+since they tapped it. A failed response and a thrown request now queue too. The
+exceptions are 403 and 404, which the drain already counts as done for the same
+reason it does: a viewer's write and a deleted team's will not start working. What the queue does differently is fold: one entry per team, replaced
 rather than appended, since five taps at the field are one write and nothing
 would merge them anyway. That entry carries its `teamId`, which the game and
 fixture entries do not need to: every team always has settings, so a replay

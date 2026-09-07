@@ -811,6 +811,17 @@ function writeLocalSettings(settings) {
  * Local first, then the server, then the queue with no signal, like a game or
  * a match. There is no merge and no version: these are four fields the whole
  * team shares, and the coach who changed one last is the one who meant it.
+ *
+ * "With no signal" was read too narrowly: only `navigator.onLine` queued, and a
+ * write that reached the network and failed anyway did not. That is the more
+ * common case at a field — the phone has a bar of LTE, so it believes it is
+ * online, and the request dies. The change was written to the device and to
+ * nowhere else, and sync() replaces local settings with the server's copy
+ * outright, so the next pull handed the formation back the way it was. The
+ * coach had seen 3-2-3 the whole time.
+ *
+ * Every other push here queues on both the failed response and the thrown
+ * request; this one was alone in not doing so.
  */
 export async function pushSettings(settings) {
     const next = normalizeSettings(settings);
@@ -831,6 +842,13 @@ export async function pushSettings(settings) {
         const result = await saveTeamSettings(currentTeamId, next);
 
         if (!result.success) {
+            // 403 is a viewer, who cannot change how the team plays, and 404 a
+            // team that has since been deleted. Neither improves by being
+            // retried, which is why the drain counts both as done — queueing
+            // them here would only park an entry to drop at the next one.
+            if (result.status !== 403 && result.status !== 404) {
+                queueSettings(currentTeamId, next);
+            }
             updateStatus(SYNC_STATUS.ERROR);
             return result;
         }
@@ -839,6 +857,10 @@ export async function pushSettings(settings) {
         updateStatus(SYNC_STATUS.SYNCED);
         return result;
     } catch (error) {
+        // A request that threw carries no status to reason about, so it is
+        // kept: the coach was shown the change, and the device is the only
+        // place it now exists.
+        queueSettings(currentTeamId, next);
         updateStatus(SYNC_STATUS.ERROR);
         return { success: false, error: error.message };
     }

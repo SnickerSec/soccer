@@ -1204,6 +1204,81 @@ describe('pushSettings', () => {
 
         expect(remainingQueue().map(e => e.teamId).sort()).toEqual(['team-1', 'team-2']);
     });
+
+    /*
+     * A phone at a field has a bar of LTE, so navigator.onLine is true and the
+     * request goes out and dies anyway. Only the offline branch queued, so the
+     * change was written to the device and to nowhere else — and sync()
+     * replaces local settings with the server's copy outright, so the next pull
+     * handed the formation back the way it was. The coach had been looking at
+     * the new one the whole time.
+     */
+    test('a change the server refuses is queued rather than lost', async () => {
+        await signInWithTeam();
+        settingsResult = () => ({ success: false, status: 500, error: 'boom' });
+
+        const result = await pushSettings(NINE_A_SIDE);
+
+        expect(result).toMatchObject({ success: false });
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({ entityType: 'settings', teamId: 'team-1' })
+        ]);
+        expect(remainingQueue()[0].data).toMatchObject({ formation: '3-2-3' });
+    });
+
+    test('a request that never lands is queued rather than lost', async () => {
+        await signInWithTeam();
+        settingsResult = () => { throw new Error('Failed to fetch'); };
+
+        const result = await pushSettings(NINE_A_SIDE);
+
+        expect(result).toMatchObject({ success: false });
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({ entityType: 'settings', teamId: 'team-1' })
+        ]);
+    });
+
+    test('a refusal that will never succeed is not parked in the queue', async () => {
+        // 403 is a viewer and 404 a team that has been deleted. The drain
+        // counts both as done, so queueing them only parks an entry to drop.
+        await signInWithTeam();
+        settingsResult = () => ({ success: false, status: 403, error: 'Forbidden' });
+
+        await pushSettings(NINE_A_SIDE);
+
+        expect(remainingQueue()).toEqual([]);
+
+        settingsResult = () => ({ success: false, status: 404, error: 'No such team' });
+
+        await pushSettings(NINE_A_SIDE);
+
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a failed write still folds to one entry per team', async () => {
+        await signInWithTeam();
+        settingsResult = () => ({ success: false, status: 500, error: 'boom' });
+
+        await pushSettings({ ...NINE_A_SIDE, formation: '3-2-3' });
+        await pushSettings({ ...NINE_A_SIDE, formation: '3-3-2' });
+        await pushSettings({ ...NINE_A_SIDE, formation: '2-3-3' });
+
+        expect(remainingQueue()).toHaveLength(1);
+        expect(remainingQueue()[0].data.formation).toBe('2-3-3');
+    });
+
+    test('what a failed write queues is what the coach was shown', async () => {
+        // Same rule as the offline branch: 4-4-2 needs eleven, and storing what
+        // was tapped rather than what will play would hand the other coaches a
+        // formation they cannot field.
+        await signInWithTeam();
+        settingsResult = () => ({ success: false, status: 500, error: 'boom' });
+
+        await pushSettings({ ageDivision: '12U', fieldPlayers: 9, formation: '4-4-2' });
+
+        expect(remainingQueue()[0].data).toMatchObject({ fieldPlayers: 9, formation: '3-3-2' });
+        expect(localSettings()).toMatchObject({ fieldPlayers: 9, formation: '3-3-2' });
+    });
 });
 
 describe('processQueue and how the team plays', () => {
@@ -1269,6 +1344,27 @@ describe('processQueue and how the team plays', () => {
 
         expect(result.processed).toBe(0);
         expect(remainingQueue()).toHaveLength(1);
+    });
+
+    test('a change the server refused reaches the team on the next drain', async () => {
+        // The whole round trip the failed write is queued for: the formation
+        // the coach tapped while the request was dying is the one the other
+        // coaches end up with.
+        await signInWithTeam();
+        settingsResult = () => ({ success: false, status: 500, error: 'boom' });
+
+        await pushSettings({ ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4 });
+
+        settingsWrites = [];
+        settingsResult = (settings) => ({ success: true, data: settings });
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(settingsWrites).toEqual([
+            { teamId: 'team-1', settings: expect.objectContaining({ formation: '3-2-3' }) }
+        ]);
+        expect(remainingQueue()).toEqual([]);
     });
 });
 
