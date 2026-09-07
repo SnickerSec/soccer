@@ -104,7 +104,7 @@ export function Header({
 
         {/* Navigation Tabs */}
         <nav aria-label="Sections" className="site-nav tab-navigation flex justify-center">
-          <div role="tablist" className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full grid-cols-4 min-w-[360px] max-w-[520px]">
+          <div role="tablist" className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full grid-cols-4 min-w-0 sm:min-w-[360px] max-w-[520px]">
             <button
               type="button"
               role="tab"

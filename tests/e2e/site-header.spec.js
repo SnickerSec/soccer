@@ -101,6 +101,38 @@ test.describe('Site header', () => {
         expect(height).toBeLessThan(30);
     });
 
+    /*
+     * The touch minimum raises every button to 44px on a phone, and the
+     * tablist holding these was a fixed 36px -- so the active tab drew above
+     * and below the bar it sits in, and the bar's 360px floor pushed the whole
+     * page sideways on a 360px screen.
+     */
+    test('the tab bar contains its tabs on a phone', async ({ page }) => {
+        for (const width of [360, 390]) {
+            await page.setViewportSize({ width, height: 800 });
+            await page.goto('/');
+
+            const { list, tab, scrollWidth, clientWidth } = await page.evaluate(() => {
+                const rect = el => {
+                    const r = el.getBoundingClientRect();
+                    return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+                };
+                return {
+                    list: rect(document.querySelector('.site-header [role="tablist"]')),
+                    tab: rect(document.querySelector('#season-tab-btn')),
+                    scrollWidth: document.documentElement.scrollWidth,
+                    clientWidth: document.documentElement.clientWidth
+                };
+            });
+
+            expect(tab.top).toBeGreaterThanOrEqual(list.top - 0.5);
+            expect(tab.bottom).toBeLessThanOrEqual(list.bottom + 0.5);
+            expect(tab.left).toBeGreaterThanOrEqual(list.left - 0.5);
+            expect(tab.right).toBeLessThanOrEqual(list.right + 0.5);
+            expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+        }
+    });
+
     test('exactly one h1 per page', async ({ page }) => {
         await page.goto('/');
         await expect(page.locator('h1')).toHaveCount(1);

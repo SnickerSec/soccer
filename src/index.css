@@ -231,6 +231,15 @@
     min-width: 44px;
   }
 
+  /* The header's tablist is a fixed h-9 — 36px, which comfortably held its
+     buttons until the minimum above raised them to 44px. The active tab then
+     drew above and below the bar it is meant to sit inside. The bar grows to
+     fit its buttons here; its p-1 keeps the same inset it has everywhere else.
+     Two class selectors, so no !important is needed to outrank `h-9`. */
+  .tab-navigation [role="tablist"] {
+    height: auto;
+  }
+
   /* 16px is the threshold below which mobile Safari zooms the page on focus —
      and it does not zoom back out, leaving the coach panning a magnified app
      for the rest of the game. */
