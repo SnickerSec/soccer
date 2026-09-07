@@ -757,6 +757,84 @@ describe('pushFixturesBulk', () => {
         ]);
     });
 
+    /*
+     * The schedule import is the one action in the app worth twenty minutes of
+     * a volunteer's evening, and sync() replaces the local schedule with the
+     * server's list outright. Queueing on navigator.onLine alone meant a batch
+     * the server refused was written to the device and nowhere else — and the
+     * next pull deleted the whole imported season.
+     */
+    test('a batch the server refuses is queued rather than lost', async () => {
+        bulkFixturesResult = () => ({ success: false, status: 500, error: 'boom' });
+
+        const result = await pushFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        expect(result).toMatchObject({ success: false });
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({
+                entityType: 'fixtures',
+                action: 'bulk_save',
+                data: [
+                    { id: 'local-1', opponent: 'Rovers' },
+                    { id: 'local-2', opponent: 'United' }
+                ]
+            })
+        ]);
+    });
+
+    test('a batch whose request never lands is queued rather than lost', async () => {
+        bulkFixturesResult = () => { throw new Error('Failed to fetch'); };
+
+        const result = await pushFixturesBulk([{ id: 'local-1', opponent: 'Rovers' }]);
+
+        expect(result).toMatchObject({ success: false });
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({ entityType: 'fixtures', action: 'bulk_save' })
+        ]);
+    });
+
+    test('a refusal that will never succeed is not parked in the queue', async () => {
+        // 400 is the route's own validation — a batch over its limit, or a
+        // fixture missing something it needs — and 403 is a viewer.
+        bulkFixturesResult = () => ({ success: false, status: 400, error: 'Cannot import more than 200 fixtures at once' });
+
+        await pushFixturesBulk([{ id: 'local-1', opponent: 'Rovers' }]);
+
+        expect(remainingQueue()).toEqual([]);
+
+        bulkFixturesResult = () => ({ success: false, status: 403, error: 'Insufficient permissions' });
+
+        await pushFixturesBulk([{ id: 'local-1', opponent: 'Rovers' }]);
+
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a refused batch reaches the team on the next drain', async () => {
+        // The round trip the queueing is for: the season the coach imported
+        // while the request was dying is the one the other coaches end up with.
+        bulkFixturesResult = () => ({ success: false, status: 500, error: 'boom' });
+
+        await pushFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]);
+
+        calls = [];
+        bulkFixturesResult = (fixtures) => ({
+            success: true,
+            data: fixtures.map((f, i) => ({ ...f, id: `cloud-bulk-${i + 1}` }))
+        });
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(calls).toEqual(['push:bulkImportFixtures:Rovers,United']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
     test('the queued bulk import reaches the server on the next drain', async () => {
         setLocalFixtures([
             { id: 'local-1', opponent: 'Rovers' },
@@ -792,6 +870,28 @@ describe('pushFixturesBulk', () => {
 
         expect(result.processed).toBe(0);
         expect(remainingQueue()).toHaveLength(1);
+    });
+
+    test('a batch the route will always refuse is dropped, not retried forever', async () => {
+        // This branch was the only one in the drain that kept its dead ends, so
+        // a batch over the route's limit — or one carrying a fixture that fails
+        // validation — cost a guaranteed-failing request before every pull.
+        bulkFixturesResult = () => ({ success: false, status: 400, error: 'Cannot import more than 200 fixtures at once' });
+        queueEntries(queuedFixturesBulk([{ id: 'local-1', opponent: 'Rovers' }]));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('so is a batch from a coach who has since become a viewer', async () => {
+        bulkFixturesResult = () => ({ success: false, status: 403, error: 'Insufficient permissions' });
+        queueEntries(queuedFixturesBulk([{ id: 'local-1', opponent: 'Rovers' }]));
+
+        await processQueue();
+
+        expect(remainingQueue()).toEqual([]);
     });
 
     test('an offline edit to a bulk-imported fixture folds into the queued bulk_save', async () => {

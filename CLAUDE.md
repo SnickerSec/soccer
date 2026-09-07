@@ -471,7 +471,7 @@ switch, and adopted only when the server had at least one match — so a
 cancellation made on another device could never arrive: the match came back
 every time, and a team whose last match was deleted kept showing it forever.
 
-Two things follow from the pull being authoritative. `migrateLocalDataToCloud`
+Three things follow from the pull being authoritative. `migrateLocalDataToCloud`
 uploads the schedule, or a season planned before signing in would be pulled out
 from under the coach on their first sync; matches the bulk route would reject
 are left behind rather than failing the batch and costing them the rest.
@@ -479,6 +479,17 @@ And a queued creation adopts the id the server issues when it replays
 (`adoptFixtureId`) — without that the local copy keeps the id this device made
 up, every later edit or delete 404s against it, and the pull hands the match
 back.
+
+The third is that `pushFixturesBulk` has to queue a batch the server refused,
+not only one it had no signal to send. It read `navigator.onLine` alone, the
+way `pushSettings` did: a phone on the drive to the field has a bar of LTE and
+believes it is online, the request dies, and nothing was kept — so the next
+pull deleted the whole imported season. The coach saw a toast about matches
+that could not be synced, which reads like a retry, and then a schedule that
+looked right for the rest of the afternoon. 400 and 403 are the exceptions,
+because the route refuses an oversized batch, an invalid fixture and a viewer
+every time; the drain drops those for the same reason, which it had not been
+doing — `bulkImportIsHopeless` is where both now decide it.
 
 A fixtures pull that fails is not fatal: the roster and the season history are
 what the app is for, and refusing to sync them because the schedule 500'd is

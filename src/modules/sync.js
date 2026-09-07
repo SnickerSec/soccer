@@ -647,6 +647,20 @@ export async function pushFixture(fixture) {
 }
 
 /**
+ * Whether the server's refusal of a batch is one that retrying cannot fix.
+ *
+ * 400 is the route's own validation — a batch over its limit, or a fixture
+ * missing something it requires — and 403 is a viewer, who may not write the
+ * schedule at all. Neither answer changes at the next drain, so keeping the
+ * entry would cost a guaranteed-failing request before every pull, for the life
+ * of the install. Every other branch of the drain already drops its dead ends;
+ * this is the same judgement, named so both callers make it the same way.
+ */
+function bulkImportIsHopeless(status) {
+    return status === 400 || status === 403;
+}
+
+/**
  * Bulk push fixtures to cloud, or queue them until there is a connection.
  *
  * An imported schedule (from .ics or CSV) typically contains 10-20 games.
@@ -655,6 +669,19 @@ export async function pushFixture(fixture) {
  *
  * This pushes the entire batch in a single atomic request via bulkImportFixtures,
  * or queues them for replay on the next drain.
+ *
+ * "Or queues them" was read as `navigator.onLine` alone, the same way
+ * pushSettings read it. A phone on the drive to the field has a bar of LTE and
+ * believes it is online; the request goes out and dies. Nothing was queued, and
+ * sync() replaces the local schedule with the server's list outright — so the
+ * next pull deleted the whole imported season. The coach had been shown a toast
+ * saying some matches could not be synced, which is true and reads like a
+ * retry, and then a schedule that looked right for the rest of the afternoon.
+ *
+ * Ten to twenty matches and twenty minutes of a volunteer's evening, so a
+ * failed response and a thrown request queue now. 400 and 403 do not: the route
+ * refuses a batch over its limit, a fixture that fails validation, and a
+ * viewer, and none of those start working on the next drain.
  */
 export async function pushFixturesBulk(fixtures) {
     if (!Array.isArray(fixtures) || fixtures.length === 0) {
@@ -676,6 +703,9 @@ export async function pushFixturesBulk(fixtures) {
         const result = await bulkImportFixtures(currentTeamId, fixtures);
 
         if (!result.success) {
+            if (!bulkImportIsHopeless(result.status)) {
+                queueChange('fixtures', 'bulk_save', fixtures);
+            }
             updateStatus(SYNC_STATUS.ERROR);
             return result;
         }
@@ -694,6 +724,9 @@ export async function pushFixturesBulk(fixtures) {
         updateStatus(SYNC_STATUS.SYNCED);
         return result;
     } catch (error) {
+        // A request that threw carries no status to reason about, so the batch
+        // is kept: the device is the only place the schedule now exists.
+        queueChange('fixtures', 'bulk_save', fixtures);
         updateStatus(SYNC_STATUS.ERROR);
         return { success: false, error: error.message };
     }
@@ -1012,6 +1045,11 @@ export async function processQueue() {
                             }
                         });
                     }
+                    processed++;
+                } else if (bulkImportIsHopeless(result.status)) {
+                    // A batch the route will refuse every time — too many, or
+                    // one bad fixture — was retried at every drain for good.
+                    // This branch was alone in keeping its dead ends.
                     processed++;
                 } else {
                     remaining.push(item);
