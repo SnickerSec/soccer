@@ -609,6 +609,16 @@ settings of the one being left. Reopening a saved game passes `push: false` —
 that sets the screen up the way that game was played, which is nobody else's
 business.
 
+`keeperPlaysThree` is the one setting that is a rule rather than a shape: when
+it is on, only a player the sitting schedule has down for three quarters or
+more may keep. The schedule is settled before any keeper is picked, so this is
+a filter on the pick, and a lineup that cannot honour it is reported by
+`validateLineup` like any other broken rule rather than refused. It is tight at
+12 on a 7v7 field, where exactly four players play three quarters and must
+take a quarter in goal each, leaving every back slot to the eight who play two
+— which is why the position scorer steers a player in their last quarter
+towards whichever side of the ball they have not yet played.
+
 The coach's theme is the one thing here that stays per-user. It is adopted from
 `user_settings.theme` only on a device with no preference of its own — a phone
 being signed into for the first time — and pushed whenever it changes after

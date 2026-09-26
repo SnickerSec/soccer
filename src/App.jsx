@@ -996,6 +996,7 @@ export default function App() {
         quarters: curSettings.quarters || 4,
         maxAttempts: CONSTANTS.MAX_GENERATION_ATTEMPTS,
         seasonStats: stats,
+        keeperPlaysThree: curSettings.keeperPlaysThree,
       });
 
       if (result && result.lineup) {
@@ -1173,7 +1174,9 @@ export default function App() {
       });
     });
 
-    const warnings = validateLineup(updatedPlayers, settings.quarters || 4);
+    const warnings = validateLineup(updatedPlayers, settings.quarters || 4, {
+      keeperPlaysThree: settings.keeperPlaysThree,
+    });
 
     setLineup({
       ...lineup,
@@ -1620,6 +1623,10 @@ export default function App() {
             }}
             onFormationChange={(formation) => {
               updateSettings({ formation });
+            }}
+            keeperPlaysThree={settings.keeperPlaysThree}
+            onKeeperPlaysThreeChange={(keeperPlaysThree) => {
+              updateSettings({ keeperPlaysThree });
             }}
             onGenerateLineup={handleGenerateLineup}
             isGenerating={isGenerating}

@@ -3,9 +3,9 @@
  *
  * Two kinds, kept apart on purpose. /api/settings is the coach: their theme
  * and which team they were last looking at. /api/teams/:teamId/settings is how
- * the team plays — division, field size, formation, quarters — which belongs
- * to the team, because two coaches sharing a side want the same answer and a
- * coach running two sides wants a different one for each.
+ * the team plays — division, field size, formation, quarters, who may keep —
+ * which belongs to the team, because two coaches sharing a side want the same
+ * answer and a coach running two sides wants a different one for each.
  */
 
 import { Router } from 'express';
@@ -38,7 +38,7 @@ export function validateTeamSettings(settings) {
         return 'A settings object is required';
     }
 
-    const { ageDivision, fieldPlayers, formation, quarters } = settings;
+    const { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree } = settings;
 
     // Divisions are not enumerated here: POST /api/teams does not enumerate
     // them either, and a second list on the server would be one more thing to
@@ -63,6 +63,11 @@ export function validateTeamSettings(settings) {
     if (quarters !== undefined && quarters !== null
         && (!Number.isInteger(quarters) || quarters < 1 || quarters > 8)) {
         return 'Quarters must be a whole number between 1 and 8';
+    }
+
+    if (keeperPlaysThree !== undefined && keeperPlaysThree !== null
+        && typeof keeperPlaysThree !== 'boolean') {
+        return 'keeperPlaysThree must be true or false';
     }
 
     return null;

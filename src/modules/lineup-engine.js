@@ -460,7 +460,7 @@ function getPositionRatingCategory(position) {
     return 'offense';
 }
 
-function assignPositionsOptimally(players, positions, defensivePositions, seasonStats = {}) {
+function assignPositionsOptimally(players, positions, defensivePositions, seasonStats = {}, finalQuarter = new Set()) {
     const assignments = [];
     const remainingPlayers = [...players];
     const remainingPositions = [...positions];
@@ -496,6 +496,16 @@ function assignPositionsOptimally(players, positions, defensivePositions, season
 
             if (projectedImbalance > currentImbalance) {
                 score -= 200 * (projectedImbalance - currentImbalance);
+            }
+
+            // A player on the field for the last time this game who has not yet
+            // played one side of the ball has no later quarter to play it in.
+            // Without this a two-quarter player could go forward twice when the
+            // backs were filled first -- rare, until keepers had to be drawn
+            // from the three-quarter players and every back slot was needed.
+            if (finalQuarter.has(player.name)) {
+                if (defensive === 0) score += isDefensive ? 400 : -400;
+                if (offensive === 0) score += isDefensive ? -400 : 400;
             }
 
             // 2. Multi-game / Season-wide D/O balance
@@ -559,7 +569,19 @@ function assignPositionsOptimally(players, positions, defensivePositions, season
     return assignments;
 }
 
-function generateQuarterLineup(quarter, sittingSchedule, players, positions, seasonStats) {
+/** Quarters a player is down to play, going by the sitting schedule. */
+function plannedQuarters(name, sittingSchedule, quarters) {
+    let sits = 0;
+    for (let q = 1; q <= quarters; q++) {
+        if ((sittingSchedule[q] || []).includes(name)) sits++;
+    }
+    return quarters - sits;
+}
+
+/** The fewest quarters a keeper may play when the team asks for keepers who play three. */
+export const KEEPER_MIN_QUARTERS = 3;
+
+function generateQuarterLineup(quarter, sittingSchedule, players, positions, seasonStats, options = {}) {
     const quarterLineup = {
         quarter: quarter,
         positions: {}
@@ -576,7 +598,20 @@ function generateQuarterLineup(quarter, sittingSchedule, players, positions, sea
 
     const keeperIndex = positionsToFill.indexOf('Keeper');
     if (keeperIndex !== -1) {
-        const keeper = selectKeeper(playingPlayers, quarter, seasonStats);
+        // The sitting schedule is settled before any keeper is picked, so who
+        // plays only two quarters is already known. When the team restricts
+        // them, keepers come from the rest; if nobody among the rest can take
+        // the gloves this quarter, the pick falls back to the whole field and
+        // validateLineup reports it, which sends the generator to try again.
+        let keeperPool = playingPlayers;
+        if (options.keeperPlaysThree) {
+            const eligible = playingPlayers.filter(p =>
+                !p.noKeeper && !p.goalieQuarter
+                && plannedQuarters(p.name, sittingSchedule, options.quarters || 4) >= KEEPER_MIN_QUARTERS
+            );
+            if (eligible.length > 0) keeperPool = eligible;
+        }
+        const keeper = selectKeeper(keeperPool, quarter, seasonStats);
         if (keeper) {
             quarterLineup.positions['Keeper'] = keeper.name;
             keeper.quartersPlayed.push(quarter);
@@ -588,7 +623,19 @@ function generateQuarterLineup(quarter, sittingSchedule, players, positions, sea
         }
     }
 
-    const assignments = assignPositionsOptimally(playingPlayers, positionsToFill, defensivePositions, seasonStats);
+    const totalQuarters = options.quarters || 4;
+    const finalQuarter = new Set(playingPlayers
+        .filter(p => {
+            for (let q = quarter + 1; q <= totalQuarters; q++) {
+                if (!(sittingSchedule[q] || []).includes(p.name)) return false;
+            }
+            return true;
+        })
+        .map(p => p.name));
+
+    const assignments = assignPositionsOptimally(
+        playingPlayers, positionsToFill, defensivePositions, seasonStats, finalQuarter
+    );
 
     assignments.forEach(({ position, player }) => {
         quarterLineup.positions[position] = player.name;
@@ -618,13 +665,17 @@ function generateQuarterLineup(quarter, sittingSchedule, players, positions, sea
     return quarterLineup;
 }
 
-export function validateLineup(players, quarters) {
+export function validateLineup(players, quarters, { keeperPlaysThree = false } = {}) {
     const issues = [];
 
     players.forEach(player => {
         const goalieQuarters = player.positionsPlayed.filter(p => p.position === 'Keeper').length;
         if (goalieQuarters > 1) {
             issues.push(`⚠️ ${player.name} is playing goalie for ${goalieQuarters} quarters (max 1)`);
+        }
+
+        if (keeperPlaysThree && goalieQuarters > 0 && player.quartersPlayed.length < KEEPER_MIN_QUARTERS) {
+            issues.push(`⚠️ ${player.name} plays goalie but only ${player.quartersPlayed.length} quarters in total`);
         }
 
         for (let i = 0; i < player.quartersSitting.length - 1; i++) {
@@ -671,7 +722,7 @@ export function validateLineup(players, quarters) {
 }
 
 export function generateLineup(data, { onProgress } = {}) {
-    const { players, positions, playersOnField, quarters, maxAttempts, seasonStats } = data;
+    const { players, positions, playersOnField, quarters, maxAttempts, seasonStats, keeperPlaysThree = false } = data;
 
     let attempts = 0;
     let validation = [];
@@ -697,11 +748,13 @@ export function generateLineup(data, { onProgress } = {}) {
         const sittingSchedule = determineSittingSchedule(players, playersOnField, quarters, seasonStats);
 
         for (let quarter = 1; quarter <= quarters; quarter++) {
-            const quarterLineup = generateQuarterLineup(quarter, sittingSchedule, players, positions, seasonStats);
+            const quarterLineup = generateQuarterLineup(
+                quarter, sittingSchedule, players, positions, seasonStats, { keeperPlaysThree, quarters }
+            );
             lineup.push(quarterLineup);
         }
 
-        validation = validateLineup(players, quarters);
+        validation = validateLineup(players, quarters, { keeperPlaysThree });
 
         if (validation.length < bestValidationCount) {
             bestValidationCount = validation.length;

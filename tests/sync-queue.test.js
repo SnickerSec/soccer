@@ -1240,7 +1240,7 @@ describe('migrating the schedule on first sign-in', () => {
  * handed 10U and a 7v7 formation, and the assistant coach never saw either.
  */
 describe('pushSettings', () => {
-    const NINE_A_SIDE = { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4 };
+    const NINE_A_SIDE = { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: false };
 
     test('the device keeps the change whether or not the server hears about it', async () => {
         await signInWithTeam();
@@ -1474,13 +1474,13 @@ describe('sync and how the team plays', () => {
         store['ayso_settings'] = JSON.stringify({ ageDivision: '10U', fieldPlayers: 7, formation: '2-3-1' });
         serverSettings = () => ({
             success: true,
-            data: { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4 }
+            data: { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: true }
         });
 
         await sync();
 
         expect(localSettings()).toEqual({
-            ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4
+            ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: true
         });
     });
 

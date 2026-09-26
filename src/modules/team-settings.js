@@ -23,7 +23,11 @@ export const DEFAULT_SETTINGS = {
     ageDivision: '10U',
     fieldPlayers: 7,
     formation: '2-3-1',
-    quarters: 4
+    quarters: 4,
+    // Only a player on the field at least three quarters may keep. A player
+    // who plays two and spends one of them in goal gets a single quarter of
+    // outfield play all game.
+    keeperPlaysThree: false
 };
 
 /**
@@ -57,7 +61,9 @@ export function normalizeSettings(raw) {
         ? Number(source.quarters)
         : DEFAULT_SETTINGS.quarters;
 
-    return { ageDivision, fieldPlayers, formation, quarters };
+    const keeperPlaysThree = source.keeperPlaysThree === true;
+
+    return { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree };
 }
 
 /**

@@ -45,7 +45,7 @@ function makeRoster(size, options = {}) {
 }
 
 /** Runs the real generator for a roster size and formation. */
-function generate(rosterSize, { playersOnField = 7, formation = '2-3-1', players, seasonStats = {}, rated = false } = {}) {
+function generate(rosterSize, { playersOnField = 7, formation = '2-3-1', players, seasonStats = {}, rated = false, keeperPlaysThree = false } = {}) {
     const roster = players ?? makeRoster(rosterSize, { rated });
     return generateLineup({
         players: roster,
@@ -53,7 +53,8 @@ function generate(rosterSize, { playersOnField = 7, formation = '2-3-1', players
         playersOnField,
         quarters: QUARTERS,
         maxAttempts: MAX_ATTEMPTS,
-        seasonStats
+        seasonStats,
+        keeperPlaysThree
     });
 }
 
@@ -590,5 +591,68 @@ describe('multi-game rotation balancing with season stats', () => {
                 expect(sits[name]).toBe(1);
             }
         }
+    });
+});
+
+describe('keepers who play three quarters', () => {
+    const keepersAndQuarters = (result) => result.lineup.map(q => {
+        const name = q.positions.Keeper;
+        const played = result.lineup.filter(other => Object.values(other.positions).includes(name)).length;
+        return { name, played };
+    });
+
+    test.each([9, 10, 11])('with the rule on, no keeper plays only two quarters (%i at 7v7)', (size) => {
+        for (let i = 0; i < 20; i++) {
+            const result = generate(size, { keeperPlaysThree: true });
+            expect(result.validation).toEqual([]);
+            for (const { played } of keepersAndQuarters(result)) {
+                expect(played).toBeGreaterThanOrEqual(3);
+            }
+        }
+    });
+
+    test('12 at 7v7, where only four players play three quarters, still keeps the rule', () => {
+        // Those four must take one quarter in goal each, which leaves every back
+        // slot to the eight who play two. It is tight enough that about one
+        // generation in two hundred still ends with a D/O warning, so only the
+        // keepers are asserted here.
+        for (let i = 0; i < 3; i++) {
+            const keepers = keepersAndQuarters(generate(12, { keeperPlaysThree: true }));
+            expect(new Set(keepers.map(k => k.name)).size).toBe(4);
+            for (const { played } of keepers) {
+                expect(played).toBeGreaterThanOrEqual(3);
+            }
+        }
+    });
+
+    test('with the rule off, a two-quarter player can still keep', () => {
+        // 12 at 7v7: eight players sit twice, so over enough games one of them
+        // is bound to draw the gloves
+        let twoQuarterKeeper = false;
+        for (let i = 0; i < 50 && !twoQuarterKeeper; i++) {
+            twoQuarterKeeper = keepersAndQuarters(generate(12)).some(k => k.played < 3);
+        }
+        expect(twoQuarterKeeper).toBe(true);
+    });
+
+    test('when the rule cannot be met it says so rather than failing', () => {
+        // 13 at 7v7: eleven sit twice, leaving two to cover four quarters in goal
+        const result = generate(13, { keeperPlaysThree: true });
+        expect(result.lineup).toHaveLength(4);
+        expect(result.validation.some(w => /plays goalie but only 2 quarters/.test(w))).toBe(true);
+    });
+
+    test('validateLineup flags a two-quarter keeper only when the rule is on', () => {
+        const player = {
+            name: 'Amos',
+            quartersPlayed: [1, 3],
+            quartersSitting: [2, 4],
+            positionsPlayed: [{ quarter: 1, position: 'Keeper' }, { quarter: 3, position: 'Striker' }],
+            defensiveQuarters: 1,
+            offensiveQuarters: 1
+        };
+        expect(validateLineup([player], 4)).toEqual([]);
+        expect(validateLineup([player], 4, { keeperPlaysThree: true }))
+            .toEqual(['⚠️ Amos plays goalie but only 2 quarters in total']);
     });
 });

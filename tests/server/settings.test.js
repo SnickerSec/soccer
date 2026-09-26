@@ -103,6 +103,11 @@ describe('validateTeamSettings', () => {
         expect(validateTeamSettings({ fieldPlayers: 7.5 })).toMatch(/between 3 and 11/);
     });
 
+    test('the keeper rule is a boolean', () => {
+        expect(validateTeamSettings({ keeperPlaysThree: true })).toBeNull();
+        expect(validateTeamSettings({ keeperPlaysThree: 'yes' })).toMatch(/keeperPlaysThree/);
+    });
+
     test('quarters outside a game are refused', () => {
         expect(validateTeamSettings({ quarters: 0 })).toMatch(/between 1 and 8/);
     });

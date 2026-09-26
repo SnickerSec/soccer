@@ -42,7 +42,17 @@ describe('normalizeSettings', () => {
     test('a complete, valid set is left as it is', () => {
         expect(normalizeSettings({
             ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4
-        })).toEqual({ ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4 });
+        })).toEqual({ ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: false });
+    });
+
+    test('the keeper rule is on only when stored as true', () => {
+        expect(normalizeSettings({ keeperPlaysThree: true }).keeperPlaysThree).toBe(true);
+        expect(normalizeSettings({ keeperPlaysThree: 'yes' }).keeperPlaysThree).toBe(false);
+        expect(normalizeSettings({}).keeperPlaysThree).toBe(false);
+    });
+
+    test('turning the keeper rule on is a change worth pushing', () => {
+        expect(sameSettings({ keeperPlaysThree: true }, {})).toBe(false);
     });
 
     test('nothing at all gives the defaults', () => {
@@ -51,11 +61,11 @@ describe('normalizeSettings', () => {
         expect(normalizeSettings('9v9')).toEqual(DEFAULT_SETTINGS);
     });
 
-    test('only the four settings come back, whatever else was stored', () => {
+    test('only the known settings come back, whatever else was stored', () => {
         const result = normalizeSettings({ ageDivision: '10U', teamName: 'Sharks' });
 
         expect(Object.keys(result).sort()).toEqual(
-            ['ageDivision', 'fieldPlayers', 'formation', 'quarters']
+            ['ageDivision', 'fieldPlayers', 'formation', 'keeperPlaysThree', 'quarters']
         );
     });
 

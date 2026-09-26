@@ -15,6 +15,8 @@ export function GameSettings({
   onAgeDivisionChange,
   onFieldPlayersChange,
   onFormationChange,
+  keeperPlaysThree = false,
+  onKeeperPlaysThreeChange,
   onGenerateLineup,
   isGenerating,
   playerCount = 0,
@@ -172,6 +174,22 @@ export function GameSettings({
             </div>
           </div>
         </div>
+
+        <label htmlFor="keeperPlaysThree" className="flex items-start gap-2 text-xs cursor-pointer">
+          <input
+            type="checkbox"
+            id="keeperPlaysThree"
+            checked={keeperPlaysThree}
+            onChange={(e) => onKeeperPlaysThreeChange?.(e.target.checked)}
+            className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span>
+            <span className="font-medium text-foreground">Goalie must play 3+ quarters</span>
+            <span className="block text-muted-foreground">
+              A player sitting two quarters won't be put in goal, so nobody spends half their game resting and a quarter of it in goal.
+            </span>
+          </span>
+        </label>
 
         {/* Formation & Age Rules descriptions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
