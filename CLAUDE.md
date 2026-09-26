@@ -329,6 +329,14 @@ player leads a tie rather than trailing it — ordering on quarters played sorts
 someone with no quarters last. It stays on rest priority alone: a player who
 has sat nothing because he has played nothing must not be told to sit.
 
+Absences count once attendance is real. The engine hands the spare rest
+quarters (squad minus field, times four, rarely divides evenly) to whoever has
+spent least of the season off the field, and it measured that per game
+*attended*: a player who sat one quarter in two games and missed the third read
+as better rested than one who sat once in three, so he drew the extra quarter
+off after already losing a whole game. `restShare` in `lineup-engine.js` counts
+a missed game (absent or injured) as four quarters off.
+
 ### Correcting a game after it was played
 
 What was planned and what happened are rarely the same match: someone does not

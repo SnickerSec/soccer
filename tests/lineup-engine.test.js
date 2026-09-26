@@ -562,4 +562,33 @@ describe('multi-game rotation balancing with season stats', () => {
             expect(sits['Player 2']).toBe(2);
         }
     });
+
+    test('a missed game counts as time off, not as a game that never happened', () => {
+        // The season that reported it: Amos sat 1 in the 2 games he came to and
+        // missed the third. Per game attended that is the second-best rested
+        // record on the squad, so he kept drawing the extra quarter off -- after
+        // already losing a whole game of field time.
+        const season = {
+            Brady: [1, 3, 0], Henry: [3, 3, 0], Ephraim: [2, 3, 0], Amos: [1, 2, 1],
+            Kamu: [3, 3, 0], Jordan: [2, 2, 1], Brees: [2, 3, 0], Kevin: [2, 3, 0],
+            Elias: [3, 3, 0], Savior: [1, 1, 2]
+        };
+        const players = Object.keys(season).map(name => ({ name, status: 'available' }));
+        const seasonStats = {};
+        for (const [name, [totalSitting, gamesPlayed, gamesAbsent]] of Object.entries(season)) {
+            seasonStats[name] = { totalSitting, gamesPlayed, gamesAbsent };
+        }
+
+        // 12 sit slots at 7v7 across 10 players: two sit twice
+        for (let i = 0; i < 30; i++) {
+            const schedule = determineSittingSchedule(players, 7, QUARTERS, seasonStats);
+            const sits = {};
+            for (let q = 1; q <= 4; q++) {
+                schedule[q].forEach(name => { sits[name] = (sits[name] || 0) + 1; });
+            }
+            for (const name of ['Amos', 'Jordan', 'Savior']) {
+                expect(sits[name]).toBe(1);
+            }
+        }
+    });
 });

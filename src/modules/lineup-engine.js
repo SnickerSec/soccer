@@ -129,15 +129,26 @@ function balanceSittingByRating(schedule, playersCopy, players, playersOnField) 
     }
 }
 
-/** A player's average quarters sat per game so far this season. */
-function averageSitting(player, seasonStats) {
-    const stats = seasonStats[player.name] || { totalSitting: 0, gamesPlayed: 0 };
-    return stats.gamesPlayed > 0 ? stats.totalSitting / stats.gamesPlayed : 0;
+/**
+ * The share of a player's season spent off the field, from 0 to 1.
+ *
+ * A game missed (absent or injured) counts as four quarters off, not as no
+ * game at all. Averaging over games attended alone made a player who missed a
+ * week look well rested -- one sit in two games beats three in three -- so he
+ * was first in line for the extra quarter off, and the absence cost him field
+ * time twice over.
+ */
+function restShare(player, seasonStats, quarters) {
+    const stats = seasonStats?.[player.name] || {};
+    const missed = (stats.gamesAbsent || 0) + (stats.gamesInjured || 0);
+    const games = (stats.gamesPlayed || 0) + missed;
+    if (games === 0) return 0;
+    return ((stats.totalSitting || 0) + missed * quarters) / (games * quarters);
 }
 
-/** Coarse bucket of averageSitting, so near-equal players shuffle together. */
-function sittingGroup(player, seasonStats) {
-    return Math.round(averageSitting(player, seasonStats) * 2) / 2;
+/** Coarse bucket of restShare -- half a quarter a game -- so near-equal players shuffle together. */
+function restGroup(player, seasonStats, quarters) {
+    return Math.round(restShare(player, seasonStats, quarters) * quarters * 2) / (quarters * 2);
 }
 
 /** Every combination of `size` quarters drawn from 1..quarters. */
@@ -331,28 +342,15 @@ export function determineSittingSchedule(players, playersOnField, quarters, seas
     const mustRestPlayers = playersCopy.filter(p => p.mustRest);
     const regularPlayers = playersCopy.filter(p => !p.mustRest);
 
-    regularPlayers.sort((a, b) => {
-        const statsA = seasonStats?.[a.name] || { totalSitting: 0, gamesPlayed: 0 };
-        const statsB = seasonStats?.[b.name] || { totalSitting: 0, gamesPlayed: 0 };
-        const avgSitA = statsA.gamesPlayed > 0 ? statsA.totalSitting / statsA.gamesPlayed : 0;
-        const avgSitB = statsB.gamesPlayed > 0 ? statsB.totalSitting / statsB.gamesPlayed : 0;
-        return avgSitA - avgSitB;
-    });
-
-    shuffleWithinSimilarGroups(regularPlayers, (p) => {
-        const stats = seasonStats?.[p.name] || { totalSitting: 0, gamesPlayed: 0 };
-        return stats.gamesPlayed > 0 ? Math.round(stats.totalSitting / stats.gamesPlayed * 2) / 2 : 0;
-    });
-
     const totalSittingSlots = sittingPerQuarter * quarters;
     const minSitsPerPlayer = Math.floor(totalSittingSlots / totalPlayers);
     const playersWithExtraSit = totalSittingSlots % totalPlayers;
 
-    // Fairness order for the remainder: whoever has sat least across the season
-    // takes the extra quarter off first.
+    // Fairness order for the remainder: whoever has spent least of the season
+    // off the field -- missed games included -- takes the extra quarter off first.
     const playersForExtraSit = [...mustRestPlayers, ...regularPlayers];
-    playersForExtraSit.sort((a, b) => averageSitting(a, seasonStats) - averageSitting(b, seasonStats));
-    shuffleWithinSimilarGroups(playersForExtraSit, (p) => sittingGroup(p, seasonStats));
+    playersForExtraSit.sort((a, b) => restShare(a, seasonStats, quarters) - restShare(b, seasonStats, quarters));
+    shuffleWithinSimilarGroups(playersForExtraSit, (p) => restGroup(p, seasonStats, quarters));
 
     const targetSits = new Map();
     const avoidMap = new Map();
