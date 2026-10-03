@@ -506,6 +506,79 @@ describe('pushGame', () => {
             { id: 'local-1', name: 'vs Rovers' }
         ]);
     });
+    /*
+     * Queueing on navigator.onLine alone meant a game saved on a bar of LTE —
+     * the phone believes it is online, the request dies — was kept on the
+     * device only. sync() replaces local history with the server's list, so
+     * the next pull removed a game the coach had been told was saved.
+     */
+    test('a game the server fails on is queued rather than lost at the next pull', async () => {
+        gameResult = () => ({ success: false, status: 502, error: 'Bad gateway' });
+
+        const result = await pushGame({ id: 'local-1', name: 'vs Rovers' });
+
+        expect(result).toMatchObject({ success: false, queued: true });
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({
+                entityType: 'games',
+                action: 'save',
+                data: { id: 'local-1', name: 'vs Rovers' }
+            })
+        ]);
+    });
+
+    test('a game whose request never lands is queued', async () => {
+        gameResult = () => { throw new Error('Failed to fetch'); };
+
+        const result = await pushGame({ id: 'local-1', name: 'vs Rovers' });
+
+        expect(result).toMatchObject({ success: false, queued: true });
+        expect(remainingQueue()).toHaveLength(1);
+    });
+
+    test('a refusal that will never succeed is not parked in the queue', async () => {
+        gameResult = () => ({ success: false, status: 400, error: 'Game name is required' });
+        await pushGame({ id: 'local-1', name: '' });
+
+        gameResult = () => ({ success: false, status: 403, error: 'Insufficient permissions' });
+        const result = await pushGame({ id: 'local-2', name: 'vs Rovers' });
+
+        expect(result.queued).toBeUndefined();
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('the failed game reaches the server on the next drain', async () => {
+        gameResult = () => ({ success: false, status: 502, error: 'Bad gateway' });
+        await pushGame({ id: 'local-1', name: 'vs Rovers' });
+
+        gameResult = (game) => ({ success: true, data: { ...game, id: 'cloud-1' } });
+        calls = [];
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(calls).toEqual(['push:saveGame:vs Rovers']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a queued game the route will always refuse is dropped by the drain', async () => {
+        gameResult = () => ({ success: false, status: 403, error: 'Insufficient permissions' });
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a queued game the server failed on stays queued', async () => {
+        gameResult = () => ({ success: false, status: 500, error: 'Server error' });
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+
+        const result = await processQueue();
+
+        expect(result.processed).toBe(0);
+        expect(remainingQueue()).toHaveLength(1);
+    });
 });
 
 /**
@@ -693,6 +766,59 @@ describe('pushFixture', () => {
 
         expect(result.processed).toBe(0);
         expect(remainingQueue()).toHaveLength(1);
+    });
+
+    test('a match the server fails on is queued, since the pull replaces the schedule', async () => {
+        fixtureResult = () => ({ success: false, status: 502, error: 'Bad gateway' });
+
+        const result = await pushFixture({ id: 'local-1', opponent: 'Rovers' });
+
+        expect(result).toMatchObject({ success: false, queued: true });
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({
+                entityType: 'fixtures',
+                action: 'save',
+                data: { id: 'local-1', opponent: 'Rovers' }
+            })
+        ]);
+    });
+
+    test('a match whose request never lands is queued', async () => {
+        fixtureResult = () => { throw new Error('Failed to fetch'); };
+
+        const result = await pushFixture({ id: 'local-1', opponent: 'Rovers' });
+
+        expect(result).toMatchObject({ success: false, queued: true });
+        expect(remainingQueue()).toHaveLength(1);
+    });
+
+    test('a match the route will always refuse is neither queued nor kept by the drain', async () => {
+        fixtureResult = () => ({ success: false, status: 400, error: 'Opponent name is required' });
+
+        const result = await pushFixture({ id: 'local-1', opponent: '' });
+
+        expect(result.queued).toBeUndefined();
+        expect(remainingQueue()).toEqual([]);
+
+        fixtureResult = () => ({ success: false, status: 403, error: 'Insufficient permissions' });
+        queueEntries(queuedFixture({ id: 'local-2', opponent: 'Rovers' }));
+
+        const drained = await processQueue();
+
+        expect(drained.processed).toBe(1);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a failed match replays on the next drain and takes the server id', async () => {
+        setLocalFixtures([{ id: 'local-1', opponent: 'Rovers' }]);
+        fixtureResult = () => ({ success: false, status: 502, error: 'Bad gateway' });
+        await pushFixture({ id: 'local-1', opponent: 'Rovers' });
+
+        fixtureResult = (fixture) => ({ success: true, data: { ...fixture, id: 'cloud-fix-1' } });
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(localFixtures().map(f => f.id)).toEqual(['cloud-fix-1']);
     });
 
     test('without a team there is nothing to push to', async () => {

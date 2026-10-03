@@ -278,15 +278,26 @@ export async function pushPlayers(players, { renames } = {}) {
 
     updateStatus(SYNC_STATUS.SYNCING);
 
+    // Captured before the write: a successful one moves them on, and the queue
+    // entry has to describe what this edit was built against.
+    const context = { expectedVersion: rosterVersion, base: rosterBase, renames };
+
+    // A write that failed is queued like one made offline. sync() replaces the
+    // local roster with the server's, and nothing else would send this one
+    // again until the coach next edited — by which time the pull had reverted
+    // it. A lost conflict is not queued: the server's roster has already been
+    // adopted and the coach told. Nor is a refusal that will never succeed.
     try {
-        return await writeRoster(players, {
-            expectedVersion: rosterVersion,
-            base: rosterBase,
-            renames
-        });
+        const result = await writeRoster(players, context);
+        if (!result.success && !result.conflict && !refusalIsFinal(result.status)) {
+            queueChange('players', 'bulk_update', players, context);
+            return { ...result, queued: true };
+        }
+        return result;
     } catch (error) {
+        queueChange('players', 'bulk_update', players, context);
         updateStatus(SYNC_STATUS.ERROR);
-        return { success: false, error: error.message };
+        return { success: false, queued: true, error: error.message };
     }
 }
 
@@ -478,12 +489,19 @@ export async function pushGame(game) {
 
     updateStatus(SYNC_STATUS.SYNCING);
 
+    // A failed save is queued, not only an offline one. The phone at the field
+    // with a bar of LTE believes it is online, and the request dies; sync()
+    // replaces local history with the server's list, so a game kept nowhere
+    // but here was gone at the next pull — after the coach had been told it
+    // was saved.
     try {
         const result = await saveGame(currentTeamId, game);
 
         if (!result.success) {
             updateStatus(SYNC_STATUS.ERROR);
-            return result;
+            if (refusalIsFinal(result.status)) return result;
+            queueChange('games', 'save', game);
+            return { ...result, queued: true };
         }
 
         // Update local with cloud ID
@@ -498,8 +516,9 @@ export async function pushGame(game) {
         updateStatus(SYNC_STATUS.SYNCED);
         return result;
     } catch (error) {
+        queueChange('games', 'save', game);
         updateStatus(SYNC_STATUS.ERROR);
-        return { success: false, error: error.message };
+        return { success: false, queued: true, error: error.message };
     }
 }
 
@@ -629,34 +648,40 @@ export async function pushFixture(fixture) {
 
     updateStatus(SYNC_STATUS.SYNCING);
 
+    // Queued on a failed request as well as on no signal, for the reason
+    // pushGame is: the pull replaces the local schedule outright, so a match
+    // that never reached the server would be deleted by it.
     try {
         const result = await saveFixture(currentTeamId, fixture);
 
         if (!result.success) {
             updateStatus(SYNC_STATUS.ERROR);
-            return result;
+            if (refusalIsFinal(result.status)) return result;
+            queueChange('fixtures', 'save', fixture);
+            return { ...result, queued: true };
         }
 
         lastSyncTime = new Date();
         updateStatus(SYNC_STATUS.SYNCED);
         return result;
     } catch (error) {
+        queueChange('fixtures', 'save', fixture);
         updateStatus(SYNC_STATUS.ERROR);
-        return { success: false, error: error.message };
+        return { success: false, queued: true, error: error.message };
     }
 }
 
 /**
- * Whether the server's refusal of a batch is one that retrying cannot fix.
+ * Whether the server's refusal of a write is one that retrying cannot fix.
  *
- * 400 is the route's own validation — a batch over its limit, or a fixture
- * missing something it requires — and 403 is a viewer, who may not write the
- * schedule at all. Neither answer changes at the next drain, so keeping the
- * entry would cost a guaranteed-failing request before every pull, for the life
- * of the install. Every other branch of the drain already drops its dead ends;
- * this is the same judgement, named so both callers make it the same way.
+ * 400 is the route's own validation — a batch over its limit, or a game or
+ * fixture missing something it requires — and 403 is a viewer, who may not
+ * write at all. Neither answer changes at the next drain, so keeping the entry
+ * would cost a guaranteed-failing request before every pull, for the life of
+ * the install. Every push that queues a failed write, and every branch of the
+ * drain that replays one, makes this judgement here so they cannot drift.
  */
-function bulkImportIsHopeless(status) {
+function refusalIsFinal(status) {
     return status === 400 || status === 403;
 }
 
@@ -703,7 +728,7 @@ export async function pushFixturesBulk(fixtures) {
         const result = await bulkImportFixtures(currentTeamId, fixtures);
 
         if (!result.success) {
-            if (!bulkImportIsHopeless(result.status)) {
+            if (!refusalIsFinal(result.status)) {
                 queueChange('fixtures', 'bulk_save', fixtures);
             }
             updateStatus(SYNC_STATUS.ERROR);
@@ -992,14 +1017,14 @@ export async function processQueue() {
                     base: item.base,
                     renames: item.renames
                 });
-                if (result.success) {
+                if (result.success || refusalIsFinal(result.status)) {
                     processed++;
                 } else {
                     remaining.push(item);
                 }
             } else if (item.entityType === 'games' && item.action === 'save') {
                 const result = await saveGame(currentTeamId, item.data);
-                if (result.success) {
+                if (result.success || refusalIsFinal(result.status)) {
                     processed++;
                 } else {
                     remaining.push(item);
@@ -1023,7 +1048,9 @@ export async function processQueue() {
                 }
             } else if (item.entityType === 'fixtures' && item.action === 'save') {
                 const result = await saveFixture(currentTeamId, item.data);
-                if (result.success) {
+                if (refusalIsFinal(result.status)) {
+                    processed++;
+                } else if (result.success) {
                     // The server issues the id, and the local copy still
                     // holds the one this device made up. Adopting
                     // the real one here is what lets a later edit or delete
@@ -1046,7 +1073,7 @@ export async function processQueue() {
                         });
                     }
                     processed++;
-                } else if (bulkImportIsHopeless(result.status)) {
+                } else if (refusalIsFinal(result.status)) {
                     // A batch the route will refuse every time — too many, or
                     // one bad fixture — was retried at every drain for good.
                     // This branch was alone in keeping its dead ends.

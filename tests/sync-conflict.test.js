@@ -356,3 +356,94 @@ describe('a rename riding along with the roster', () => {
         expect(writes[0].renames).toEqual(renames);
     });
 });
+
+/**
+ * A roster write that fails online, rather than one made with no signal.
+ *
+ * pushPlayers queued only when navigator.onLine said so. A phone at the field
+ * with a bar of LTE believes it is online, and the request dies: the edit was
+ * on the device and nowhere else, nothing would send it again until the coach
+ * next edited, and sync() replaces the local roster with the server's — so the
+ * next pull reverted it.
+ */
+describe('a roster write that fails in flight', () => {
+    const queue = () => JSON.parse(store['ayso_sync_queue'] || '[]');
+
+    test('is queued against the version it was built on', async () => {
+        await signedInWithRoster();
+        replies.push({ success: false, status: 502, error: 'Bad gateway' });
+
+        const result = await pushPlayers([player('Ana'), player('Ben')]);
+
+        expect(result).toMatchObject({ success: false, queued: true });
+        const [entry] = queue();
+        expect(entry).toMatchObject({ entityType: 'players', action: 'bulk_update', expectedVersion: 4 });
+        expect(names(entry.data)).toEqual(['Ana', 'Ben']);
+        expect(names(entry.base)).toEqual(['Ana']);
+    });
+
+    test('is queued when the request throws', async () => {
+        await signedInWithRoster();
+        const original = replies;
+        // replaceRoster throwing, as fetch does when the connection drops
+        replies = { shift: () => { throw new Error('Failed to fetch'); } };
+
+        const result = await pushPlayers([player('Ana'), player('Ben')]);
+
+        replies = original;
+        expect(result).toMatchObject({ success: false, queued: true });
+        expect(queue()).toHaveLength(1);
+    });
+
+    test('carries its renames into the queue, and replays them once', async () => {
+        await signedInWithRoster();
+        const renames = [{ from: 'Ana', to: 'Anastasia' }];
+        replies.push({ success: false, status: 503, error: 'Unavailable' });
+
+        await pushPlayers([player('Anastasia')], { renames });
+        writes = [];
+
+        const { processQueue } = await import('../src/modules/sync.js');
+        await processQueue();
+
+        expect(writes).toHaveLength(1);
+        expect(writes[0].renames).toEqual(renames);
+        expect(queue()).toEqual([]);
+    });
+
+    test('is not queued when it lost a conflict, which the coach has been told about', async () => {
+        await signedInWithRoster();
+        replies.push({ success: false, conflict: true, version: 9, data: [player('Ana'), player('Cleo')] });
+        replies.push({ success: false, conflict: true, version: 12, data: [player('Ana'), player('Dev')] });
+
+        const result = await pushPlayers([player('Ana'), player('Ben')]);
+
+        expect(result.conflict).toBe(true);
+        expect(result.queued).toBeUndefined();
+        expect(queue()).toEqual([]);
+    });
+
+    test('is not queued when the server will refuse it every time', async () => {
+        await signedInWithRoster();
+        replies.push({ success: false, status: 403, error: 'Insufficient permissions' });
+
+        const result = await pushPlayers([player('Ana'), player('Ben')]);
+
+        expect(result.queued).toBeUndefined();
+        expect(queue()).toEqual([]);
+    });
+
+    test('a queued roster from a coach who has since become a viewer is dropped', async () => {
+        await signedInWithRoster();
+        store['ayso_sync_queue'] = JSON.stringify([
+            { entityType: 'players', action: 'bulk_update', data: [player('Ana')], expectedVersion: 4, timestamp: 1 }
+        ]);
+        replies.push({ success: false, status: 403, error: 'Insufficient permissions' });
+
+        const { processQueue } = await import('../src/modules/sync.js');
+        const result = await processQueue();
+
+        expect(result.processed).toBe(1);
+        expect(queue()).toEqual([]);
+    });
+});

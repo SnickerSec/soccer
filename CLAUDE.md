@@ -497,7 +497,16 @@ that could not be synced, which reads like a retry, and then a schedule that
 looked right for the rest of the afternoon. 400 and 403 are the exceptions,
 because the route refuses an oversized batch, an invalid fixture and a viewer
 every time; the drain drops those for the same reason, which it had not been
-doing — `bulkImportIsHopeless` is where both now decide it.
+doing — `refusalIsFinal` is where both now decide it.
+
+That rule holds for every push now, not only the batch. `pushGame`,
+`pushFixture` and `pushPlayers` had the same `navigator.onLine`-only test, so a
+game saved after the final whistle on a bar of LTE was toasted as saved, sat in
+Game History until the next pull, and was then replaced out of existence by the
+server's list. Each queues a failed or thrown write and says `queued: true`;
+`pushPlayers` leaves out a lost conflict, whose server roster has already been
+adopted and reported. A queued roster write carries its renames, so App holds
+them for retry only when the write was not queued.
 
 A fixtures pull that fails is not fatal: the roster and the season history are
 what the app is for, and refusing to sync them because the schedule 500'd is

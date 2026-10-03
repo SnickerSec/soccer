@@ -319,7 +319,10 @@ export default function App() {
       .then((result) => {
         if (!result) return;
         if (result.success === false) {
-          keepForRetry();
+          // A queued write carries its renames with it; holding them here too
+          // would send them a second time on the next push, against a roster
+          // that already has the new names.
+          if (!result.queued) keepForRetry();
           return;
         }
         // Players another coach edited at the same time, which the merge
@@ -1276,6 +1279,13 @@ export default function App() {
       // local one straight back, so the swap has to happen here too.
       pushGame(gameEntry)
         .then((result) => {
+          // Queued is fine — it goes out on the next drain. A refusal that
+          // will never succeed is not queued, and the next pull will take the
+          // game off this device, so the coach has to hear it now.
+          if (result && !result.success && !result.queued && result.error !== 'No team selected') {
+            toast.error(`"${name}" is saved on this device only: ${result.error || 'the server refused it'}`);
+            return;
+          }
           const saved = result?.success && result.data;
           if (!saved || result.data.id === gameEntry.id) return;
           setGameHistory((prev) =>
