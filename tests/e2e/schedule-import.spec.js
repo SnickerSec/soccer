@@ -59,6 +59,16 @@ END:VCALENDAR`;
     await expect(page.locator('#schedule-tab')).toContainText('Lightning');
     await expect(page.locator('#schedule-tab')).toContainText('Sharks');
     await expect(page.locator('#schedule-tab')).toContainText('Kapiolani Park Field 1');
+
+    // Check accessible names (aria-label) on icon-only buttons
+    const shareBtn = page.locator('button[aria-label*="Copy parent reminder memo"]').first();
+    const icsBtn = page.locator('button[aria-label*="Download calendar invite"]').first();
+    const editBtn = page.locator('button[aria-label*="Edit match details"]').first();
+    const deleteBtn = page.locator('button[aria-label*="Delete match against"]').first();
+    await expect(shareBtn).toBeVisible();
+    await expect(icsBtn).toBeVisible();
+    await expect(editBtn).toBeVisible();
+    await expect(deleteBtn).toBeVisible();
   });
 
   // A TeamSnap "one calendar" export: CRLF, tab-folded lines, every DTSTART in
@@ -270,5 +280,48 @@ END:VCALENDAR`;
     const panel = page.locator('#schedule-tab');
     await expect(panel).toContainText('50%');
     await expect(panel).toContainText('Snack Coverage (1/2 assigned)');
+  });
+
+  test('completed filter displays contextual empty state when upcoming matches exist', async ({ page }) => {
+    const sampleIcs = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Shinguard//Empty State Test//EN
+BEGIN:VEVENT
+UID:evt-1@ayso.test
+DTSTART:20290912T090000Z
+SUMMARY:Thunder vs Lightning
+END:VEVENT
+BEGIN:VEVENT
+UID:evt-2@ayso.test
+DTSTART:20290919T090000Z
+SUMMARY:Thunder vs Sharks
+END:VEVENT
+END:VCALENDAR`;
+
+    await page.goto('/');
+    await page.click('#schedule-tab-btn');
+
+    // Import sample schedule with upcoming matches
+    await page.locator('#scheduleFileInput').setInputFiles({
+      name: 'season.ics',
+      mimeType: 'text/calendar',
+      buffer: Buffer.from(sampleIcs, 'utf-8'),
+    });
+    await page.click('#confirmScheduleImportBtn');
+    await expect(page.locator('#scheduleImportModal')).not.toBeVisible();
+
+    // Switch to Completed filter
+    await page.click('button:has-text("Completed (0)")');
+
+    // Contextual empty state must appear rather than the global "No matches scheduled" card
+    const completedEmpty = page.locator('#completedEmptyState');
+    await expect(completedEmpty).toBeVisible();
+    await expect(completedEmpty).toContainText('No completed matches yet');
+    await expect(completedEmpty).toContainText('You currently have 2 upcoming matches');
+
+    // Clicking View Upcoming Matches switches back to upcoming view
+    await page.click('#viewUpcomingMatchesBtn');
+    await expect(completedEmpty).not.toBeVisible();
+    await expect(page.locator('#schedule-tab')).toContainText('vs Lightning');
   });
 });

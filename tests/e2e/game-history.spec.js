@@ -47,6 +47,8 @@ test.describe('Game history', () => {
 
         // Re-open the saved game from history, then put it back on the field
         await page.click('#season-tab-btn');
+        const deleteGameBtn = page.locator('.game-history-item button[data-action="delete-game"]').first();
+        await expect(deleteGameBtn).toHaveAttribute('aria-label', /^Delete game record for/);
         await page.locator('.game-history-item button[data-action="view-game"]').first().click();
         await expect(page.locator('#editGameModal')).toBeVisible();
         await page.click('#openGameOnField');

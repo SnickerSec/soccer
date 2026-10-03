@@ -468,18 +468,19 @@ export function ScheduleTab({
           </CardHeader>
           <CardContent className="p-4">
             <ScrollArea className="w-full">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b">
-                  <tr>
-                    <th className="p-2">Player / Family</th>
-                    <th className="p-2 text-center">Halftime Fruit</th>
-                    <th className="p-2 text-center">Post-Game Snack</th>
-                    <th className="p-2 text-center">Referee / Lines</th>
-                    <th className="p-2 text-center">Field Setup</th>
-                    <th className="p-2 text-center">Total Duties</th>
-                    <th className="p-2">Assigned Matches</th>
-                  </tr>
-                </thead>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left min-w-[600px]">
+                  <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b">
+                    <tr>
+                      <th className="p-2 whitespace-nowrap">Player / Family</th>
+                      <th className="p-2 text-center whitespace-nowrap">Halftime Fruit</th>
+                      <th className="p-2 text-center whitespace-nowrap">Post-Game Snack</th>
+                      <th className="p-2 text-center whitespace-nowrap">Referee / Lines</th>
+                      <th className="p-2 text-center whitespace-nowrap">Field Setup</th>
+                      <th className="p-2 text-center whitespace-nowrap">Total Duties</th>
+                      <th className="p-2 whitespace-nowrap">Assigned Matches</th>
+                    </tr>
+                  </thead>
                 <tbody className="divide-y divide-border">
                   {volunteerStats.playerList.map((playerStat) => (
                     <tr key={playerStat.name} className="hover:bg-muted/30 transition-colors">
@@ -519,6 +520,7 @@ export function ScheduleTab({
                   )}
                 </tbody>
               </table>
+              </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </CardContent>
@@ -528,26 +530,66 @@ export function ScheduleTab({
       {/* Match Fixtures Cards */}
       <div className="space-y-3">
         {filteredFixtures.length === 0 ? (
-          <Card className="border-dashed p-8 text-center bg-card/50">
-            <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-60" />
-            <h4 className="text-base font-semibold text-foreground">No matches scheduled</h4>
-            <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
-              Add your upcoming AYSO season games to manage kickoff times, locations, jersey colors, and snack duty rotations.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button size="sm" onClick={onAddFixture} className="text-xs">
-                <Plus className="h-4 w-4 mr-1" /> Schedule First Match
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleUploadScheduleClick}
-                className="text-xs"
-              >
-                <UploadCloud className="h-4 w-4 mr-1" /> Import Calendar (.ics / CSV)
-              </Button>
-            </div>
-          </Card>
+          fixtures.length === 0 ? (
+            <Card className="border-dashed p-8 text-center bg-card/50">
+              <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-60" />
+              <h4 className="text-base font-semibold text-foreground">No matches scheduled</h4>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
+                Add your upcoming AYSO season games to manage kickoff times, locations, jersey colors, and snack duty rotations.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button size="sm" onClick={onAddFixture} className="text-xs">
+                  <Plus className="h-4 w-4 mr-1" /> Schedule First Match
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleUploadScheduleClick}
+                  className="text-xs"
+                >
+                  <UploadCloud className="h-4 w-4 mr-1" /> Import Calendar (.ics / CSV)
+                </Button>
+              </div>
+            </Card>
+          ) : filter === 'completed' ? (
+            <Card className="border-dashed p-8 text-center bg-card/50" id="completedEmptyState">
+              <CalendarCheck className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-60" />
+              <h4 className="text-base font-semibold text-foreground">No completed matches yet</h4>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
+                Matches marked completed will appear here with final scores and volunteer duties. You currently have {upcomingFixtures.length} upcoming {upcomingFixtures.length === 1 ? 'match' : 'matches'}.
+              </p>
+              <div className="flex justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setFilter('upcoming')}
+                  className="text-xs"
+                  id="viewUpcomingMatchesBtn"
+                >
+                  View Upcoming Matches ({upcomingFixtures.length})
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card className="border-dashed p-8 text-center bg-card/50" id="upcomingEmptyState">
+              <CalendarCheck className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-60" />
+              <h4 className="text-base font-semibold text-foreground">All scheduled matches completed</h4>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
+                You have completed all {completedFixtures.length} {completedFixtures.length === 1 ? 'match' : 'matches'} on your schedule.
+              </p>
+              <div className="flex justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setFilter('completed')}
+                  className="text-xs"
+                  id="viewCompletedMatchesBtn"
+                >
+                  View Completed Matches ({completedFixtures.length})
+                </Button>
+              </div>
+            </Card>
+          )
         ) : (
           filteredFixtures.map((fixture) => {
             const isCompleted = fixture.status === 'completed';
@@ -687,6 +729,7 @@ export function ScheduleTab({
                       className="text-xs h-8 px-2"
                       onClick={() => handleShareMemo(fixture)}
                       title="Copy parent reminder memo to clipboard"
+                      aria-label={`Copy parent reminder memo for match against ${fixture.opponent || 'opponent'}`}
                     >
                       <Share2 className="h-3.5 w-3.5" />
                     </Button>
@@ -696,6 +739,7 @@ export function ScheduleTab({
                       className="text-xs h-8 px-2"
                       onClick={() => handleDownloadSingleIcs(fixture)}
                       title="Download calendar (.ics) invite"
+                      aria-label={`Download calendar invite for match against ${fixture.opponent || 'opponent'}`}
                     >
                       <CalendarPlus className="h-3.5 w-3.5" />
                     </Button>
@@ -705,6 +749,7 @@ export function ScheduleTab({
                       className="text-xs h-8 px-2 text-muted-foreground hover:text-foreground"
                       onClick={() => onEditFixture && onEditFixture(fixture)}
                       title="Edit match details"
+                      aria-label={`Edit match details for match against ${fixture.opponent || 'opponent'}`}
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </Button>
@@ -714,6 +759,7 @@ export function ScheduleTab({
                       className="text-xs h-8 px-2 text-muted-foreground hover:text-destructive"
                       onClick={() => onDeleteFixture && onDeleteFixture(fixture)}
                       title="Delete match"
+                      aria-label={`Delete match against ${fixture.opponent || 'opponent'}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

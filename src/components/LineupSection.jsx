@@ -89,7 +89,9 @@ export function LineupSection({
     setMobileQuarter((prev) => {
       const next = prev === 'all' ? 2 : prev === 4 ? 1 : prev + 1;
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try { navigator.vibrate(15); } catch (_) {}
+        try { navigator.vibrate(15); } catch (_) {
+          // Ignore vibration failures when unsupported or blocked by browser permissions
+        }
       }
       return next;
     });
@@ -99,7 +101,9 @@ export function LineupSection({
     setMobileQuarter((prev) => {
       const prevQ = prev === 'all' ? 4 : prev === 1 ? 4 : prev - 1;
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try { navigator.vibrate(15); } catch (_) {}
+        try { navigator.vibrate(15); } catch (_) {
+          // Ignore vibration failures when unsupported or blocked by browser permissions
+        }
       }
       return prevQ;
     });
@@ -465,7 +469,8 @@ export function LineupSection({
                 <CardContent className="p-3 flex-1 flex flex-col justify-between space-y-3">
                   {/* Position Table */}
                   {viewMode !== 'pitch' && (
-                    <table className="w-full text-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
                       <tbody>
                       {canonicalPositions.map((posName) => {
                         const playerVal = positions[posName];
@@ -506,7 +511,9 @@ export function LineupSection({
                               e.currentTarget.classList.add('dragging');
                               try {
                                 e.dataTransfer.setData('text/plain', JSON.stringify(slotObj));
-                              } catch (_) {}
+                              } catch (_) {
+                                // Fallback when clipboard dataTransfer is restricted by platform
+                              }
                               e.dataTransfer.effectAllowed = 'move';
                             }}
                             onDragEnd={(e) => {
@@ -530,7 +537,9 @@ export function LineupSection({
                               if (!from) {
                                 try {
                                   from = JSON.parse(e.dataTransfer.getData('text/plain'));
-                                } catch (_) {}
+                                } catch (_) {
+                                  // Fallback when clipboard data cannot be parsed
+                                }
                               }
                               activeDragSlot = null;
                               window._draggedSlot = null;
@@ -605,7 +614,9 @@ export function LineupSection({
                               e.currentTarget.classList.add('dragging');
                               try {
                                 e.dataTransfer.setData('text/plain', JSON.stringify(slotObj));
-                              } catch (_) {}
+                              } catch (_) {
+                                // Fallback when clipboard dataTransfer is restricted by platform
+                              }
                               e.dataTransfer.effectAllowed = 'move';
                             }}
                             onDragEnd={(e) => {
@@ -629,7 +640,9 @@ export function LineupSection({
                               if (!from) {
                                 try {
                                   from = JSON.parse(e.dataTransfer.getData('text/plain'));
-                                } catch (_) {}
+                                } catch (_) {
+                                  // Fallback when clipboard data cannot be parsed
+                                }
                               }
                               activeDragSlot = null;
                               window._draggedSlot = null;
@@ -666,6 +679,7 @@ export function LineupSection({
                       })}
                     </tbody>
                   </table>
+                  </div>
                   )}
 
                   {/* Field Pitch Diagram */}

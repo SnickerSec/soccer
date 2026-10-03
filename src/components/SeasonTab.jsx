@@ -308,6 +308,7 @@ export function SeasonTab({
                       onClick={() => onDeleteGame(game.id)}
                       className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 btn-delete-game"
                       title="Delete game"
+                      aria-label={`Delete game record for ${game.name || 'this game'}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

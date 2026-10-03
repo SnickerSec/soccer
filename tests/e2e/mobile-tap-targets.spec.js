@@ -115,6 +115,21 @@ test.describe('Mobile tap targets', () => {
         });
     }
 
+    test('the schedule tab volunteer duty matrix never scrolls the page sideways', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#generateLineup');
+        await page.click('#schedule-tab-btn');
+        await page.click('button:has-text("Volunteer Duty Matrix")');
+        await expect(page.locator('text=Season Volunteer Duty Roster')).toBeVisible();
+
+        const width = await page.evaluate(() => ({
+            content: document.documentElement.scrollWidth,
+            viewport: document.documentElement.clientWidth,
+        }));
+        expect(width.content).toBeLessThanOrEqual(width.viewport);
+    });
+
     /**
      * Nine buttons, each clamped to a 44px tap target by the touch rule in
      * index.css, wrapped into a 174px sticky block — a fifth of an iPhone
@@ -205,4 +220,44 @@ test.describe('Mobile tap targets', () => {
         );
         expect(tooSmall).toEqual([]);
     });
+
+    test('custom formation modal controls meet minimum tap targets and do not overflow page', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#openCustomFormation');
+
+        const modal = page.locator('#customFormationModal');
+        await expect(modal).toBeVisible();
+
+        // Check that modal does not cause page-level horizontal overflow
+        const width = await page.evaluate(() => ({
+            content: document.documentElement.scrollWidth,
+            viewport: document.documentElement.clientWidth,
+        }));
+        expect(width.content).toBeLessThanOrEqual(width.viewport);
+
+        // Check inputs inside custom formation modal are at least 16px font-size
+        const inputs = await modal.locator('input, select').evaluateAll((els) =>
+            els.map((el) => parseFloat(getComputedStyle(el).fontSize))
+        );
+        for (const size of inputs) {
+            expect(size).toBeGreaterThanOrEqual(16);
+        }
+
+        // Check position chips meet minimum tap targets (using layout dimensions to avoid animation scaling)
+        const chips = modal.locator('button:has-text("Center Back"), button:has-text("Striker")');
+        await expect(chips.first()).toBeVisible();
+        const dimensions = await chips.evaluateAll((els) =>
+            els.map((el) => ({
+                height: el.offsetHeight,
+                width: el.offsetWidth,
+            }))
+        );
+        expect(dimensions.length).toBeGreaterThan(0);
+        for (const dim of dimensions) {
+            expect(dim.height).toBeGreaterThanOrEqual(MIN_TAP);
+            expect(dim.width).toBeGreaterThanOrEqual(MIN_TAP);
+        }
+    });
 });
+

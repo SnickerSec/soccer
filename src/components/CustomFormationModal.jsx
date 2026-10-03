@@ -162,7 +162,7 @@ export function CustomFormationModal({
                 placeholder="e.g. 3-1-2-1 Diamond"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="text-xs h-8"
+                className="text-sm h-9"
                 required
               />
             </div>
@@ -180,7 +180,7 @@ export function CustomFormationModal({
                   // Reset positions to keep Keeper + slice
                   setSelectedPositions(['Keeper']);
                 }}
-                className="flex h-8 w-full rounded-md border border-input bg-card px-3 py-1 text-xs shadow-sm text-foreground"
+                className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-sm text-foreground"
               >
                 <option value={5}>5v5 (5 Players)</option>
                 <option value={6}>6v6 (6 Players)</option>
@@ -199,7 +199,7 @@ export function CustomFormationModal({
                 placeholder="e.g. Strong midfield control with solo forward"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="text-xs h-8"
+                className="text-sm h-9"
               />
             </div>
           </div>
@@ -243,9 +243,9 @@ export function CustomFormationModal({
                         variant={isSelected ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => togglePosition(pos)}
-                        className="h-6 px-2 text-[10px]"
+                        className="h-8 md:h-7 px-3 text-xs font-medium gap-1.5 touch-manipulation transition-all"
                       >
-                        {isSelected && <Check className="h-2.5 w-2.5 mr-1" />}
+                        {isSelected && <Check className="h-3.5 w-3.5 mr-1" />}
                         {pos}
                       </Button>
                     );
@@ -268,9 +268,9 @@ export function CustomFormationModal({
                         variant={isSelected ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => togglePosition(pos)}
-                        className="h-6 px-2 text-[10px]"
+                        className="h-8 md:h-7 px-3 text-xs font-medium gap-1.5 touch-manipulation transition-all"
                       >
-                        {isSelected && <Check className="h-2.5 w-2.5 mr-1" />}
+                        {isSelected && <Check className="h-3.5 w-3.5 mr-1" />}
                         {pos}
                       </Button>
                     );
@@ -293,9 +293,9 @@ export function CustomFormationModal({
                         variant={isSelected ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => togglePosition(pos)}
-                        className="h-6 px-2 text-[10px]"
+                        className="h-8 md:h-7 px-3 text-xs font-medium gap-1.5 touch-manipulation transition-all"
                       >
-                        {isSelected && <Check className="h-2.5 w-2.5 mr-1" />}
+                        {isSelected && <Check className="h-3.5 w-3.5 mr-1" />}
                         {pos}
                       </Button>
                     );
@@ -341,10 +341,11 @@ export function CustomFormationModal({
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(f.name, f.fieldSize)}
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive touch-manipulation"
                         title="Delete formation"
+                        aria-label={`Delete custom formation ${f.name}`}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
@@ -356,7 +357,7 @@ export function CustomFormationModal({
       </ScrollArea>
 
         <DialogFooter className="pt-3 border-t flex flex-row items-center justify-between">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs">
+          <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs h-9">
             Cancel
           </Button>
 
@@ -367,7 +368,7 @@ export function CustomFormationModal({
             onClick={handleSave}
             disabled={!name.trim() || !isComplete}
             id="saveCustomFormation"
-            className="text-xs font-semibold flex items-center gap-1.5"
+            className="text-xs font-semibold flex items-center gap-1.5 h-9"
           >
             <Plus className="h-3.5 w-3.5" /> Save & Apply Formation
           </Button>

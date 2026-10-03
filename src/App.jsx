@@ -407,7 +407,15 @@ export default function App() {
     const canWrite = currentTeamRef.current?.role !== 'viewer';
     if (push && canWrite && currentUserRef.current && currentTeamRef.current
         && !sameSettings(previous, next)) {
-      pushSettings(next).catch(() => {});
+      pushSettings(next)
+        .then((result) => {
+          if (result && !result.success && !result.queued && result.error !== 'No team selected') {
+            toast.error(`Team settings saved locally only: ${result.error || 'the server refused them'}`);
+          }
+        })
+        .catch(() => {
+          toast.error('Failed to sync team settings to cloud');
+        });
     }
   }, []);
 
@@ -511,7 +519,9 @@ export default function App() {
     if (!currentUser || !themeAdoptedRef.current) return;
     if (syncedThemeRef.current === theme) return;
     syncedThemeRef.current = theme;
-    updateUserSettings({ theme }).catch(() => {});
+    updateUserSettings({ theme }).catch(() => {
+      // Swallowed intentionally: theme preference is non-critical and will resync on next session
+    });
   }, [theme, currentUser]);
 
   useEffect(() => {
@@ -547,6 +557,7 @@ export default function App() {
         }
       } catch (err) {
         console.error('Auth/Sync init error:', err);
+        toast.error('Could not initialize cloud sync. Working in offline mode.');
       }
     };
     setupAuth();
@@ -1298,7 +1309,9 @@ export default function App() {
             prev.map((g) => (g.id === gameEntry.id ? { ...g, ...result.data } : g))
           );
         })
-        .catch(() => {});
+        .catch(() => {
+          toast.error(`"${name}" could not be synced to cloud: network error`);
+        });
     }
 
     toast.success(`Saved game: "${name}"`);
@@ -1321,8 +1334,13 @@ export default function App() {
           // team's, so the row survived and the next sync brought it back — and
           // queues the delete when there is no signal to send it over.
           try {
-            await pushGameDelete(gameId);
-          } catch (e) {}
+            const result = await pushGameDelete(gameId);
+            if (result && !result.success && !result.queued && result.error !== 'No team selected') {
+              toast.error(`Game deleted locally only: ${result.error || 'the server refused it'}`);
+            }
+          } catch (e) {
+            toast.error('Failed to sync game deletion to cloud');
+          }
         }
 
         toast.info('Game deleted');
@@ -1368,7 +1386,15 @@ export default function App() {
     });
 
     if (currentUser && currentTeam) {
-      pushGameUpdate(gameId, updates).catch(() => {});
+      pushGameUpdate(gameId, updates)
+        .then((result) => {
+          if (result && !result.success && !result.queued && result.error !== 'No team selected') {
+            toast.error(`Game updated locally only: ${result.error || 'the server refused it'}`);
+          }
+        })
+        .catch(() => {
+          toast.error('Failed to sync game update to cloud');
+        });
     }
 
     toast.success('Game updated');
@@ -1384,7 +1410,15 @@ export default function App() {
     // Notes stayed on the device until this: the next sync replaced local
     // history with the server's copy and took them with it.
     if (currentUser && currentTeam) {
-      pushGameUpdate(gameId, { notes }).catch(() => {});
+      pushGameUpdate(gameId, { notes })
+        .then((result) => {
+          if (result && !result.success && !result.queued && result.error !== 'No team selected') {
+            toast.error(`Notes saved locally only: ${result.error || 'the server refused them'}`);
+          }
+        })
+        .catch(() => {
+          toast.error('Failed to sync notes to cloud');
+        });
     }
 
     toast.success('Game notes saved');
@@ -1435,7 +1469,15 @@ export default function App() {
         // went straight to the API inside a catch that only logged, so a match
         // rescheduled with no signal never left the device — and the next pull
         // put the old kick-off time back.
-        pushFixtureUpdate(fixtureData.id, fixtureData).catch(() => {});
+        pushFixtureUpdate(fixtureData.id, fixtureData)
+          .then((res) => {
+            if (res && !res.success && !res.queued && res.error !== 'No team selected') {
+              toast.error(`Match update saved locally only: ${res.error || 'the server refused it'}`);
+            }
+          })
+          .catch(() => {
+            toast.error('Failed to sync match update to cloud');
+          });
       }
     } else {
       const newFixture = {
@@ -1475,7 +1517,15 @@ export default function App() {
         if (currentUser && currentTeam && fixture.id) {
           // Queues the delete when there is no signal, and drops the creation
           // instead if the match has not reached the server yet.
-          pushFixtureDelete(fixture.id).catch(() => {});
+          pushFixtureDelete(fixture.id)
+            .then((res) => {
+              if (res && !res.success && !res.queued && res.error !== 'No team selected') {
+                toast.error(`Match deleted locally only: ${res.error || 'the server refused it'}`);
+              }
+            })
+            .catch(() => {
+              toast.error('Failed to sync match deletion to cloud');
+            });
         }
         toast.info('Match deleted');
       },
