@@ -1207,9 +1207,9 @@ export default function App() {
    * names on the roster every week — which is also what the balancing in
    * handleGenerateLineup was reading.
    */
-  const gameRosterSnapshot = () => {
+  const gameRosterSnapshot = (playerStats = lineup?.playerStats) => {
     const played = new Map(
-      (lineup?.playerStats || []).map((p) => [p.name, p])
+      (playerStats || []).map((p) => [p.name, p])
     );
     const roster = (playersRef.current && playersRef.current.length > 0)
       ? playersRef.current
@@ -1229,8 +1229,33 @@ export default function App() {
     }));
   };
 
-  const handleSaveGame = ({ name, date }) => {
+  /**
+   * `quarters` is the lineup as it was actually played, when that differs
+   * from the one on screen — the live match dialog subs players on its own
+   * copy. It used to save the planned lineup regardless, so every sub made at
+   * the touchline was missing from Game History and from the season stats.
+   */
+  const handleSaveGame = ({ name, date, quarters: playedQuarters }) => {
     if (!lineup) return;
+
+    let quarters = lineup.quarters;
+    let playerStats = lineup.playerStats;
+    if (playedQuarters) {
+      // Recounted from what was played, over the players who were here, the
+      // same way a swap recounts — and the screen is brought up to date, so
+      // the Lineup tab shows the match that was saved rather than the plan.
+      const present = players.filter((p) => !p.status || p.status === 'available');
+      quarters = playedQuarters;
+      playerStats = recalculateGamePlayers(present, playedQuarters, { captains });
+      setLineup({
+        ...lineup,
+        quarters,
+        playerStats,
+        warnings: validateLineup(playerStats, settings.quarters || 4, {
+          keeperPlaysThree: settings.keeperPlaysThree,
+        }),
+      });
+    }
 
     const gameEntry = {
       id: `game-${Date.now()}`,
@@ -1240,8 +1265,8 @@ export default function App() {
       division: settingsRef.current.ageDivision,
       formation: lineup.formation || settingsRef.current.formation,
       fieldPlayers: lineup.fieldPlayers || settingsRef.current.fieldPlayers,
-      quarters: lineup.quarters,
-      players: gameRosterSnapshot(),
+      quarters,
+      players: gameRosterSnapshot(playerStats),
       captains: [...captains],
       notes: '',
       createdAt: new Date().toISOString(),

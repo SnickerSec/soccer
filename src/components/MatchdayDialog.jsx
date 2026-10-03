@@ -29,6 +29,7 @@ import {
 import { FieldVisualization } from '@/components/FieldVisualization';
 import { playWhistleSound } from '@/modules/whistle-audio';
 import { todayLocalDate } from '@/modules/schedule';
+import { sittingInQuarter } from '@/modules/lineup-engine';
 import { toast } from 'sonner';
 
 export function MatchdayDialog({
@@ -96,7 +97,10 @@ export function MatchdayDialog({
   ) || activeLineup.quarters[activeQuarter - 1] || {};
 
   const positions = currentQData.positions || {};
-  const sitting = currentQData.sitting || [];
+  // Worked out from the squad when the quarter does not list it — a lineup
+  // reopened from Game History or a shared link does not — or the bench was
+  // empty and nobody could be subbed on.
+  const sitting = sittingInQuarter(currentQData, activeLineup.playerStats || players);
 
   const formatTime = (totalSeconds) => {
     const mins = Math.floor(totalSeconds / 60);
@@ -158,6 +162,8 @@ export function MatchdayDialog({
       if (qIndex === -1) return prev;
 
       const q = updated.quarters[qIndex];
+      // The bench as shown, so the sub below has a list to swap within
+      q.sitting = [...sittingInQuarter(q, updated.playerStats || players)];
       // Find which position fieldPlayerName plays
       let fieldPos = null;
       for (const [pos, val] of Object.entries(q.positions || {})) {
@@ -203,6 +209,8 @@ export function MatchdayDialog({
       onSaveGame({
         name: `vs ${opponentName || 'Opponent'} (${homeScore}-${awayScore})`,
         date: fixture?.gameDate || todayLocalDate(),
+        // As played, subs and all — not the lineup this dialog was opened with
+        quarters: activeLineup.quarters,
       });
     }
     toast.success('Match completed and game saved!');

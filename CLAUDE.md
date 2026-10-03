@@ -382,6 +382,13 @@ snapshot still carrying `isCaptain` credits a captain game for a match they
 missed. Nobody may hold two positions in one quarter — `assignToSlot` clears
 the other one — or that quarter is counted twice against one afternoon.
 
+A swap on the Lineup tab and a sub in the live match change the lineup too, and
+both recount through `recalculateGamePlayers` over the players who are present.
+The swap had a loop of its own that took the whole roster, so an absent player
+sat all four quarters; the live match saved the lineup it was opened with, so
+every sub was missing from the game that went into history. Finishing a match
+hands `handleSaveGame` the quarters as played.
+
 The rotation warnings are shown and never enforced. A match that broke the
 "everyone plays" rules is still what happened, and the record has to be able to
 say so.

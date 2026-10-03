@@ -120,3 +120,76 @@ test.describe('Live Matchday from the schedule', () => {
         expect(errors).toEqual([]);
     });
 });
+
+/**
+ * A sub made during the match is part of the game that gets saved.
+ *
+ * The dialog subs players on its own copy of the lineup, and finishing the
+ * match saved the lineup the dialog had been opened with — so every sub was
+ * missing from Game History and from the season stats.
+ */
+test('a sub made during the match is in the game that is saved', async ({ page }) => {
+    await page.goto('/');
+    await page.click('#demoButton');
+    await page.click('#generateLineup');
+
+    await page.locator('#openMatchday').click();
+    const dialog = page.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible();
+
+    // Quarter 1: take the first player on the field off for the first on the bench
+    const fieldRow = dialog.locator('.max-h-44 [role="button"]').first();
+    const position = (await fieldRow.locator('span').first().textContent()).replace(':', '').trim();
+    await fieldRow.click();
+    const subButton = dialog.getByText('Sub for:').locator('..').getByRole('button').first();
+    const benchName = (await subButton.textContent()).trim();
+    await subButton.click();
+
+    await dialog.getByRole('button', { name: /Save Game Record/i }).click();
+    await expect(dialog).not.toBeVisible();
+
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('ayso_lineup_history'))[0]);
+    const firstQuarter = saved.quarters.find(q => q.quarter === 1) || saved.quarters[0];
+    expect(firstQuarter.positions[position]).toBe(benchName);
+
+    // The counts the season stats read are recounted from it, not the plan
+    const row = saved.players.find(p => p.name === benchName);
+    expect(row.quartersPlayed).toContain(1);
+    expect(row.quartersSitting).not.toContain(1);
+
+    // And the Lineup tab shows the match that was saved
+    await expect(page.locator(`#lineupGrid tr[data-quarter="1"][data-position="${position}"]`))
+        .toHaveAttribute('data-player', benchName);
+});
+
+/**
+ * The bench is worked out when the lineup does not list it. A game reopened
+ * from Game History carries only who took the field, so the bench was empty
+ * and nobody could be subbed on.
+ */
+test('a lineup reopened from Game History still has a bench to sub from', async ({ page }) => {
+    await page.goto('/');
+    await page.click('#demoButton');
+    await page.click('#generateLineup');
+
+    // Save the game, strip its resting lists the way an older save has none,
+    // and reopen it on the field
+    await page.locator('.action-buttons-inline [data-action="saveGame"]').click();
+    await page.fill('#saveGameName', 'vs Hawks');
+    await page.click('#confirmSaveGame');
+    await page.evaluate(() => {
+        const history = JSON.parse(localStorage.getItem('ayso_lineup_history'));
+        history.forEach(g => g.quarters.forEach(q => { delete q.sitting; }));
+        localStorage.setItem('ayso_lineup_history', JSON.stringify(history));
+    });
+    await page.reload();
+    await page.click('#loadSavedGame');
+    await page.locator('#loadGameModal [data-action="load-game"]').first().click();
+
+    await page.locator('#openMatchday').click();
+    const dialog = page.locator('[role="dialog"]');
+    await dialog.locator('.max-h-44 [role="button"]').first().click();
+
+    await expect(dialog.getByText('Sub for:')).toBeVisible();
+    expect(await dialog.getByText('Sub for:').locator('..').getByRole('button').count()).toBe(3);
+});
