@@ -46,6 +46,7 @@ import {
   formationHasMidfieldLine,
 } from '@/modules/formations';
 import { generateLineup, validateLineup, sittingInQuarter } from '@/modules/lineup-engine';
+import { recalculateGamePlayers } from '@/modules/game-edit';
 import { rosterPushDecision } from '@/modules/roster-push-guard';
 import { calculatePlayerStats, currentQuarters, currentPlayerPositions } from '@/modules/season-stats';
 import {
@@ -1155,35 +1156,14 @@ export default function App() {
     setVal(qFrom, fromPosition, toVal);
     setVal(qTo, toPosition, fromVal);
 
-    // Reconstruct updated players and re-validate
-    const updatedPlayers = JSON.parse(JSON.stringify(players));
-    updatedPlayers.forEach((p) => {
-      p.quartersPlayed = [];
-      p.quartersSitting = [];
-      p.positionsPlayed = [];
-      p.defensiveQuarters = 0;
-      p.offensiveQuarters = 0;
-    });
-
-    newQuarters.forEach((quarter) => {
-      const onField = new Set(Object.values(quarter.positions));
-      for (const [pos, pName] of Object.entries(quarter.positions)) {
-        const p = updatedPlayers.find((pl) => pl.name === pName);
-        if (p) {
-          const qNum = quarter.quarter || 1;
-          if (!p.quartersPlayed.includes(qNum)) p.quartersPlayed.push(qNum);
-          p.positionsPlayed.push({ quarter: qNum, position: pos });
-          if (pos === 'Keeper' || pos.includes('Back')) p.defensiveQuarters++;
-          else p.offensiveQuarters++;
-        }
-      }
-      updatedPlayers.forEach((p) => {
-        const qNum = quarter.quarter || 1;
-        if (!onField.has(p.name)) {
-          if (!p.quartersSitting.includes(qNum)) p.quartersSitting.push(qNum);
-        }
-      });
-    });
+    // Recounted from the edited quarters the way a corrected game is, which
+    // mirrors the engine, and over the players generation was given: the ones
+    // who are here. A loop of its own counted everyone on the roster who was
+    // not on the field as sitting, so an absent player sat all four quarters —
+    // four rotation warnings and a Player Summary row for someone who was not
+    // there, and four sat quarters in the season stats once the game was saved.
+    const present = players.filter((p) => !p.status || p.status === 'available');
+    const updatedPlayers = recalculateGamePlayers(present, newQuarters, { captains });
 
     const warnings = validateLineup(updatedPlayers, settings.quarters || 4, {
       keeperPlaysThree: settings.keeperPlaysThree,

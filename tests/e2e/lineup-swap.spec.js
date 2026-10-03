@@ -227,3 +227,35 @@ test.describe('The two swap paths together', () => {
             .not.toHaveClass(/swap-selected/);
     });
 });
+
+/**
+ * A swap recounts the whole lineup. It used to count everyone on the roster who
+ * was not on the field as sitting, so a player marked absent sat all four
+ * quarters: four rotation notices for someone who was not there, and four sat
+ * quarters in the season stats once the game was saved.
+ */
+test('a swap does not count an absent player as sitting', async ({ page }) => {
+    await page.goto('/');
+    await page.click('#demoButton');
+
+    const absentRow = page.locator('#playerList .player-status-select').first();
+    const absentName = await absentRow.getAttribute('data-player');
+    await absentRow.selectOption('absent');
+
+    await page.click('#generateLineup');
+    await expect(page.locator('.quarter-lineup').first()).toBeVisible({ timeout: 20000 });
+
+    const before = await readQuarter(page);
+    const [first, second] = Object.keys(before);
+    await page.locator(`tr[data-quarter="1"][data-position="${first}"]`).click();
+    await page.locator(`tr[data-quarter="1"][data-position="${second}"]`).click();
+    await expect.poll(async () => (await readQuarter(page))[first]).toBe(before[second]);
+
+    // Whatever else the swap broke, nothing may be said about the absent player
+    const display = page.locator('#lineupDisplay');
+    await expect(display).not.toContainText(`${absentName} sits`);
+    await expect(display).not.toContainText('sits for 4 quarters');
+    // Nor does the swap give them a row in the Player Summary, which a freshly
+    // generated lineup does not
+    await expect(display).not.toContainText(absentName);
+});
