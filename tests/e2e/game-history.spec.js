@@ -68,6 +68,32 @@ test.describe('Game history', () => {
         expect(restored.rows).toBe(9);
     });
 
+    test('the Lineup tab loads a saved game without visiting the Season tab', async ({ page }) => {
+        // Nothing to load until a game is saved
+        await expect(page.locator('#loadSavedGame')).toHaveCount(0);
+
+        await saveGameAt(page, { division: '12U', name: 'vs Hawks', date: '2026-03-28' });
+        const savedLineup = await page.locator('#lineupGrid tr[data-quarter="1"]')
+            .evaluateAll(rows => rows.map(r => `${r.dataset.position}=${r.dataset.player}`));
+
+        // Move on to a fresh lineup at another division
+        await page.selectOption('#ageDivision', '10U');
+        await page.click('#generateLineup');
+        await expect(page.locator('#fieldPlayers')).toHaveValue('7');
+
+        await page.click('#loadSavedGame');
+        await expect(page.locator('#loadGameModal')).toBeVisible();
+        await page.locator('#loadGameModal [data-action="load-game"]', { hasText: 'vs Hawks' }).click();
+        await expect(page.locator('#loadGameModal')).toBeHidden();
+
+        await expect(page.locator('#roster-tab')).toBeVisible();
+        await expect(page.locator('#ageDivision')).toHaveValue('12U');
+        await expect(page.locator('#fieldPlayers')).toHaveValue('9');
+        const loadedLineup = await page.locator('#lineupGrid tr[data-quarter="1"]')
+            .evaluateAll(rows => rows.map(r => `${r.dataset.position}=${r.dataset.player}`));
+        expect(loadedLineup).toEqual(savedLineup);
+    });
+
     test('notes open in a dialog rather than a browser prompt', async ({ page }) => {
         await saveGameAt(page, { division: '10U', name: 'vs Lions', date: '2026-03-21' });
 

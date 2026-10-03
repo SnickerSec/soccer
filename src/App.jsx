@@ -8,6 +8,7 @@ import { ScheduleTab } from '@/components/ScheduleTab';
 import { EvaluationTab } from '@/components/EvaluationTab';
 import { TeamModal } from '@/components/TeamModal';
 import { SaveGameModal } from '@/components/SaveGameModal';
+import { LoadGameDialog } from '@/components/LoadGameDialog';
 import { EditGameModal } from '@/components/EditGameModal';
 import { GameNotesModal } from '@/components/GameNotesModal';
 import { MatchdayDialog } from '@/components/MatchdayDialog';
@@ -186,6 +187,7 @@ export default function App() {
   const [teamModalInitialTeamId, setTeamModalInitialTeamId] = useState(null);
   const [teamModalInitialView, setTeamModalInitialView] = useState('list');
   const [isSaveGameOpen, setIsSaveGameOpen] = useState(false);
+  const [isLoadGameOpen, setIsLoadGameOpen] = useState(false);
   const [isMatchdayOpen, setIsMatchdayOpen] = useState(false);
   const [isCustomFormationOpen, setIsCustomFormationOpen] = useState(false);
   const [isFixtureModalOpen, setIsFixtureModalOpen] = useState(false);
@@ -1637,6 +1639,8 @@ export default function App() {
             isGenerating={isGenerating}
             playerCount={players.length}
             onOpenCustomFormation={() => setIsCustomFormationOpen(true)}
+            savedGameCount={gameHistory.length}
+            onLoadSavedGame={() => setIsLoadGameOpen(true)}
           />
 
           {/* Lineup Section */}
@@ -1747,6 +1751,13 @@ export default function App() {
         isOpen={isSaveGameOpen}
         onClose={() => setIsSaveGameOpen(false)}
         onSave={handleSaveGame}
+      />
+
+      <LoadGameDialog
+        isOpen={isLoadGameOpen}
+        onClose={() => setIsLoadGameOpen(false)}
+        gameHistory={gameHistory}
+        onLoad={handleOpenGameOnField}
       />
 
       <MatchdayDialog

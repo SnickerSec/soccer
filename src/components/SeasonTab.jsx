@@ -23,7 +23,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { calculatePlayerStats, getLineupRecommendations } from '@/modules/season-stats';
-import { parseLocalDate } from '@/modules/schedule';
+import { formatGameDate } from '@/modules/schedule';
 import { PlayerHeatmapCard } from './PlayerHeatmapCard';
 import { RosterEditor } from './RosterEditor';
 import {
@@ -35,19 +35,6 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formationHasMidfieldLine } from '@/modules/formations';
 import { cn } from '@/lib/utils';
-
-/**
- * A saved game's date, however it was written down: 'YYYY-MM-DD' from the save
- * dialog, an ISO timestamp from a game that has been through the cloud, or a
- * locale string from an old local save. Anything unreadable is shown as it was
- * stored rather than as "Invalid Date".
- */
-function formatDisplayDate(dateStr) {
-  if (!dateStr) return 'Recent';
-  const date = parseLocalDate(dateStr);
-  if (Number.isNaN(date.getTime())) return String(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 export function SeasonTab({
   formation,
@@ -276,7 +263,7 @@ export function SeasonTab({
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1 game-date">
-                        <Calendar className="h-3 w-3" /> {formatDisplayDate(game.date)}
+                        <Calendar className="h-3 w-3" /> {formatGameDate(game.date)}
                       </span>
                       {game.notes && (
                         <span className="game-notes italic max-w-[200px] truncate">

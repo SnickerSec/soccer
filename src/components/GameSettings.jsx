@@ -6,7 +6,7 @@ import {
   getFormationsForFieldSize,
   getFormationDescription,
 } from '@/modules/formations';
-import { Play, Sparkles } from 'lucide-react';
+import { History, Play, Sparkles } from 'lucide-react';
 
 export function GameSettings({
   ageDivision,
@@ -21,6 +21,8 @@ export function GameSettings({
   isGenerating,
   playerCount = 0,
   onOpenCustomFormation,
+  savedGameCount = 0,
+  onLoadSavedGame,
 }) {
   const availableFormations = getFormationsForFieldSize(fieldPlayers);
   const formationDesc = getFormationDescription(fieldPlayers, formation);
@@ -64,21 +66,35 @@ export function GameSettings({
             Configure division, field size, and tactical formation
           </p>
         </div>
-        <Button
-          type="button"
-          id="generateLineup"
-          size="default"
-          onClick={onGenerateLineup}
-          className="flex w-full shrink-0 items-center justify-center gap-1.5 shadow-sm sm:w-auto"
-          aria-label="Generate lineup based on current players and settings"
-        >
-          {isGenerating ? (
-            <Sparkles className="h-4 w-4 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4 fill-current" />
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+          {savedGameCount > 0 && (
+            <Button
+              type="button"
+              id="loadSavedGame"
+              variant="outline"
+              onClick={onLoadSavedGame}
+              className="flex w-full items-center justify-center gap-1.5 sm:w-auto"
+            >
+              <History className="h-4 w-4" />
+              <span>Load Saved Game</span>
+            </Button>
           )}
-          <span>{isGenerating ? 'Generating...' : 'Generate Lineup'}</span>
-        </Button>
+          <Button
+            type="button"
+            id="generateLineup"
+            size="default"
+            onClick={onGenerateLineup}
+            className="flex w-full shrink-0 items-center justify-center gap-1.5 shadow-sm sm:w-auto"
+            aria-label="Generate lineup based on current players and settings"
+          >
+            {isGenerating ? (
+              <Sparkles className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 fill-current" />
+            )}
+            <span>{isGenerating ? 'Generating...' : 'Generate Lineup'}</span>
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="pt-4 space-y-4">

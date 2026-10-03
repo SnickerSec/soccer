@@ -26,6 +26,19 @@ export function parseLocalDate(dateStr) {
 }
 
 /**
+ * A saved game's date, however it was written down: 'YYYY-MM-DD' from the save
+ * dialog, an ISO timestamp from a game that has been through the cloud, or a
+ * locale string from an old local save. Anything unreadable is shown as it was
+ * stored rather than as "Invalid Date".
+ */
+export function formatGameDate(dateStr) {
+    if (!dateStr) return 'Recent';
+    const date = parseLocalDate(dateStr);
+    if (Number.isNaN(date.getTime())) return String(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/**
  * Today as the coach's calendar reads it, 'YYYY-MM-DD'.
  *
  * `new Date().toISOString()` is the UTC day, and everywhere this app is used
