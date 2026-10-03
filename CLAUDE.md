@@ -59,6 +59,19 @@ against a `postgres:18` service container. The database is truncated between
 tests, so the harness refuses any `TEST_DATABASE_URL` whose database name does
 not contain "test".
 
+Truncating between tests also means two runs against one database wreck each
+other — a team deleted under a test that just created it, a seeded user that
+collides with the other run's. That happened with two checkouts of this repo
+running `test:db` against `soccer_test` at once, and it read as eight failing
+invite tests in a route with nothing wrong. `tests/integration/helpers/run-lock.js`
+holds a PostgreSQL advisory lock for the whole run, so a second run waits for
+the first and says so. A checkout on an older commit does not take the lock, so
+give a worktree its own database if it might run alongside another.
+
+If `postgres://localhost/...` asks for a password, the local server accepts
+peer authentication over its socket instead:
+`TEST_DATABASE_URL="postgres:///soccer_test?host=/var/run/postgresql"`.
+
 `npm run test:e2e` downloads the Chromium build Playwright needs on first run,
 via the `pretest:e2e` hook — roughly 300MB once, then a ~0.5s no-op. Keep
 Playwright reasonably current: older versions resolve distro-pinned browser
