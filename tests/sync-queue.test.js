@@ -1802,3 +1802,75 @@ describe('processQueue run twice at once', () => {
         ]);
     });
 });
+
+/**
+ * A push folds an edit into a creation that is still queued, and drops the
+ * creation when the record is deleted — there is no row to address yet. Once
+ * the drain has picked the creation up there is, or is about to be: an edit
+ * folded in then went nowhere, and a deleted game had already been created,
+ * so the next pull brought it back.
+ */
+describe('a creation changed while the drain is sending it', () => {
+    beforeEach(signInWithTeam);
+
+    test('an edit made meanwhile reaches the server, in the same drain', async () => {
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+        let edits = [];
+        gameUpdateResult = (gameId, updates) => { edits.push({ gameId, updates }); return { success: true }; };
+        gameResult = async (game) => {
+            globalThis.navigator = { onLine: false };
+            await pushGameUpdate('local-1', { notes: 'Won 3-1' });
+            globalThis.navigator = { onLine: true };
+            return { success: true, data: { ...game, id: 'cloud-1' } };
+        };
+
+        await processQueue();
+
+        expect(edits).toEqual([{ gameId: 'cloud-1', updates: { notes: 'Won 3-1' } }]);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a delete made meanwhile removes what was just created', async () => {
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+        gameResult = async (game) => {
+            globalThis.navigator = { onLine: false };
+            await pushGameDelete('local-1');
+            globalThis.navigator = { onLine: true };
+            return { success: true, data: { ...game, id: 'cloud-1' } };
+        };
+
+        await processQueue();
+
+        expect(calls).toEqual(['push:saveGame:vs Rovers', 'push:deleteGame:cloud-1']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('an edit to one match of an imported batch goes to that match', async () => {
+        queueEntries(queuedFixturesBulk([
+            { id: 'local-1', opponent: 'Rovers' },
+            { id: 'local-2', opponent: 'United' }
+        ]));
+        let edits = [];
+        fixtureUpdateResult = (fixtureId, updates) => { edits.push({ fixtureId, updates }); return { success: true }; };
+        bulkFixturesResult = async (fixtures) => {
+            globalThis.navigator = { onLine: false };
+            await pushFixtureUpdate('local-2', { location: 'Kaha Park' });
+            globalThis.navigator = { onLine: true };
+            return { success: true, data: fixtures.map((f, i) => ({ ...f, id: `cloud-bulk-${i + 1}` })) };
+        };
+
+        await processQueue();
+
+        expect(edits).toEqual([{ fixtureId: 'cloud-bulk-2', updates: { location: 'Kaha Park' } }]);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a creation nobody touched leaves nothing behind', async () => {
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+
+        await processQueue();
+
+        expect(calls).toEqual(['push:saveGame:vs Rovers']);
+        expect(remainingQueue()).toEqual([]);
+    });
+});

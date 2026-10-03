@@ -78,6 +78,12 @@ Playwright reasonably current: older versions resolve distro-pinned browser
 builds and fail on newer Linux releases with "does not support chromium on
 <distro>".
 
+The e2e server listens on `PORT`, 3000 by default, and Playwright will not reuse
+one already there. When another checkout is serving on 3000 the run fails
+wholesale with "http://localhost:3000 is already used" — or, if that server
+starts partway through, as dozens of unrelated failures. `PORT=3917 npm run
+test:e2e` sidesteps it.
+
 ## Architecture
 
 This is an AYSO Soccer Lineup Generator web application with a Node.js/Express
@@ -536,7 +542,12 @@ rather than calling `sync()` beside it, which would race the pull ahead of the
 drain. `processQueue` runs one drain at a time, and when it finishes it writes
 back the queue as it is *then*, less what it sent — a push that queued, folded
 into or dropped an entry while the drain was sending used to be overwritten by
-the copy the drain read at the start.
+the copy the drain read at the start. A creation the drain is already sending
+is the one entry folding cannot reach: an edit folded into it went nowhere, and
+a delete that dropped it left the server's new row for the next pull to bring
+back. `landedCreationChanges` turns either into an update or delete addressed
+to the id the server just issued, and the drain sends it before returning, so
+the pull that follows already has it.
 
 A fixtures pull that fails is not fatal: the roster and the season history are
 what the app is for, and refusing to sync them because the schedule 500'd is

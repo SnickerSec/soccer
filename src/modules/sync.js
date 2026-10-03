@@ -1053,6 +1053,10 @@ async function drainQueue() {
 
     let processed = 0;
     const remaining = [];
+    // The creations this drain landed, by qid: which server id each local
+    // record came back with. A push can fold an edit into one, or drop it,
+    // while it is in flight, and the end of the drain has to pass that on.
+    const created = new Map();
 
     for (const item of queue) {
         // Each entry goes to the team it was made against. An entry from a
@@ -1078,6 +1082,9 @@ async function drainQueue() {
             } else if (item.entityType === 'games' && item.action === 'save') {
                 const result = await saveGame(teamId, item.data);
                 if (result.success || refusalIsFinal(result.status)) {
+                    if (result.success) {
+                        created.set(item.qid, { [item.data?.id]: result.data?.id });
+                    }
                     processed++;
                 } else {
                     remaining.push(item);
@@ -1110,6 +1117,7 @@ async function drainQueue() {
                     // name a row the server has heard of — without it they
                     // 404, and the pull hands the match back.
                     adoptFixtureId(item.data?.id, result.data);
+                    created.set(item.qid, { [item.data?.id]: result.data?.id });
                     processed++;
                 } else {
                     remaining.push(item);
@@ -1117,14 +1125,17 @@ async function drainQueue() {
             } else if (item.entityType === 'fixtures' && item.action === 'bulk_save') {
                 const result = await bulkImportFixtures(teamId, item.data);
                 if (result.success) {
+                    const ids = {};
                     if (Array.isArray(result.data)) {
                         result.data.forEach((saved, index) => {
                             const localId = item.data[index]?.id;
                             if (localId && saved?.id) {
                                 adoptFixtureId(localId, saved);
+                                ids[localId] = saved.id;
                             }
                         });
                     }
+                    created.set(item.qid, ids);
                     processed++;
                 } else if (refusalIsFinal(result.status)) {
                     // A batch the route will refuse every time — too many, or
@@ -1187,10 +1198,70 @@ async function drainQueue() {
     const kept = new Set(remaining.map(item => item.qid));
     const read = new Set(queue.map(item => item.qid));
     const current = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
-    safeSetToStorage('ayso_sync_queue', JSON.stringify(
-        current.filter(item => !read.has(item.qid) || kept.has(item.qid))
-    ));
+    const followUps = landedCreationChanges(queue, current, created);
+    safeSetToStorage('ayso_sync_queue', JSON.stringify([
+        ...current.filter(item => !read.has(item.qid) || kept.has(item.qid)),
+        ...followUps
+    ]));
+
+    // Sent now rather than at the next drain: the caller pulls next, and a
+    // pull ahead of them would show the game without the notes just typed.
+    if (followUps.length > 0) {
+        const again = await drainQueue();
+        processed += again.processed;
+    }
     return { success: true, processed };
+}
+
+/**
+ * What a push did to a creation while the drain was sending it.
+ *
+ * pushGameUpdate and pushFixtureUpdate fold an edit into a creation that is
+ * still queued, and the delete pair drops one — there is no row yet to address.
+ * But a creation the drain has picked up is already on its way: an edit folded
+ * into it then went nowhere, and a dropped one had already been created, so the
+ * next pull brought it back. Each becomes an ordinary update or delete, now
+ * addressed to the id the server issued.
+ */
+function landedCreationChanges(read, current, created) {
+    const followUps = [];
+    const nowById = new Map(current.map(item => [item.qid, item]));
+
+    for (const sent of read) {
+        const ids = created.get(sent.qid);
+        if (!ids) continue;
+
+        const before = Array.isArray(sent.data) ? sent.data : [sent.data];
+        const now = nowById.get(sent.qid);
+        const after = now ? (Array.isArray(now.data) ? now.data : [now.data]) : [];
+        const afterById = new Map(after.map(record => [record?.id, record]));
+
+        for (const record of before) {
+            const cloudId = ids[record?.id];
+            if (!cloudId) continue;
+            const context = { teamId: sent.teamId };
+            const changed = afterById.get(record.id);
+
+            if (!changed) {
+                followUps.push(followUp(sent.entityType, 'delete', { id: cloudId }, context));
+                continue;
+            }
+            const updates = {};
+            for (const [key, value] of Object.entries(changed)) {
+                if (key !== 'id' && JSON.stringify(value) !== JSON.stringify(record[key])) {
+                    updates[key] = value;
+                }
+            }
+            if (Object.keys(updates).length > 0) {
+                followUps.push(followUp(sent.entityType, 'update', { id: cloudId, updates }, context));
+            }
+        }
+    }
+    return followUps;
+}
+
+function followUp(entityType, action, data, { teamId }) {
+    return { qid: newQueueId(), entityType, action, data, teamId, timestamp: Date.now() };
 }
 
 /**
