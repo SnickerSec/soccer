@@ -154,6 +154,13 @@ export async function setCurrentTeam(teamId) {
     // Save as default team
     await updateUserSettings({ default_team_id: teamId });
 
+    // Drained before the pull, as initSync and the 'online' handler do. The
+    // pull replaces local storage with this team's copy, so a game saved
+    // against it on a bar of LTE and still queued would vanish from the device
+    // until some later drain put it on the server. Each entry carries its own
+    // team, so draining after the switch still sends it to the right one.
+    await processQueue();
+
     // Sync with new team
     return await sync();
 }
@@ -316,10 +323,19 @@ export async function pushPlayers(players, { renames } = {}) {
  * Retried once only: a second rejection means a third writer is active, and
  * looping would keep rebasing on a roster that keeps moving.
  */
-async function writeRoster(players, { expectedVersion, base, renames }) {
+async function writeRoster(players, { expectedVersion, base, renames, teamId = currentTeamId }) {
+    // A queued roster for a team that is no longer open still goes to its own
+    // team, but what comes back is that team's roster: it must not become this
+    // device's roster, nor the version the open team's next write claims.
+    const adopt = (data, version) => {
+        if (teamId !== currentTeamId) return;
+        rememberRoster(data, version);
+        safeSetToStorage('ayso_players', JSON.stringify(data));
+    };
+
     // One atomic replace. Doing this as a delete followed by an upload left
     // the roster empty if the second request never landed.
-    const result = await replaceRoster(currentTeamId, players, expectedVersion, renames);
+    const result = await replaceRoster(teamId, players, expectedVersion, renames);
 
     if (!result.conflict) {
         if (!result.success) {
@@ -327,8 +343,7 @@ async function writeRoster(players, { expectedVersion, base, renames }) {
             return result;
         }
 
-        rememberRoster(result.data, result.version);
-        safeSetToStorage('ayso_players', JSON.stringify(result.data));
+        adopt(result.data, result.version);
 
         lastSyncTime = new Date();
         updateStatus(SYNC_STATUS.SYNCED);
@@ -350,13 +365,12 @@ async function writeRoster(players, { expectedVersion, base, renames }) {
     // kept. See surviveMerge.
     const { renames: keptRenames, roster, dropped } = surviveMerge(merged, renames);
 
-    const retry = await replaceRoster(currentTeamId, roster, result.version, keptRenames);
+    const retry = await replaceRoster(teamId, roster, result.version, keptRenames);
 
     if (!retry.success) {
         // Includes a second conflict: hand back the server's roster so the
         // caller can show what is actually there rather than a stale local one.
-        rememberRoster(result.data, result.version);
-        safeSetToStorage('ayso_players', JSON.stringify(result.data));
+        adopt(result.data, result.version);
         updateStatus(SYNC_STATUS.ERROR);
         return {
             success: false,
@@ -366,8 +380,7 @@ async function writeRoster(players, { expectedVersion, base, renames }) {
         };
     }
 
-    rememberRoster(retry.data, retry.version);
-    safeSetToStorage('ayso_players', JSON.stringify(retry.data));
+    adopt(retry.data, retry.version);
 
     lastSyncTime = new Date();
     updateStatus(SYNC_STATUS.SYNCED);
@@ -941,6 +954,7 @@ function queueSettings(teamId, settings) {
         item.entityType === 'settings' && (item.teamId || teamId) === teamId
     ));
     remaining.push({
+        qid: newQueueId(),
         entityType: 'settings',
         action: 'update',
         teamId,
@@ -971,9 +985,15 @@ function adoptFixtureId(localId, saved) {
 function queueChange(entityType, action, data, context = {}) {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
     queue.push({
+        qid: newQueueId(),
         entityType,
         action,
         data,
+        // The team this was made against. A create replayed to whichever team
+        // is open when the drain runs would land in the wrong one after a
+        // switch; an edit or delete names its row by id and would not, but
+        // stamping them all costs nothing and leaves no entry to reason about.
+        teamId: currentTeamId,
         // What the edit was built on, so a replay hours later can be merged
         // against whatever happened in between rather than overwriting it.
         // Absent on entries queued by an older version of this code.
@@ -984,9 +1004,31 @@ function queueChange(entityType, action, data, context = {}) {
 }
 
 /**
+ * An id for a queue entry, so the drain can tell which entries it read from
+ * the ones a push added, folded into or dropped while it was sending.
+ */
+function newQueueId() {
+    return `q-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
  * Process queued changes when back online
  */
-export async function processQueue() {
+let drainInFlight = null;
+
+/**
+ * Replay the queue. One drain at a time: startup, the 'online' event and a
+ * team switch can all ask for one, and two running together would each send
+ * every entry.
+ */
+export function processQueue() {
+    if (!drainInFlight) {
+        drainInFlight = drainQueue().finally(() => { drainInFlight = null; });
+    }
+    return drainInFlight;
+}
+
+async function drainQueue() {
     const queue = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
     if (queue.length === 0) {
         return { success: true, processed: 0 };
@@ -1002,10 +1044,20 @@ export async function processQueue() {
         return { success: false, processed: 0 };
     }
 
+    // Entries from an older build have no qid. They get one before anything is
+    // awaited, so the merge at the end can recognise them.
+    if (queue.some(item => !item.qid)) {
+        queue.forEach(item => { if (!item.qid) item.qid = newQueueId(); });
+        safeSetToStorage('ayso_sync_queue', JSON.stringify(queue));
+    }
+
     let processed = 0;
     const remaining = [];
 
     for (const item of queue) {
+        // Each entry goes to the team it was made against. An entry from a
+        // build that stamped no team goes to the open one, as it always did.
+        const teamId = item.teamId || currentTeamId;
         try {
             if (item.entityType === 'players' && item.action === 'bulk_update') {
                 // Through the same merge as a live save. An entry recorded
@@ -1015,7 +1067,8 @@ export async function processQueue() {
                 const result = await writeRoster(item.data, {
                     expectedVersion: item.expectedVersion,
                     base: item.base,
-                    renames: item.renames
+                    renames: item.renames,
+                    teamId
                 });
                 if (result.success || refusalIsFinal(result.status)) {
                     processed++;
@@ -1023,7 +1076,7 @@ export async function processQueue() {
                     remaining.push(item);
                 }
             } else if (item.entityType === 'games' && item.action === 'save') {
-                const result = await saveGame(currentTeamId, item.data);
+                const result = await saveGame(teamId, item.data);
                 if (result.success || refusalIsFinal(result.status)) {
                     processed++;
                 } else {
@@ -1047,7 +1100,7 @@ export async function processQueue() {
                     remaining.push(item);
                 }
             } else if (item.entityType === 'fixtures' && item.action === 'save') {
-                const result = await saveFixture(currentTeamId, item.data);
+                const result = await saveFixture(teamId, item.data);
                 if (refusalIsFinal(result.status)) {
                     processed++;
                 } else if (result.success) {
@@ -1062,7 +1115,7 @@ export async function processQueue() {
                     remaining.push(item);
                 }
             } else if (item.entityType === 'fixtures' && item.action === 'bulk_save') {
-                const result = await bulkImportFixtures(currentTeamId, item.data);
+                const result = await bulkImportFixtures(teamId, item.data);
                 if (result.success) {
                     if (Array.isArray(result.data)) {
                         result.data.forEach((saved, index) => {
@@ -1102,7 +1155,7 @@ export async function processQueue() {
                 // To the team the change was made against, not whichever one
                 // is open now. An entry from a build that stamped no team is
                 // replayed the old way rather than dropped.
-                const result = await saveTeamSettings(item.teamId || currentTeamId, item.data);
+                const result = await saveTeamSettings(teamId, item.data);
                 // 403 is a viewer, who cannot change how the team plays, and
                 // 404 a team that has since been deleted. Neither improves by
                 // being retried at every drain from here on.
@@ -1126,7 +1179,17 @@ export async function processQueue() {
         }
     }
 
-    safeSetToStorage('ayso_sync_queue', JSON.stringify(remaining));
+    // The queue as it is now, not as it was read: a push may have queued a
+    // failed write while this was sending, folded an edit into an entry, or
+    // dropped one. Writing back only what was left of the first read lost all
+    // three. What survives is every entry now stored, less the ones this drain
+    // finished.
+    const kept = new Set(remaining.map(item => item.qid));
+    const read = new Set(queue.map(item => item.qid));
+    const current = safeParseJSON(safeGetFromStorage('ayso_sync_queue'), []);
+    safeSetToStorage('ayso_sync_queue', JSON.stringify(
+        current.filter(item => !read.has(item.qid) || kept.has(item.qid))
+    ));
     return { success: true, processed };
 }
 

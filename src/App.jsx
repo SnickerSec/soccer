@@ -64,7 +64,6 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   initSync,
-  sync,
   pushPlayers,
   pushGame,
   pushGameUpdate,
@@ -695,10 +694,12 @@ export default function App() {
 
   // Team Selection
   const handleSelectTeam = async (teamId) => {
-    setCurrentTeam(teamId);
     const selected = teams.find((t) => t.id === teamId);
     setCurrentTeamState(selected || null);
-    await sync();
+    // setCurrentTeam sends whatever is queued and then pulls. A sync() of our
+    // own beside it would race that pull ahead of the drain, and a game still
+    // queued for this team would be missing from what the pull wrote.
+    await setCurrentTeam(teamId);
     // The roster, the captains and the history the pull just wrote to storage.
     adoptRoster();
     // sync() has already pulled this team's schedule into localStorage. The

@@ -508,6 +508,23 @@ server's list. Each queues a failed or thrown write and says `queued: true`;
 adopted and reported. A queued roster write carries its renames, so App holds
 them for retry only when the write was not queued.
 
+Every entry records the team that was open when it was made, and the drain
+sends it there rather than to whichever team is open when it runs. A create is
+the case that needed it: a game queued for one side and replayed after a team
+switch was created in the other. A roster replayed for a team that is not open
+reaches its team but is not adopted locally, since this device is showing
+another team's roster. Entries from a build that stamped no team still go to the
+open one.
+
+`setCurrentTeam` drains before it pulls, as `initSync` and the `online` handler
+do; it used to pull straight away, so a game still queued for the team being
+opened was missing from the device until some later drain. App awaits it
+rather than calling `sync()` beside it, which would race the pull ahead of the
+drain. `processQueue` runs one drain at a time, and when it finishes it writes
+back the queue as it is *then*, less what it sent — a push that queued, folded
+into or dropped an entry while the drain was sending used to be overwritten by
+the copy the drain read at the start.
+
 A fixtures pull that fails is not fatal: the roster and the season history are
 what the app is for, and refusing to sync them because the schedule 500'd is
 the worse trade. The local schedule stands until the next try.
@@ -591,10 +608,10 @@ since they tapped it. A failed response and a thrown request now queue too. The
 exceptions are 403 and 404, which the drain already counts as done for the same
 reason it does: a viewer's write and a deleted team's will not start working. What the queue does differently is fold: one entry per team, replaced
 rather than appended, since five taps at the field are one write and nothing
-would merge them anyway. That entry carries its `teamId`, which the game and
-fixture entries do not need to: every team always has settings, so a replay
-addressed to whichever team happened to be open would not fail — it would
-quietly hand one side the other's formation. A replay refused 403 (a viewer) or
+would merge them anyway. Like every queue entry, it carries its `teamId`: every
+team always has settings, so a replay addressed to whichever team happened to
+be open would not fail — it would quietly hand one side the other's formation.
+A replay refused 403 (a viewer) or
 404 (a deleted team) counts as done, since neither improves by being retried at
 every drain.
 

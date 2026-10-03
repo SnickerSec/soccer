@@ -33,6 +33,8 @@ let serverSettings;
 let settingsResult;
 /** What each settings write was given, and which team it was addressed to. */
 let settingsWrites = [];
+/** The team each roster, game and match write was addressed to, in order. */
+let writeTeams = [];
 
 jest.unstable_mockModule('../src/modules/storage.js', () => ({
     safeGetFromStorage: (key) => (key in store ? store[key] : null),
@@ -73,15 +75,18 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
         return serverFixtures();
     },
     replaceRoster: async (teamId, players, expectedVersion, renames) => {
+        writeTeams.push(`roster:${teamId}`);
         calls.push(`push:replaceRoster:${players.map(p => p.name).join(',')}`);
         rosterWrites.push({ players, expectedVersion, renames });
         return rosterResult(players);
     },
     saveGame: async (teamId, game) => {
+        writeTeams.push(`game:${teamId}`);
         calls.push(`push:saveGame:${game.name}`);
         return gameResult(game);
     },
     saveFixture: async (teamId, fixture) => {
+        writeTeams.push(`fixture:${teamId}`);
         calls.push(`push:saveFixture:${fixture.opponent}`);
         return fixtureResult(fixture);
     },
@@ -103,6 +108,7 @@ jest.unstable_mockModule('../src/modules/cloud-storage.js', () => ({
     },
     bulkImportGames: async () => ({ success: true }),
     bulkImportFixtures: async (teamId, fixtures) => {
+        writeTeams.push(`bulk:${teamId}`);
         calls.push(`push:bulkImportFixtures:${fixtures.map(f => f.opponent).join(',')}`);
         return bulkFixturesResult(fixtures);
     },
@@ -137,6 +143,8 @@ let pushFixturesBulk;
 let pushFixtureUpdate;
 let pushFixtureDelete;
 let pushSettings;
+let pushPlayers;
+let setCurrentTeam;
 let sync;
 
 /** Queue entries as pushPlayers/pushGame would have written them offline. */
@@ -223,12 +231,14 @@ beforeEach(async () => {
     serverSettings = () => ({ success: true, data: {} });
     settingsResult = (settings) => ({ success: true, data: settings });
     settingsWrites = [];
+    writeTeams = [];
     // Set by a completed first sign-in; leaving it unset runs the migration path
     globalThis.localStorage = { getItem: () => 'completed', setItem: () => {} };
     globalThis.navigator = { onLine: true };
     ({
         initSync, sync, processQueue, pushGame, pushGameUpdate, pushGameDelete,
-        pushFixture, pushFixturesBulk, pushFixtureUpdate, pushFixtureDelete, pushSettings
+        pushFixture, pushFixturesBulk, pushFixtureUpdate, pushFixtureDelete, pushSettings,
+        pushPlayers, setCurrentTeam
     } = await loadSync());
 });
 
@@ -429,7 +439,7 @@ describe('processQueue and game edits', () => {
         const result = await processQueue();
 
         expect(result.processed).toBe(0);
-        expect(remainingQueue()).toEqual([queuedGameUpdate('cloud-1', { notes: 'Won' })]);
+        expect(remainingQueue()).toEqual([expect.objectContaining(queuedGameUpdate('cloud-1', { notes: 'Won' }))]);
     });
 });
 
@@ -1671,5 +1681,124 @@ describe('migrating the settings on first sign-in', () => {
         await initSync();
 
         expect(settingsWrites).toEqual([]);
+    });
+});
+
+/**
+ * Which team a queued write reaches.
+ *
+ * The drain used to send every create to whichever team was open when it ran,
+ * and a team switch pulled without draining at all. So a game saved to one
+ * side on a bar of LTE and replayed after switching landed in the other, and
+ * one still queued for the side being switched to was missing from the pull.
+ */
+describe('the queue and a team switch', () => {
+    beforeEach(signInWithTeam);
+
+    test('an entry records the team that was open when it was made', async () => {
+        globalThis.navigator = { onLine: false };
+
+        await pushGame({ id: 'local-1', name: 'vs Rovers' });
+        await pushFixture({ id: 'local-f', opponent: 'United' });
+        await pushPlayers([{ name: 'Ana' }]);
+
+        expect(remainingQueue().map(item => item.teamId)).toEqual(['team-1', 'team-1', 'team-1']);
+    });
+
+    test('a create queued for one team reaches that team after a switch', async () => {
+        globalThis.navigator = { onLine: false };
+        await pushGame({ id: 'local-1', name: 'vs Rovers' });
+        await pushFixture({ id: 'local-f', opponent: 'United' });
+
+        globalThis.navigator = { onLine: true };
+        await setCurrentTeam('team-2');
+
+        expect(writeTeams).toEqual(['game:team-1', 'fixture:team-1']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('a switch sends the queue before it pulls', async () => {
+        queueEntries({ ...queuedGame({ id: 'local-1', name: 'vs Rovers' }), teamId: 'team-2' });
+
+        await setCurrentTeam('team-2');
+
+        expect(calls.indexOf('push:saveGame:vs Rovers'))
+            .toBeLessThan(calls.indexOf('pull:getGames'));
+        expect(writeTeams).toEqual(['game:team-2']);
+    });
+
+    test('an entry from a build that stamped no team goes to the open one', async () => {
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+
+        await processQueue();
+
+        expect(writeTeams).toEqual(['game:team-1']);
+    });
+
+    test('a roster replayed to another team does not become this device\'s roster', async () => {
+        // team-1 is open; the entry was made while team-2 was
+        queueEntries({ ...queuedRoster([{ name: 'Other Team Player' }], { expectedVersion: 3 }), teamId: 'team-2' });
+        rosterResult = (players) => ({ success: true, data: players, version: 7 });
+        store['ayso_players'] = JSON.stringify([{ name: 'Open Team Player' }]);
+
+        await processQueue();
+
+        expect(writeTeams).toEqual(['roster:team-2']);
+        expect(JSON.parse(store['ayso_players'])).toEqual([{ name: 'Open Team Player' }]);
+
+        // Nor is team-2's version what the open team's next write claims
+        await pushPlayers([{ name: 'Open Team Player' }, { name: 'New' }]);
+        expect(rosterWrites[1].expectedVersion).not.toBe(7);
+    });
+});
+
+describe('processQueue run twice at once', () => {
+    beforeEach(signInWithTeam);
+
+    test('sends each entry once', async () => {
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+
+        await Promise.all([processQueue(), processQueue()]);
+
+        expect(calls).toEqual(['push:saveGame:vs Rovers']);
+        expect(remainingQueue()).toEqual([]);
+    });
+
+    test('keeps a write queued while it was sending', async () => {
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+        gameResult = async (game) => {
+            if (game.name === 'vs Rovers') {
+                // A save made at the same moment, on no signal
+                globalThis.navigator = { onLine: false };
+                await pushGame({ id: 'local-2', name: 'vs United' });
+                globalThis.navigator = { onLine: true };
+            }
+            return { success: true, data: { ...game, id: `cloud-${game.id}` } };
+        };
+
+        await processQueue();
+
+        // The drain wrote back what was left of the queue it had read, and the
+        // save queued in the meantime was not in it
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({ entityType: 'games', action: 'save', data: { id: 'local-2', name: 'vs United' } })
+        ]);
+    });
+
+    test('keeps an entry it failed on in the form a push left it', async () => {
+        queueEntries(queuedGame({ id: 'local-1', name: 'vs Rovers' }));
+        gameResult = async () => {
+            // Notes added to the game while its creation was being sent
+            globalThis.navigator = { onLine: false };
+            await pushGameUpdate('local-1', { notes: 'Won 3-1' });
+            globalThis.navigator = { onLine: true };
+            return { success: false, status: 500, error: 'boom' };
+        };
+
+        await processQueue();
+
+        expect(remainingQueue()).toEqual([
+            expect.objectContaining({ data: { id: 'local-1', name: 'vs Rovers', notes: 'Won 3-1' } })
+        ]);
     });
 });
