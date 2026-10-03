@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { FieldVisualization } from './FieldVisualization';
 import { getPositionsForFormation } from '@/modules/formations';
+import { sittingInQuarter } from '@/modules/lineup-engine';
 import { SUMMARY_HEADERS, summaryCells } from '@/modules/player-summary';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -442,7 +443,7 @@ export function LineupSection({
           {quarters.map((quarter, qIndex) => {
             const qNum = quarter.quarter || qIndex + 1;
             const positions = quarter.positions || {};
-            const sitting = quarter.sitting || [];
+            const sitting = sittingInQuarter(quarter, playerStats);
 
             return (
               <Card

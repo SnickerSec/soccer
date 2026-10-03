@@ -44,7 +44,7 @@ import {
   getFormationsForFieldSize,
   formationHasMidfieldLine,
 } from '@/modules/formations';
-import { generateLineup, validateLineup } from '@/modules/lineup-engine';
+import { generateLineup, validateLineup, sittingInQuarter } from '@/modules/lineup-engine';
 import { rosterPushDecision } from '@/modules/roster-push-guard';
 import { calculatePlayerStats, currentQuarters, currentPlayerPositions } from '@/modules/season-stats';
 import {
@@ -1110,7 +1110,12 @@ export default function App() {
     saveSnapshot();
     const fQ = Number(fromQuarter);
     const tQ = Number(toQuarter);
-    const newQuarters = JSON.parse(JSON.stringify(lineup.quarters));
+    // Materialise the resting list first: a quarter that does not carry one
+    // would otherwise start an empty list holding only the swapped player.
+    const newQuarters = JSON.parse(JSON.stringify(lineup.quarters)).map((q) => ({
+      ...q,
+      sitting: [...sittingInQuarter(q, lineup.playerStats || players)],
+    }));
     const qFrom = newQuarters.find((q, idx) => Number(q.quarter != null ? q.quarter : idx + 1) === fQ);
     const qTo = newQuarters.find((q, idx) => Number(q.quarter != null ? q.quarter : idx + 1) === tQ);
     if (!qFrom || !qTo) return;

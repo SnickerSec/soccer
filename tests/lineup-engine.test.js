@@ -11,7 +11,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { generateLineup, validateLineup, determineSittingSchedule } from '../src/modules/lineup-engine.js';
+import { generateLineup, validateLineup, determineSittingSchedule, sittingInQuarter } from '../src/modules/lineup-engine.js';
 import { getPositionsForFormation, isDefensivePosition } from '../src/modules/formations.js';
 
 const QUARTERS = 4;
@@ -654,5 +654,35 @@ describe('keepers who play three quarters', () => {
         expect(validateLineup([player], 4)).toEqual([]);
         expect(validateLineup([player], 4, { keeperPlaysThree: true }))
             .toEqual(['⚠️ Amos plays goalie but only 2 quarters in total']);
+    });
+});
+
+describe('who is resting', () => {
+    test('a generated quarter lists everyone not on the field as sitting', () => {
+        const result = generate(10);
+        for (const quarter of result.lineup) {
+            const onField = Object.values(quarter.positions);
+            expect(quarter.sitting).toHaveLength(3);
+            expect([...onField, ...quarter.sitting].sort())
+                .toEqual(makeRoster(10).map(p => p.name).sort());
+        }
+    });
+
+    test('a quarter without a sitting list derives it from the available players', () => {
+        const quarter = { quarter: 1, positions: { Keeper: 'Ann', Striker: 'Bo' } };
+        const players = [
+            { name: 'Ann', status: 'available' },
+            { name: 'Bo', status: 'available' },
+            { name: 'Cy', status: 'available' },
+            { name: 'Di', status: 'absent' },
+            { name: 'Ed', status: 'injured' },
+            { name: 'Fi' }
+        ];
+        expect(sittingInQuarter(quarter, players)).toEqual(['Cy', 'Fi']);
+    });
+
+    test('a listed sitting list is taken as it stands, even when empty', () => {
+        const players = [{ name: 'Ann' }, { name: 'Bo' }];
+        expect(sittingInQuarter({ positions: { Keeper: 'Ann' }, sitting: [] }, players)).toEqual([]);
     });
 });

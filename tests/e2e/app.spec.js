@@ -57,6 +57,15 @@ test.describe('Shinguard', () => {
         // Wait for lineup to appear
         await expect(page.locator('#lineupDisplay')).toBeVisible({ timeout: 15000 });
         await expect(page.locator('#lineupGrid')).toBeVisible();
+
+        // Everyone present appears in every quarter card, on the field or resting.
+        const present = parseInt(await page.locator('#presentPlayerCount').textContent() || '0');
+        for (const q of ['1', '2', '3', '4']) {
+            const names = await page.locator(`#lineupGrid tr[data-quarter="${q}"]`)
+                .evaluateAll(rows => rows.map(r => r.getAttribute('data-player')));
+            expect(new Set(names).size).toBe(present);
+        }
+        expect(await page.locator('#lineupGrid .sitting-row').count()).toBeGreaterThan(0);
     });
 
     test('game settings are visible', async ({ page }) => {

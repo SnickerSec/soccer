@@ -656,13 +656,34 @@ function generateQuarterLineup(quarter, sittingSchedule, players, positions, sea
     // playing, which hid genuine rotation violations from validateLineup and
     // from the coach's resting list.
     const onField = new Set(Object.values(quarterLineup.positions));
+    quarterLineup.sitting = [];
     players.forEach(player => {
         if (!onField.has(player.name)) {
             player.quartersSitting.push(quarter);
+            quarterLineup.sitting.push(player.name);
         }
     });
 
     return quarterLineup;
+}
+
+/**
+ * Who is resting in a quarter. A generated quarter lists them in `sitting`;
+ * one from before it did — a saved game, a shared link — lists only who took
+ * the field, so the rest are the available players not on it. Absent and
+ * injured players are in a saved game's snapshot but were not resting.
+ */
+export function sittingInQuarter(quarter, players = []) {
+    if (Array.isArray(quarter?.sitting)) return quarter.sitting;
+    const onField = new Set(
+        Object.values(quarter?.positions || {})
+            .map((value) => (typeof value === 'string' ? value : value?.name))
+            .filter(Boolean)
+    );
+    return (players || [])
+        .filter((player) => player?.name && !onField.has(player.name))
+        .filter((player) => player.status !== 'absent' && player.status !== 'injured')
+        .map((player) => player.name);
 }
 
 export function validateLineup(players, quarters, { keeperPlaysThree = false } = {}) {
