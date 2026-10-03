@@ -348,18 +348,26 @@ export function determineSittingSchedule(players, playersOnField, quarters, seas
 
     // Fairness order for the remainder: whoever has spent least of the season
     // off the field -- missed games included -- takes the extra quarter off first.
-    const playersForExtraSit = [...mustRestPlayers, ...regularPlayers];
-    playersForExtraSit.sort((a, b) => restShare(a, seasonStats, quarters) - restShare(b, seasonStats, quarters));
-    shuffleWithinSimilarGroups(playersForExtraSit, (p) => restGroup(p, seasonStats, quarters));
+    // Players the coach asked to rest come ahead of everyone, so the extra
+    // quarters go to them before anyone who was not asked. Topping them up
+    // after the fact instead handed out more sits than the quarters have room
+    // for: a quarter with two resting and a TBD position on the field.
+    const byFairness = (group) => {
+        const ordered = [...group];
+        ordered.sort((a, b) => restShare(a, seasonStats, quarters) - restShare(b, seasonStats, quarters));
+        shuffleWithinSimilarGroups(ordered, (p) => restGroup(p, seasonStats, quarters));
+        return ordered;
+    };
+    const playersForExtraSit = [...byFairness(mustRestPlayers), ...byFairness(regularPlayers)];
 
     const targetSits = new Map();
     const avoidMap = new Map();
 
     playersForExtraSit.forEach((player, index) => {
-        let target = minSitsPerPlayer + (index < playersWithExtraSit ? 1 : 0);
-        // A player asked to rest sits at least once, even on a roster where
-        // nobody would otherwise sit at all
-        if (player.mustRest) target = Math.max(target, 1);
+        // Never more than the quarters hold: with more players asked to rest
+        // than there are spare places, the ones owed it most sit and the rest
+        // play, rather than leaving the field a player short.
+        const target = minSitsPerPlayer + (index < playersWithExtraSit ? 1 : 0);
         targetSits.set(player.name, target);
 
         // If player sat in Q4 of their last match, avoid having them sit in Q1 of this match

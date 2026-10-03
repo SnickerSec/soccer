@@ -206,6 +206,34 @@ describe('player preferences', () => {
             expect(tally(result, 7).get('Player 3').sat.length).toBeGreaterThanOrEqual(1);
         }
     });
+
+    test('with as many marked to rest as there are rest places, only they sit and the field stays full', () => {
+        // 8 on a 7v7 field: four rest places. Topping marked players up after
+        // the fairness pick handed out five or six, leaving a quarter short.
+        for (let run = 0; run < 30; run++) {
+            const players = makeRoster(8);
+            [0, 2, 4, 6].forEach(i => { players[i].mustRest = true; });
+
+            const result = generate(8, { players });
+            for (const quarter of result.lineup) {
+                expect(Object.values(quarter.positions).filter(Boolean)).toHaveLength(7);
+            }
+            for (const [name, entry] of tally(result, 7)) {
+                const marked = players.find(p => p.name === name).mustRest;
+                expect(`${name} sat ${entry.sat.length}`).toBe(`${name} sat ${marked ? 1 : 0}`);
+            }
+        }
+    });
+
+    test('more marked to rest than there are rest places never leaves the field short', () => {
+        for (let run = 0; run < 30; run++) {
+            const players = makeRoster(8);
+            players.slice(0, 6).forEach(p => { p.mustRest = true; });
+
+            const schedule = determineSittingSchedule(players, 7, QUARTERS, {});
+            for (let q = 1; q <= QUARTERS; q++) expect(schedule[q]).toHaveLength(1);
+        }
+    });
 });
 
 describe('exact-fit rosters', () => {
