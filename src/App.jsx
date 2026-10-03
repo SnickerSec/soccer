@@ -37,6 +37,7 @@ import { UndoHistory } from '@/modules/history';
 import {
   safeGetFromStorage,
   safeSetToStorage,
+  safeRemoveFromStorage,
   safeParseJSON,
 } from '@/modules/storage';
 import { shuffleArray } from '@/modules/utils';
@@ -160,8 +161,15 @@ export default function App() {
   // Settings
   const [settings, setSettings] = useState(readStoredSettings);
 
-  // Lineup
-  const [lineup, setLineup] = useState(null);
+  // Lineup. Kept in storage so a refresh does not lose it — a lineup opened
+  // from a saved game or generated at the field is the one the coach is about
+  // to use. It is stamped with the team it was made for, since the team is not
+  // known until sign-in settles and another side's lineup must not reappear.
+  const [storedLineup] = useState(() => {
+    const saved = safeParseJSON(safeGetFromStorage(CONSTANTS.STORAGE_KEYS.CURRENT_LINEUP), null);
+    return saved && saved.lineup && Array.isArray(saved.lineup.quarters) ? saved : null;
+  });
+  const [lineup, setLineup] = useState(() => storedLineup?.lineup || null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Game History / Season
@@ -217,6 +225,29 @@ export default function App() {
   currentTeamRef.current = currentTeam;
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
+
+  // Written whenever the lineup changes, but not for the copy just read back:
+  // at that moment the team has not loaded, and rewriting it would lose the
+  // team it was stamped with.
+  useEffect(() => {
+    if (lineup === storedLineup?.lineup) return;
+    if (!lineup) {
+      safeRemoveFromStorage(CONSTANTS.STORAGE_KEYS.CURRENT_LINEUP);
+      return;
+    }
+    safeSetToStorage(
+      CONSTANTS.STORAGE_KEYS.CURRENT_LINEUP,
+      JSON.stringify({ teamId: currentTeamRef.current?.id || null, lineup })
+    );
+  }, [lineup, storedLineup]);
+
+  // Once the team is known, a restored lineup made for a different one goes.
+  useEffect(() => {
+    if (!currentTeam || !storedLineup?.teamId) return;
+    if (storedLineup.teamId !== currentTeam.id) {
+      setLineup((prev) => (prev === storedLineup.lineup ? null : prev));
+    }
+  }, [currentTeam, storedLineup]);
   const testAuthUserRef = useRef(null);
   // Renames waiting to be told to the server. Held rather than sent on their
   // own so they travel with the roster push that already carries the new name.

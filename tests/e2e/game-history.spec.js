@@ -96,6 +96,25 @@ test.describe('Game history', () => {
         expect(loadedLineup).toEqual(savedLineup);
     });
 
+    test('a lineup loaded from a saved game survives a refresh', async ({ page }) => {
+        await saveGameAt(page, { division: '12U', name: 'vs Owls', date: '2026-04-04' });
+        const savedLineup = await page.locator('#lineupGrid tr[data-quarter="1"]')
+            .evaluateAll(rows => rows.map(r => `${r.dataset.position}=${r.dataset.player}`));
+
+        await page.selectOption('#ageDivision', '10U');
+        await page.click('#generateLineup');
+        await page.click('#loadSavedGame');
+        await page.locator('#loadGameModal [data-action="load-game"]', { hasText: 'vs Owls' }).click();
+        await expect(page.locator('#loadGameModal')).toBeHidden();
+
+        await page.reload();
+
+        await expect(page.locator('#lineupGrid tr[data-quarter="1"]').first()).toBeVisible();
+        const reloaded = await page.locator('#lineupGrid tr[data-quarter="1"]')
+            .evaluateAll(rows => rows.map(r => `${r.dataset.position}=${r.dataset.player}`));
+        expect(reloaded).toEqual(savedLineup);
+    });
+
     test('notes open in a dialog rather than a browser prompt', async ({ page }) => {
         await saveGameAt(page, { division: '10U', name: 'vs Lions', date: '2026-03-21' });
 

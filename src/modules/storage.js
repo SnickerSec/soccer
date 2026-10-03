@@ -47,7 +47,8 @@ const TEAM_SCOPED_KEYS = [
     'ayso_settings',
     'ayso_sync_queue',
     'ayso_migration_status',
-    'ayso_current_team'
+    'ayso_current_team',
+    'ayso_current_lineup'
 ];
 
 export function clearTeamScopedData() {
