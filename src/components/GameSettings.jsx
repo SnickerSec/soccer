@@ -46,6 +46,12 @@ export function GameSettings({
   const selectClasses =
     "flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground cursor-pointer";
 
+  // Every column's label sits in a row of the same fixed height. A bare inline
+  // label takes the line height of the div around it (24px), while Formation's
+  // row, which also holds "+ Custom", and the Quarters span came out at 16px —
+  // so the first two selects sat lower than the last two.
+  const labelRowClasses = 'flex h-5 items-center justify-between';
+
   return (
     <Card className="settings-section shadow-sm">
       {/*
@@ -102,9 +108,11 @@ export function GameSettings({
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Age Division */}
           <div className="space-y-1.5">
-            <label htmlFor="ageDivision" className="text-xs font-medium text-muted-foreground">
-              Age Division:
-            </label>
+            <div className={labelRowClasses}>
+              <label htmlFor="ageDivision" className="text-xs font-medium text-muted-foreground">
+                Age Division:
+              </label>
+            </div>
             <select
               id="ageDivision"
               aria-label="Select age division"
@@ -122,9 +130,11 @@ export function GameSettings({
 
           {/* Players on Field */}
           <div className="space-y-1.5">
-            <label htmlFor="fieldPlayers" className="text-xs font-medium text-muted-foreground">
-              Players on Field:
-            </label>
+            <div className={labelRowClasses}>
+              <label htmlFor="fieldPlayers" className="text-xs font-medium text-muted-foreground">
+                Players on Field:
+              </label>
+            </div>
             <select
               id="fieldPlayers"
               aria-label="Select number of players on the field"
@@ -149,7 +159,7 @@ export function GameSettings({
 
           {/* Formation */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
+            <div className={labelRowClasses}>
               <label htmlFor="formation" className="text-xs font-medium text-muted-foreground">
                 Formation:
               </label>
@@ -182,10 +192,12 @@ export function GameSettings({
 
           {/* Quarters */}
           <div className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground block">
-              Quarters:
-            </span>
-            <div className="h-9 px-3 flex items-center rounded-md border bg-muted/30 text-xs font-medium">
+            <div className={labelRowClasses}>
+              <span className="text-xs font-medium text-muted-foreground">
+                Quarters:
+              </span>
+            </div>
+            <div className="h-9 px-3 flex items-center rounded-md border border-input bg-muted/30 text-xs font-medium shadow-sm">
               4 (AYSO Standard)
             </div>
           </div>
