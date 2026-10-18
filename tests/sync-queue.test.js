@@ -1376,7 +1376,7 @@ describe('migrating the schedule on first sign-in', () => {
  * handed 10U and a 7v7 formation, and the assistant coach never saw either.
  */
 describe('pushSettings', () => {
-    const NINE_A_SIDE = { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: false };
+    const NINE_A_SIDE = { ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: false, lineupStrategy: 'balanced' };
 
     test('the device keeps the change whether or not the server hears about it', async () => {
         await signInWithTeam();
@@ -1616,7 +1616,7 @@ describe('sync and how the team plays', () => {
         await sync();
 
         expect(localSettings()).toEqual({
-            ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: true
+            ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: true, lineupStrategy: 'balanced'
         });
     });
 

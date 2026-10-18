@@ -8,6 +8,12 @@ import {
 } from '@/modules/formations';
 import { History, Play, Sparkles } from 'lucide-react';
 
+const STRATEGY_DESCRIPTIONS = {
+  balanced: 'Spreads your stronger players evenly across defense, midfield and attack each quarter.',
+  defense: 'Puts your stronger players at the back and in midfield, and the rest up front.',
+  offense: 'Puts your stronger players up front, and the rest behind them.',
+};
+
 export function GameSettings({
   ageDivision,
   fieldPlayers,
@@ -17,6 +23,8 @@ export function GameSettings({
   onFormationChange,
   keeperPlaysThree = false,
   onKeeperPlaysThreeChange,
+  lineupStrategy = 'balanced',
+  onLineupStrategyChange,
   onGenerateLineup,
   isGenerating,
   playerCount = 0,
@@ -201,6 +209,31 @@ export function GameSettings({
               4 (AYSO Standard)
             </div>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,12rem)_1fr] sm:items-center gap-1.5 sm:gap-4">
+          <div className="space-y-1.5">
+            <div className={labelRowClasses}>
+              <label htmlFor="lineupStrategy" className="text-xs font-medium text-muted-foreground">
+                Lineup Strategy:
+              </label>
+            </div>
+            <select
+              id="lineupStrategy"
+              aria-label="Select how player ratings shape the lineup"
+              value={lineupStrategy}
+              onChange={(e) => onLineupStrategyChange?.(e.target.value)}
+              className={selectClasses}
+            >
+              <option value="balanced">Balanced</option>
+              <option value="defense">Defense focus</option>
+              <option value="offense">Offense focus</option>
+            </select>
+          </div>
+          <p className="text-xs text-muted-foreground sm:pt-6" id="lineupStrategyDescription">
+            {STRATEGY_DESCRIPTIONS[lineupStrategy] || STRATEGY_DESCRIPTIONS.balanced}{' '}
+            Uses player ratings. Everyone still rotates through defense and offense, so a focus shifts strength rather than stacking one end.
+          </p>
         </div>
 
         <label htmlFor="keeperPlaysThree" className="flex items-start gap-2 text-xs cursor-pointer">

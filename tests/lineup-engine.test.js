@@ -45,7 +45,7 @@ function makeRoster(size, options = {}) {
 }
 
 /** Runs the real generator for a roster size and formation. */
-function generate(rosterSize, { playersOnField = 7, formation = '2-3-1', players, seasonStats = {}, rated = false, keeperPlaysThree = false } = {}) {
+function generate(rosterSize, { playersOnField = 7, formation = '2-3-1', players, seasonStats = {}, rated = false, keeperPlaysThree = false, strategy } = {}) {
     const roster = players ?? makeRoster(rosterSize, { rated });
     return generateLineup({
         players: roster,
@@ -54,7 +54,8 @@ function generate(rosterSize, { playersOnField = 7, formation = '2-3-1', players
         quarters: QUARTERS,
         maxAttempts: MAX_ATTEMPTS,
         seasonStats,
-        keeperPlaysThree
+        keeperPlaysThree,
+        strategy
     });
 }
 
@@ -712,5 +713,87 @@ describe('who is resting', () => {
     test('a listed sitting list is taken as it stands, even when empty', () => {
         const players = [{ name: 'Ann' }, { name: 'Bo' }];
         expect(sittingInQuarter({ positions: { Keeper: 'Ann' }, sitting: [] }, players)).toEqual([]);
+    });
+});
+
+describe('lineup strategy', () => {
+    /**
+     * Half the squad are rated five everywhere and half one, so which line the
+     * strong half lands on says which way the strategy pushed them.
+     */
+    function stars(size) {
+        return Array.from({ length: size }, (_, i) => {
+            const r = i % 2 === 0 ? 5 : 1;
+            return makePlayer(`Player ${i + 1}`, {
+                overallRating: r,
+                positionalRatings: { defense: r, midfield: r, offense: r }
+            });
+        });
+    }
+
+    /** Average rating on each line, over many games. */
+    function lineStrength(strategy, { size = 12, playersOnField = 7, formation = '2-3-1', runs = 30 } = {}) {
+        const lines = { back: [], mid: [], front: [] };
+        for (let run = 0; run < runs; run++) {
+            const players = stars(size);
+            const rating = new Map(players.map(p => [p.name, p.overallRating]));
+            const result = generate(size, { playersOnField, formation, players, strategy });
+            expect(result.validation).toEqual([]);
+            for (const quarter of result.lineup) {
+                for (const [position, name] of Object.entries(quarter.positions)) {
+                    if (position === 'Keeper') continue;
+                    const line = position.includes('Back') ? 'back' : position.includes('Mid') ? 'mid' : 'front';
+                    lines[line].push(rating.get(name));
+                }
+            }
+        }
+        const avg = list => list.reduce((a, b) => a + b, 0) / list.length;
+        return { back: avg(lines.back), mid: avg(lines.mid), front: avg(lines.front) };
+    }
+
+    /**
+     * Everyone Plays fixes how many defensive quarters each player gets — in
+     * 2-3-1 the slot counts leave no choice at all — so no strategy can stack
+     * the back line. What a focus moves is which end of the field the strong
+     * players' turns are spent at: the half behind the attack, or the front.
+     */
+    test('defense focus strengthens the back half, offense focus the front', () => {
+        const defense = lineStrength('defense', { runs: 60 });
+        const offense = lineStrength('offense', { runs: 60 });
+        const backHalf = ({ back, mid }) => (back * 2 + mid * 3) / 5;
+        expect(backHalf(defense)).toBeGreaterThan(backHalf(offense) + 1);
+        expect(offense.front).toBeGreaterThan(defense.front + 0.5);
+        expect(defense.back).toBeGreaterThan(defense.front);
+        expect(offense.front).toBeGreaterThan(offense.mid);
+    });
+
+    test('balanced keeps the lines closer together than either focus', () => {
+        const spread = ({ back, mid, front }) => Math.max(back, mid, front) - Math.min(back, mid, front);
+        const balanced = spread(lineStrength('balanced'));
+        expect(balanced).toBeLessThan(spread(lineStrength('defense')));
+        expect(balanced).toBeLessThan(spread(lineStrength('offense')));
+    });
+
+    test.each(['balanced', 'defense', 'offense'])('%s still satisfies the rotation rules', (strategy) => {
+        for (const { size, playersOnField, formation } of [
+            { size: 10, playersOnField: 7, formation: '2-3-1' },
+            { size: 12, playersOnField: 7, formation: '2-3-1' },
+            { size: 16, playersOnField: 9, formation: '3-3-2' }
+        ]) {
+            for (let run = 0; run < 10; run++) {
+                const result = generate(size, { playersOnField, formation, players: stars(size), strategy });
+                expect(result.validation).toEqual([]);
+                for (const [name, entry] of tally(result, playersOnField)) {
+                    expect(`${name} D${entry.defense}`).not.toBe(`${name} D0`);
+                    expect(`${name} O${entry.offense}`).not.toBe(`${name} O0`);
+                }
+            }
+        }
+    });
+
+    test('an unrated roster is not rearranged into anything invalid', () => {
+        for (const strategy of ['balanced', 'defense', 'offense']) {
+            expect(generate(11, { strategy }).validation).toEqual([]);
+        }
     });
 });

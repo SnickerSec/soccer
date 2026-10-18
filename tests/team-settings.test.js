@@ -42,13 +42,21 @@ describe('normalizeSettings', () => {
     test('a complete, valid set is left as it is', () => {
         expect(normalizeSettings({
             ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4
-        })).toEqual({ ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: false });
+        })).toEqual({ ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: false, lineupStrategy: 'balanced' });
     });
 
     test('the keeper rule is on only when stored as true', () => {
         expect(normalizeSettings({ keeperPlaysThree: true }).keeperPlaysThree).toBe(true);
         expect(normalizeSettings({ keeperPlaysThree: 'yes' }).keeperPlaysThree).toBe(false);
         expect(normalizeSettings({}).keeperPlaysThree).toBe(false);
+    });
+
+    test('the lineup strategy is one of the known ones, balanced otherwise', () => {
+        expect(normalizeSettings({ lineupStrategy: 'defense' }).lineupStrategy).toBe('defense');
+        expect(normalizeSettings({ lineupStrategy: 'offense' }).lineupStrategy).toBe('offense');
+        expect(normalizeSettings({ lineupStrategy: 'park-the-bus' }).lineupStrategy).toBe('balanced');
+        expect(normalizeSettings({}).lineupStrategy).toBe('balanced');
+        expect(sameSettings({ lineupStrategy: 'offense' }, {})).toBe(false);
     });
 
     test('turning the keeper rule on is a change worth pushing', () => {
@@ -65,7 +73,7 @@ describe('normalizeSettings', () => {
         const result = normalizeSettings({ ageDivision: '10U', teamName: 'Sharks' });
 
         expect(Object.keys(result).sort()).toEqual(
-            ['ageDivision', 'fieldPlayers', 'formation', 'keeperPlaysThree', 'quarters']
+            ['ageDivision', 'fieldPlayers', 'formation', 'keeperPlaysThree', 'lineupStrategy', 'quarters']
         );
     });
 

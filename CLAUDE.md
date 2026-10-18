@@ -676,6 +676,19 @@ take a quarter in goal each, leaving every back slot to the eight who play two
 — which is why the position scorer steers a player in their last quarter
 towards whichever side of the ball they have not yet played.
 
+`lineupStrategy` — `balanced`, `defense` or `offense` — decides where the
+player ratings send the stronger players. After each quarter's greedy pick,
+`applyLineupStrategy` in `lineup-engine.js` swaps pairs of outfield players
+while that improves the strategy's score. It only makes swaps that keep
+Everyone Plays intact: nobody ends up more than one quarter out between
+defense and offense, and nobody plays a position twice. That means a focus
+cannot stack the back line. Everyone Plays fixes each player's split between
+defense and offense (in 2-3-1 the slot counts leave no choice at all), so a
+focus moves strength along the field instead: the strong players'
+defensive turns go to the back and their attacking ones to midfield, or
+everything goes up front. An unrated roster scores the same however it is
+arranged, so it is never rearranged.
+
 The coach's theme is the one thing here that stays per-user. It is adopted from
 `user_settings.theme` only on a device with no preference of its own — a phone
 being signed into for the first time — and pushed whenever it changes after

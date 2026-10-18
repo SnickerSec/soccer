@@ -108,6 +108,11 @@ describe('validateTeamSettings', () => {
         expect(validateTeamSettings({ keeperPlaysThree: 'yes' })).toMatch(/keeperPlaysThree/);
     });
 
+    test('the lineup strategy is one of the known ones', () => {
+        expect(validateTeamSettings({ lineupStrategy: 'defense' })).toBeNull();
+        expect(validateTeamSettings({ lineupStrategy: 'attack' })).toMatch(/lineupStrategy/);
+    });
+
     test('quarters outside a game are refused', () => {
         expect(validateTeamSettings({ quarters: 0 })).toMatch(/between 1 and 8/);
     });

@@ -577,6 +577,110 @@ function assignPositionsOptimally(players, positions, defensivePositions, season
     return assignments;
 }
 
+/** How the coach wants rated players spread across the field. */
+export const LINEUP_STRATEGIES = ['balanced', 'defense', 'offense'];
+
+/**
+ * A player's strength in a line, on the one-to-five scale the rating dialog
+ * uses. The rating for that line wins, then the overall, then a neutral 3 —
+ * an unrated player is "no opinion", not the weakest on the roster.
+ */
+function strengthIn(player, category) {
+    const positional = (player.positionalRatings || {})[category];
+    if (positional) return positional;
+    return player.overallRating || 3;
+}
+
+/** How much a line counts towards each focus. Midfield is half of either. */
+const FOCUS_WEIGHTS = {
+    defense: { defense: 2, midfield: 1, offense: 0 },
+    offense: { defense: 0, midfield: 1, offense: 2 }
+};
+
+function strategyScore(assignments, strategy) {
+    const placed = assignments.map(({ position, player }) => {
+        const category = getPositionRatingCategory(position);
+        return { category, strength: strengthIn(player, category) };
+    });
+
+    const weights = FOCUS_WEIGHTS[strategy];
+    if (weights) {
+        return placed.reduce((sum, { category, strength }) => sum + (weights[category] ?? 0) * strength, 0);
+    }
+
+    // Balanced: every line as close to the quarter's average as the squad
+    // allows, so no third of the field is where the weak players all went.
+    // The small fit term keeps players in lines they are rated for when the
+    // spread is already as even as it gets.
+    const lines = {};
+    let total = 0;
+    placed.forEach(({ category, strength }) => {
+        (lines[category] ||= []).push(strength);
+        total += strength;
+    });
+    const mean = total / (placed.length || 1);
+    const spread = Object.values(lines).reduce((sum, line) => {
+        const avg = line.reduce((a, b) => a + b, 0) / line.length;
+        return sum + line.length * Math.abs(avg - mean);
+    }, 0);
+    return -spread + total * 0.01;
+}
+
+/**
+ * Rearranges a quarter's outfield assignments towards the coach's strategy,
+ * by swapping pairs of players while it keeps improving.
+ *
+ * Moving a player between two positions on the same side of the ball leaves
+ * their defence and offence counts as they were. Moving one across is allowed
+ * only while the rotation rules still hold for both: neither ends the quarter
+ * more than one quarter out between defence and offence, and a player in
+ * their last quarter is not moved off the only side they have yet to play.
+ * Nobody is moved to a position they have already played this game. So the
+ * strategy decides who goes where among choices that keep Everyone Plays,
+ * and the generator's validation and retries catch the rest as before.
+ */
+function applyLineupStrategy(assignments, strategy, defensivePositions, finalQuarter = new Set()) {
+    if (!LINEUP_STRATEGIES.includes(strategy) || assignments.length < 2) return;
+
+    // Whether a player may take a position on the given side this quarter.
+    const fitsSide = (player, defensive) => {
+        const d = (player.defensiveQuarters || 0) + (defensive ? 1 : 0);
+        const o = (player.offensiveQuarters || 0) + (defensive ? 0 : 1);
+        if (Math.abs(d - o) > 1) return false;
+        return !finalQuarter.has(player.name) || (d > 0 && o > 0);
+    };
+    const hasPlayed = (player, position) => player.positionsPlayed.some(p => p.position === position);
+
+    let current = strategyScore(assignments, strategy);
+    for (let iter = 0; iter < 50; iter++) {
+        let best = null;
+        for (let i = 0; i < assignments.length; i++) {
+            for (let j = i + 1; j < assignments.length; j++) {
+                const a = assignments[i];
+                const b = assignments[j];
+                const aDefensive = defensivePositions.includes(a.position);
+                const bDefensive = defensivePositions.includes(b.position);
+                if (aDefensive !== bDefensive
+                    && !(fitsSide(a.player, bDefensive) && fitsSide(b.player, aDefensive))) continue;
+                if (hasPlayed(a.player, b.position) || hasPlayed(b.player, a.position)) continue;
+
+                [a.player, b.player] = [b.player, a.player];
+                const score = strategyScore(assignments, strategy);
+                [a.player, b.player] = [b.player, a.player];
+
+                if (score > current + 1e-9 && (!best || score > best.score)) {
+                    best = { i, j, score };
+                }
+            }
+        }
+        if (!best) break;
+        const a = assignments[best.i];
+        const b = assignments[best.j];
+        [a.player, b.player] = [b.player, a.player];
+        current = best.score;
+    }
+}
+
 /** Quarters a player is down to play, going by the sitting schedule. */
 function plannedQuarters(name, sittingSchedule, quarters) {
     let sits = 0;
@@ -644,6 +748,7 @@ function generateQuarterLineup(quarter, sittingSchedule, players, positions, sea
     const assignments = assignPositionsOptimally(
         playingPlayers, positionsToFill, defensivePositions, seasonStats, finalQuarter
     );
+    applyLineupStrategy(assignments, options.strategy, defensivePositions, finalQuarter);
 
     assignments.forEach(({ position, player }) => {
         quarterLineup.positions[position] = player.name;
@@ -751,7 +856,7 @@ export function validateLineup(players, quarters, { keeperPlaysThree = false } =
 }
 
 export function generateLineup(data, { onProgress } = {}) {
-    const { players, positions, playersOnField, quarters, maxAttempts, seasonStats, keeperPlaysThree = false } = data;
+    const { players, positions, playersOnField, quarters, maxAttempts, seasonStats, keeperPlaysThree = false, strategy = 'balanced' } = data;
 
     let attempts = 0;
     let validation = [];
@@ -778,7 +883,7 @@ export function generateLineup(data, { onProgress } = {}) {
 
         for (let quarter = 1; quarter <= quarters; quarter++) {
             const quarterLineup = generateQuarterLineup(
-                quarter, sittingSchedule, players, positions, seasonStats, { keeperPlaysThree, quarters }
+                quarter, sittingSchedule, players, positions, seasonStats, { keeperPlaysThree, quarters, strategy }
             );
             lineup.push(quarterLineup);
         }

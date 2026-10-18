@@ -14,6 +14,9 @@ import { requireAuth, requireTeamAccess } from '../middleware.js';
 
 const router = Router();
 
+/** Mirrors LINEUP_STRATEGIES in src/modules/lineup-engine.js. */
+const LINEUP_STRATEGIES = ['balanced', 'defense', 'offense'];
+
 /** The team's play settings as the API exposes them. */
 export function mapTeamSettings(row) {
     const stored = (row.settings && typeof row.settings === 'object' && !Array.isArray(row.settings))
@@ -38,7 +41,7 @@ export function validateTeamSettings(settings) {
         return 'A settings object is required';
     }
 
-    const { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree } = settings;
+    const { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree, lineupStrategy } = settings;
 
     // Divisions are not enumerated here: POST /api/teams does not enumerate
     // them either, and a second list on the server would be one more thing to
@@ -68,6 +71,11 @@ export function validateTeamSettings(settings) {
     if (keeperPlaysThree !== undefined && keeperPlaysThree !== null
         && typeof keeperPlaysThree !== 'boolean') {
         return 'keeperPlaysThree must be true or false';
+    }
+
+    if (lineupStrategy !== undefined && lineupStrategy !== null
+        && !LINEUP_STRATEGIES.includes(lineupStrategy)) {
+        return `lineupStrategy must be one of ${LINEUP_STRATEGIES.join(', ')}`;
     }
 
     return null;

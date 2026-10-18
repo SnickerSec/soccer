@@ -18,6 +18,7 @@
 
 import { CONSTANTS } from '../constants.js';
 import { FORMATIONS, getFormationsForFieldSize } from './formations.js';
+import { LINEUP_STRATEGIES } from './lineup-engine.js';
 
 export const DEFAULT_SETTINGS = {
     ageDivision: '10U',
@@ -27,7 +28,11 @@ export const DEFAULT_SETTINGS = {
     // Only a player on the field at least three quarters may keep. A player
     // who plays two and spends one of them in goal gets a single quarter of
     // outfield play all game.
-    keeperPlaysThree: false
+    keeperPlaysThree: false,
+    // Where the player ratings send the stronger players: spread evenly over
+    // the field, or towards the back or the front. Unrated rosters play the
+    // same whichever is picked.
+    lineupStrategy: 'balanced'
 };
 
 /**
@@ -63,7 +68,11 @@ export function normalizeSettings(raw) {
 
     const keeperPlaysThree = source.keeperPlaysThree === true;
 
-    return { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree };
+    const lineupStrategy = LINEUP_STRATEGIES.includes(source.lineupStrategy)
+        ? source.lineupStrategy
+        : DEFAULT_SETTINGS.lineupStrategy;
+
+    return { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree, lineupStrategy };
 }
 
 /**

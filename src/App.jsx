@@ -1046,6 +1046,7 @@ export default function App() {
         maxAttempts: CONSTANTS.MAX_GENERATION_ATTEMPTS,
         seasonStats: stats,
         keeperPlaysThree: curSettings.keeperPlaysThree,
+        strategy: curSettings.lineupStrategy,
       });
 
       if (result && result.lineup) {
@@ -1729,6 +1730,10 @@ export default function App() {
               updateSettings({ formation });
             }}
             keeperPlaysThree={settings.keeperPlaysThree}
+            lineupStrategy={settings.lineupStrategy}
+            onLineupStrategyChange={(lineupStrategy) => {
+              updateSettings({ lineupStrategy });
+            }}
             onKeeperPlaysThreeChange={(keeperPlaysThree) => {
               updateSettings({ keeperPlaysThree });
             }}
