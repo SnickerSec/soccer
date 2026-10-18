@@ -696,6 +696,22 @@ defensive turns go to the back and their attacking ones to midfield, or
 everything goes up front. An unrated roster scores the same however it is
 arranged, so it is never rearranged.
 
+What a strength is — the line's rating, then the overall, then a neutral 3 —
+lives in `src/modules/line-strength.js`, which the engine imports. The quarter
+cards read the same module for the "Back ★4.0 · Mid ★3.5 · Front ★2.8"
+footer, so what the coach is shown is what the generator steered by. Without
+it a Defense focus that mostly strengthened midfield looked like a setting
+that did nothing. The footer is left off when nobody on the field is rated,
+since an average of neutral threes says nothing.
+
+The keeper is deliberately outside the strategy. Defense focus once put the
+strongest of the players whose turn it was in goal, judged by defense rating
+when no keeper rating was set. That is a straight trade: Everyone Plays fixes
+how many defensive quarters the strong players get, so each one in goal was
+one taken from the back line, which fell from 3.0 to 2.0 in simulation. Keeper
+ratings already decide among the players whose turn it is, under every
+strategy, so a coach who wants a strong keeper rates keeping.
+
 The coach's theme is the one thing here that stays per-user. It is adopted from
 `user_settings.theme` only on a device with no preference of its own — a phone
 being signed into for the first time — and pushed whenever it changes after

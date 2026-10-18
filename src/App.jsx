@@ -46,7 +46,8 @@ import {
   getFormationsForFieldSize,
   formationHasMidfieldLine,
 } from '@/modules/formations';
-import { generateLineup, validateLineup, sittingInQuarter, ratedForStrategy } from '@/modules/lineup-engine';
+import { generateLineup, validateLineup, sittingInQuarter } from '@/modules/lineup-engine';
+import { ratedForStrategy } from '@/modules/line-strength';
 import { recalculateGamePlayers } from '@/modules/game-edit';
 import { rosterPushDecision } from '@/modules/roster-push-guard';
 import { calculatePlayerStats, currentQuarters, currentPlayerPositions } from '@/modules/season-stats';
@@ -1060,7 +1061,9 @@ export default function App() {
           fieldPlayers: curSettings.fieldPlayers,
           playerStats: result.players || [],
         });
-        toast.success('Generated balanced game lineup!');
+        // "Balanced" is a strategy now, so it is not how every lineup is described.
+        const focus = { defense: ' with a defense focus', offense: ' with an offense focus' }[curSettings.lineupStrategy] || '';
+        toast.success(`Generated lineup${focus}!`);
       } else {
         toast.error('Failed to generate a valid lineup rotation');
       }

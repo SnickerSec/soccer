@@ -32,6 +32,7 @@ import {
 import { FieldVisualization } from './FieldVisualization';
 import { getPositionsForFormation } from '@/modules/formations';
 import { sittingInQuarter } from '@/modules/lineup-engine';
+import { quarterLineStrength, LINES } from '@/modules/line-strength';
 import { SUMMARY_HEADERS, summaryCells } from '@/modules/player-summary';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -448,6 +449,8 @@ export function LineupSection({
             const qNum = quarter.quarter || qIndex + 1;
             const positions = quarter.positions || {};
             const sitting = sittingInQuarter(quarter, playerStats);
+            const strength = quarterLineStrength(quarter, playerStats);
+            const shownLines = strength ? LINES.filter((l) => strength[l.key] != null) : [];
 
             return (
               <Card
@@ -689,6 +692,24 @@ export function LineupSection({
                       positions={positions}
                       players={playerStats}
                     />
+                  )}
+
+                  {shownLines.length > 0 && (
+                    <div
+                      className="line-strength flex items-center justify-between gap-2 border-t pt-2 text-[11px] text-muted-foreground"
+                      data-line-strength={String(qNum)}
+                      title="Average player rating on each line. Unrated players count as 3."
+                      aria-label={`Average rating: ${shownLines.map((l) => `${l.label} ${strength[l.key].toFixed(1)}`).join(', ')}`}
+                    >
+                      {shownLines.map((l) => (
+                        <span key={l.key} data-line={l.key} className="whitespace-nowrap" aria-hidden="true">
+                          {l.label}{' '}
+                          <span className="font-semibold tabular-nums text-foreground">
+                            ★{strength[l.key].toFixed(1)}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>

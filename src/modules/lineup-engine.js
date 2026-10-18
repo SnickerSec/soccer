@@ -16,6 +16,7 @@
  */
 
 import { shuffleArray, shuffleWithinSimilarGroups } from './utils.js';
+import { lineOf, strengthIn } from './line-strength.js';
 
 /** Attempts between progress reports during generation. */
 const PROGRESS_INTERVAL = 50;
@@ -461,13 +462,6 @@ function selectKeeper(availablePlayers, quarter, seasonStats = {}) {
     return poolToSelectFrom[0];
 }
 
-function getPositionRatingCategory(position) {
-    if (position === 'Keeper') return 'keeper';
-    if (position.includes('Back')) return 'defense';
-    if (position.includes('Mid') || position === 'Midfield') return 'midfield';
-    return 'offense';
-}
-
 function assignPositionsOptimally(players, positions, defensivePositions, seasonStats = {}, finalQuarter = new Set()) {
     const assignments = [];
     const remainingPlayers = [...players];
@@ -544,7 +538,7 @@ function assignPositionsOptimally(players, positions, defensivePositions, season
             }
 
             const posRatings = player.positionalRatings || {};
-            const posRatingCategory = getPositionRatingCategory(position);
+            const posRatingCategory = lineOf(position);
             const posRating = posRatings[posRatingCategory] || 0;
             if (posRating > 0) {
                 score += posRating * 30;
@@ -579,27 +573,6 @@ function assignPositionsOptimally(players, positions, defensivePositions, season
 
 /** How the coach wants rated players spread across the field. */
 export const LINEUP_STRATEGIES = ['balanced', 'defense', 'offense'];
-
-/**
- * A player's strength in a line, on the one-to-five scale the rating dialog
- * uses. The rating for that line wins, then the overall, then a neutral 3 —
- * an unrated player is "no opinion", not the weakest on the roster.
- */
-function strengthIn(player, category) {
-    const positional = (player.positionalRatings || {})[category];
-    if (positional) return positional;
-    return player.overallRating || 3;
-}
-
-/**
- * Whether the strategy has anything to go on for a player. Only the overall
- * and the three outfield ratings count: the keeper pick has its own rules,
- * and a keeper rating alone leaves the player a neutral 3 everywhere else.
- */
-export function ratedForStrategy(player) {
-    const positional = player?.positionalRatings || {};
-    return Boolean(player?.overallRating || positional.defense || positional.midfield || positional.offense);
-}
 
 /** How much a line counts towards each focus. Midfield is half of either. */
 const FOCUS_WEIGHTS = {
@@ -712,7 +685,7 @@ function applyLineupStrategy(lineup, players, defensivePositions, strategy) {
         Object.entries(lineup[qi].positions)
             .filter(([position]) => position !== 'Keeper')
             .map(([position, name]) => {
-                const category = getPositionRatingCategory(position);
+                const category = lineOf(position);
                 return { category, strength: strengthIn(byName.get(name) || {}, category) };
             }),
         strategy

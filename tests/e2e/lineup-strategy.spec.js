@@ -67,4 +67,29 @@ test.describe('Lineup strategy', () => {
         await loadDemo(page);
         await expect(page.locator('#lineupStrategyRatingsHint')).toHaveCount(0);
     });
+
+    test('each quarter card shows how strong each line is', async ({ page }) => {
+        await loadDemo(page);
+        await page.click('#generateLineup');
+        await expect(page.locator('#lineupDisplay')).toBeVisible({ timeout: 15000 });
+
+        for (const q of ['1', '2', '3', '4']) {
+            const readout = page.locator(`[data-line-strength="${q}"]`);
+            await expect(readout).toBeVisible();
+            for (const line of ['defense', 'midfield', 'offense']) {
+                await expect(readout.locator(`[data-line="${line}"]`)).toHaveText(/^(Back|Mid|Front) ★[1-5]\.\d$/);
+            }
+        }
+    });
+
+    test('an unrated roster gets no readout', async ({ page }) => {
+        await page.goto('/');
+        for (let i = 1; i <= 8; i++) {
+            await page.fill('#playerName', `Player ${i}`);
+            await page.click('#addPlayer');
+        }
+        await page.click('#generateLineup');
+        await expect(page.locator('#lineupDisplay')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('[data-line-strength]')).toHaveCount(0);
+    });
 });
