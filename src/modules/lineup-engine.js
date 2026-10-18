@@ -597,12 +597,8 @@ const FOCUS_WEIGHTS = {
     offense: { defense: 0, midfield: 1, offense: 2 }
 };
 
-function strategyScore(assignments, strategy) {
-    const placed = assignments.map(({ position, player }) => {
-        const category = getPositionRatingCategory(position);
-        return { category, strength: strengthIn(player, category) };
-    });
-
+/** One quarter's score under a strategy. `placed` is [{ category, strength }]. */
+function quarterScore(placed, strategy) {
     const weights = FOCUS_WEIGHTS[strategy];
     if (weights) {
         return placed.reduce((sum, { category, strength }) => sum + (weights[category] ?? 0) * strength, 0);
@@ -627,58 +623,176 @@ function strategyScore(assignments, strategy) {
 }
 
 /**
- * Rearranges a quarter's outfield assignments towards the coach's strategy,
- * by swapping pairs of players while it keeps improving.
- *
- * Moving a player between two positions on the same side of the ball leaves
- * their defence and offence counts as they were. Moving one across is allowed
- * only while the rotation rules still hold for both: neither ends the quarter
- * more than one quarter out between defence and offence, and a player in
- * their last quarter is not moved off the only side they have yet to play.
- * Nobody is moved to a position they have already played this game. So the
- * strategy decides who goes where among choices that keep Everyone Plays,
- * and the generator's validation and retries catch the rest as before.
+ * How much a quarter that falls short of the game's average costs a focus.
+ * Without it the strongest players spent their defensive turns in the first
+ * quarter, because that was the first place they could, and the back line
+ * was weaker than Balanced's by the third.
  */
-function applyLineupStrategy(assignments, strategy, defensivePositions, finalQuarter = new Set()) {
-    if (!LINEUP_STRATEGIES.includes(strategy) || assignments.length < 2) return;
+const SHORTFALL_PENALTY = 2;
 
-    // Whether a player may take a position on the given side this quarter.
-    const fitsSide = (player, defensive) => {
-        const d = (player.defensiveQuarters || 0) + (defensive ? 1 : 0);
-        const o = (player.offensiveQuarters || 0) + (defensive ? 0 : 1);
-        if (Math.abs(d - o) > 1) return false;
-        return !finalQuarter.has(player.name) || (d > 0 && o > 0);
+function gameScore(scores, strategy) {
+    const total = scores.reduce((a, b) => a + b, 0);
+    if (!FOCUS_WEIGHTS[strategy]) return total;
+    const mean = total / scores.length;
+    return scores.reduce((sum, score) => sum - SHORTFALL_PENALTY * Math.max(0, mean - score), total);
+}
+
+/**
+ * Rearranges a generated game towards the coach's strategy, by trading
+ * players between outfield positions while that keeps improving it.
+ *
+ * It works on the whole game rather than quarter by quarter: a quarter filled
+ * on its own spends the strong players' defensive turns as early as it can.
+ * Two kinds of move are tried. One trades two players' positions within a
+ * quarter. The other trades them in two quarters at once, where they are on
+ * opposite sides in each, so neither one's defence and offence count changes
+ * — only which quarter they defend in.
+ *
+ * A move is kept only if it leaves both players with no more rotation
+ * problems than before: defence and offence both played, at most one quarter
+ * apart, no position twice. The keeper stays where the keeper pick put them.
+ * So the strategy decides who goes where among choices that keep Everyone
+ * Plays, and validateLineup checks the result as before.
+ */
+function applyLineupStrategy(lineup, players, defensivePositions, strategy) {
+    if (!LINEUP_STRATEGIES.includes(strategy) || lineup.length === 0) return;
+
+    const byName = new Map(players.map(p => [p.name, p]));
+    const isDefensive = (position) => defensivePositions.includes(position);
+
+    // Per player: defence and offence counts, and positions played, from the lineup.
+    const state = new Map(players.map(p => [p.name, { d: 0, o: 0, positions: new Map() }]));
+    lineup.forEach(quarter => {
+        Object.entries(quarter.positions).forEach(([position, name]) => {
+            const entry = state.get(name);
+            if (!entry) return;
+            if (isDefensive(position)) entry.d++; else entry.o++;
+            entry.positions.set(position, (entry.positions.get(position) || 0) + 1);
+        });
+    });
+
+    const problems = (name) => {
+        const { d, o, positions } = state.get(name);
+        if (d + o === 0) return 0;
+        let count = (d === 0) + (o === 0) + (Math.abs(d - o) > 1);
+        positions.forEach(times => { if (times > 1) count += times - 1; });
+        return count;
     };
-    const hasPlayed = (player, position) => player.positionsPlayed.some(p => p.position === position);
 
-    let current = strategyScore(assignments, strategy);
-    for (let iter = 0; iter < 50; iter++) {
+    const move = (name, from, to) => {
+        const entry = state.get(name);
+        if (isDefensive(from)) entry.d--; else entry.o--;
+        if (isDefensive(to)) entry.d++; else entry.o++;
+        entry.positions.set(from, entry.positions.get(from) - 1);
+        entry.positions.set(to, (entry.positions.get(to) || 0) + 1);
+    };
+
+    // Trades the players at two positions in a quarter; trading again undoes it.
+    const trade = (qi, x, y) => {
+        const positions = lineup[qi].positions;
+        const a = positions[x];
+        const b = positions[y];
+        move(a, x, y);
+        move(b, y, x);
+        positions[x] = b;
+        positions[y] = a;
+    };
+
+    const scoreOf = (qi) => quarterScore(
+        Object.entries(lineup[qi].positions)
+            .filter(([position]) => position !== 'Keeper')
+            .map(([position, name]) => {
+                const category = getPositionRatingCategory(position);
+                return { category, strength: strengthIn(byName.get(name) || {}, category) };
+            }),
+        strategy
+    );
+
+    const scores = lineup.map((_, qi) => scoreOf(qi));
+    let current = gameScore(scores, strategy);
+
+    // Every candidate move: a list of [quarter index, position, position] trades.
+    const outfield = lineup.map(quarter => Object.keys(quarter.positions).filter(p => p !== 'Keeper'));
+    const candidates = [];
+    outfield.forEach((positions, qi) => {
+        for (let i = 0; i < positions.length; i++) {
+            for (let j = i + 1; j < positions.length; j++) {
+                candidates.push([[qi, positions[i], positions[j]]]);
+            }
+        }
+    });
+    const positionOf = (qi, name) => outfield[qi].find(p => lineup[qi].positions[p] === name);
+
+    const tryMove = (trades) => {
+        const names = new Set();
+        trades.forEach(([qi, x, y]) => {
+            names.add(lineup[qi].positions[x]);
+            names.add(lineup[qi].positions[y]);
+        });
+        const before = [...names].reduce((sum, name) => sum + problems(name), 0);
+        const touched = new Set(trades.map(([qi]) => qi));
+        trades.forEach(([qi, x, y]) => trade(qi, x, y));
+        const after = [...names].reduce((sum, name) => sum + problems(name), 0);
+        let score = -Infinity;
+        if (after <= before) {
+            const trial = scores.map((value, qi) => (touched.has(qi) ? scoreOf(qi) : value));
+            score = gameScore(trial, strategy);
+        }
+        [...trades].reverse().forEach(([qi, x, y]) => trade(qi, x, y));
+        return score;
+    };
+
+    for (let iter = 0; iter < 200; iter++) {
         let best = null;
-        for (let i = 0; i < assignments.length; i++) {
-            for (let j = i + 1; j < assignments.length; j++) {
-                const a = assignments[i];
-                const b = assignments[j];
-                const aDefensive = defensivePositions.includes(a.position);
-                const bDefensive = defensivePositions.includes(b.position);
-                if (aDefensive !== bDefensive
-                    && !(fitsSide(a.player, bDefensive) && fitsSide(b.player, aDefensive))) continue;
-                if (hasPlayed(a.player, b.position) || hasPlayed(b.player, a.position)) continue;
+        const consider = (trades) => {
+            const score = tryMove(trades);
+            if (score > current + 1e-9 && (!best || score > best.score)) best = { trades, score };
+        };
 
-                [a.player, b.player] = [b.player, a.player];
-                const score = strategyScore(assignments, strategy);
-                [a.player, b.player] = [b.player, a.player];
+        candidates.forEach(consider);
 
-                if (score > current + 1e-9 && (!best || score > best.score)) {
-                    best = { i, j, score };
+        // The same two players traded in two quarters where they stand on
+        // opposite sides in each: their counts stay as they are.
+        for (let q1 = 0; q1 < lineup.length; q1++) {
+            for (let q2 = q1 + 1; q2 < lineup.length; q2++) {
+                const both = outfield[q1]
+                    .map(p => lineup[q1].positions[p])
+                    .filter(name => positionOf(q2, name));
+                for (let i = 0; i < both.length; i++) {
+                    for (let j = i + 1; j < both.length; j++) {
+                        const x1 = positionOf(q1, both[i]);
+                        const y1 = positionOf(q1, both[j]);
+                        const x2 = positionOf(q2, both[i]);
+                        const y2 = positionOf(q2, both[j]);
+                        if (isDefensive(x1) === isDefensive(y1)) continue;
+                        if (isDefensive(x2) === isDefensive(y2)) continue;
+                        if (isDefensive(x1) === isDefensive(x2)) continue;
+                        consider([[q1, x1, y1], [q2, x2, y2]]);
+                    }
                 }
             }
         }
+
         if (!best) break;
-        const a = assignments[best.i];
-        const b = assignments[best.j];
-        [a.player, b.player] = [b.player, a.player];
+        best.trades.forEach(([qi, x, y]) => trade(qi, x, y));
+        new Set(best.trades.map(([qi]) => qi)).forEach(qi => { scores[qi] = scoreOf(qi); });
         current = best.score;
     }
+
+    // Bring the player records the validator and the app read up to date.
+    players.forEach(player => {
+        player.positionsPlayed = [];
+        player.defensiveQuarters = 0;
+        player.offensiveQuarters = 0;
+    });
+    lineup.forEach(quarter => {
+        Object.entries(quarter.positions).forEach(([position, name]) => {
+            const player = byName.get(name);
+            if (!player) return;
+            player.positionsPlayed.push({ quarter: quarter.quarter, position });
+            if (isDefensive(position)) player.defensiveQuarters++; else player.offensiveQuarters++;
+        });
+    });
 }
 
 /** Quarters a player is down to play, going by the sitting schedule. */
@@ -748,7 +862,6 @@ function generateQuarterLineup(quarter, sittingSchedule, players, positions, sea
     const assignments = assignPositionsOptimally(
         playingPlayers, positionsToFill, defensivePositions, seasonStats, finalQuarter
     );
-    applyLineupStrategy(assignments, options.strategy, defensivePositions, finalQuarter);
 
     assignments.forEach(({ position, player }) => {
         quarterLineup.positions[position] = player.name;
@@ -883,7 +996,7 @@ export function generateLineup(data, { onProgress } = {}) {
 
         for (let quarter = 1; quarter <= quarters; quarter++) {
             const quarterLineup = generateQuarterLineup(
-                quarter, sittingSchedule, players, positions, seasonStats, { keeperPlaysThree, quarters, strategy }
+                quarter, sittingSchedule, players, positions, seasonStats, { keeperPlaysThree, quarters }
             );
             lineup.push(quarterLineup);
         }
@@ -891,6 +1004,14 @@ export function generateLineup(data, { onProgress } = {}) {
         validation = validateLineup(players, quarters, { keeperPlaysThree });
 
         if (validation.length < bestValidationCount) {
+            // Only an attempt worth keeping is rearranged. A move never adds a
+            // rotation problem, so this cannot cost the attempt its place, and
+            // a roster that can never pass does not pay for it 500 times.
+            applyLineupStrategy(
+                lineup, players, positions.filter(p => p.includes('Back') || p === 'Keeper'), strategy
+            );
+            validation = validateLineup(players, quarters, { keeperPlaysThree });
+
             bestValidationCount = validation.length;
             bestLineup = JSON.parse(JSON.stringify(lineup));
             bestPlayers = JSON.parse(JSON.stringify(players));

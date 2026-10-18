@@ -677,12 +677,19 @@ take a quarter in goal each, leaving every back slot to the eight who play two
 towards whichever side of the ball they have not yet played.
 
 `lineupStrategy` — `balanced`, `defense` or `offense` — decides where the
-player ratings send the stronger players. After each quarter's greedy pick,
-`applyLineupStrategy` in `lineup-engine.js` swaps pairs of outfield players
-while that improves the strategy's score. It only makes swaps that keep
-Everyone Plays intact: nobody ends up more than one quarter out between
-defense and offense, and nobody plays a position twice. That means a focus
-cannot stack the back line. Everyone Plays fixes each player's split between
+player ratings send the stronger players. Once a game is laid out,
+`applyLineupStrategy` in `lineup-engine.js` trades outfield players between
+positions while that improves the strategy's score, keeping only trades that
+leave nobody with more rotation problems than before. It works on the whole
+game, not quarter by quarter: filled one quarter at a time, defense focus
+spent the strong players' defensive turns in Q1 and left Q3's back line
+weaker than Balanced's. A focus also penalises any quarter below the game's
+average, and one of the moves trades two players in two quarters at once so
+that only *when* each defends changes. The pass runs only on an attempt that
+is the best so far, since a roster that can never pass would otherwise pay
+for it on all 500 retries.
+
+A focus cannot stack the back line. Everyone Plays fixes each player's split between
 defense and offense (in 2-3-1 the slot counts leave no choice at all), so a
 focus moves strength along the field instead: the strong players'
 defensive turns go to the back and their attacking ones to midfield, or

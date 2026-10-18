@@ -767,6 +767,34 @@ describe('lineup strategy', () => {
         expect(offense.front).toBeGreaterThan(offense.mid);
     });
 
+    /**
+     * Filled quarter by quarter, defense focus spent the strong players'
+     * defensive turns as early as it could: about two of them at the back in
+     * the first quarter and half of one in the third, weaker than Balanced by
+     * then. A focus has to hold for the whole game.
+     */
+    test.each([
+        ['defense', 'back'],
+        ['offense', 'front']
+    ])('%s focus keeps its line strong in every quarter, not just the first', (strategy, line) => {
+        const strongByQuarter = [0, 0, 0, 0];
+        const runs = 60;
+        for (let run = 0; run < runs; run++) {
+            const players = stars(12);
+            const rating = new Map(players.map(p => [p.name, p.overallRating]));
+            const result = generate(12, { players, strategy });
+            expect(result.validation).toEqual([]);
+            for (const quarter of result.lineup) {
+                for (const [position, name] of Object.entries(quarter.positions)) {
+                    if (position === 'Keeper' || position.includes('Mid')) continue;
+                    const inLine = position.includes('Back') ? 'back' : 'front';
+                    if (inLine === line && rating.get(name) === 5) strongByQuarter[quarter.quarter - 1]++;
+                }
+            }
+        }
+        expect(Math.min(...strongByQuarter)).toBeGreaterThan(0.6 * Math.max(...strongByQuarter));
+    });
+
     test('balanced keeps the lines closer together than either focus', () => {
         const spread = ({ back, mid, front }) => Math.max(back, mid, front) - Math.min(back, mid, front);
         const balanced = spread(lineStrength('balanced'));
