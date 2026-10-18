@@ -46,7 +46,7 @@ import {
   getFormationsForFieldSize,
   formationHasMidfieldLine,
 } from '@/modules/formations';
-import { generateLineup, validateLineup, sittingInQuarter } from '@/modules/lineup-engine';
+import { generateLineup, validateLineup, sittingInQuarter, ratedForStrategy } from '@/modules/lineup-engine';
 import { recalculateGamePlayers } from '@/modules/game-edit';
 import { rosterPushDecision } from '@/modules/roster-push-guard';
 import { calculatePlayerStats, currentQuarters, currentPlayerPositions } from '@/modules/season-stats';
@@ -101,6 +101,9 @@ import { extractPlayersFromFile } from '@/modules/roster-importer';
 import { extractFixturesFromFile } from '@/modules/schedule-importer';
 import { buildShareUrl, decodeShareData } from '@/modules/share-link';
 import { toast } from 'sonner';
+
+/** Who the generator is handed: the players who are here. */
+const isAvailable = (p) => !p.status || p.status === 'available';
 
 /**
  * The schedule as localStorage has it.
@@ -1740,6 +1743,8 @@ export default function App() {
             onGenerateLineup={handleGenerateLineup}
             isGenerating={isGenerating}
             playerCount={players.length}
+            availablePlayerCount={players.filter(isAvailable).length}
+            ratedPlayerCount={players.filter((p) => isAvailable(p) && ratedForStrategy(p)).length}
             onOpenCustomFormation={() => setIsCustomFormationOpen(true)}
             savedGameCount={gameHistory.length}
             onLoadSavedGame={() => setIsLoadGameOpen(true)}

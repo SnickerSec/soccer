@@ -47,4 +47,24 @@ test.describe('Lineup strategy', () => {
             expect(new Set(names).size).toBe(present);
         }
     });
+
+    test('says so when nobody is rated, and goes once somebody is', async ({ page }) => {
+        await page.goto('/');
+        for (const name of ['Ana', 'Ben']) {
+            await page.fill('#playerName', name);
+            await page.click('#addPlayer');
+        }
+        await expect(page.locator('#lineupStrategyRatingsHint')).toContainText('No player here is rated yet');
+
+        await page.locator('#playerList li[aria-label*="Ana"] .player-rating-btn').click();
+        await page.locator('.rating-stars[data-category="overall"] .rating-star').nth(3).click();
+        await page.locator('.rating-dialog-buttons button', { hasText: 'Save' }).click();
+
+        await expect(page.locator('#lineupStrategyRatingsHint')).toHaveText('1 of 2 players are rated; the rest count as 3 stars.');
+    });
+
+    test('the demo roster is rated, so there is nothing to say', async ({ page }) => {
+        await loadDemo(page);
+        await expect(page.locator('#lineupStrategyRatingsHint')).toHaveCount(0);
+    });
 });

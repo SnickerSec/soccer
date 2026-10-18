@@ -591,6 +591,16 @@ function strengthIn(player, category) {
     return player.overallRating || 3;
 }
 
+/**
+ * Whether the strategy has anything to go on for a player. Only the overall
+ * and the three outfield ratings count: the keeper pick has its own rules,
+ * and a keeper rating alone leaves the player a neutral 3 everywhere else.
+ */
+export function ratedForStrategy(player) {
+    const positional = player?.positionalRatings || {};
+    return Boolean(player?.overallRating || positional.defense || positional.midfield || positional.offense);
+}
+
 /** How much a line counts towards each focus. Midfield is half of either. */
 const FOCUS_WEIGHTS = {
     defense: { defense: 2, midfield: 1, offense: 0 },

@@ -11,7 +11,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { generateLineup, validateLineup, determineSittingSchedule, sittingInQuarter } from '../src/modules/lineup-engine.js';
+import { generateLineup, validateLineup, determineSittingSchedule, sittingInQuarter, ratedForStrategy } from '../src/modules/lineup-engine.js';
 import { getPositionsForFormation, isDefensivePosition } from '../src/modules/formations.js';
 
 const QUARTERS = 4;
@@ -823,5 +823,20 @@ describe('lineup strategy', () => {
         for (const strategy of ['balanced', 'defense', 'offense']) {
             expect(generate(11, { strategy }).validation).toEqual([]);
         }
+    });
+});
+
+describe('ratedForStrategy', () => {
+    test('an overall or an outfield rating counts', () => {
+        expect(ratedForStrategy({ overallRating: 4 })).toBe(true);
+        expect(ratedForStrategy({ overallRating: null, positionalRatings: { defense: 2 } })).toBe(true);
+        expect(ratedForStrategy({ positionalRatings: { offense: 5 } })).toBe(true);
+    });
+
+    test('nothing, or a keeper rating alone, does not', () => {
+        expect(ratedForStrategy({ overallRating: null, positionalRatings: {} })).toBe(false);
+        expect(ratedForStrategy({ positionalRatings: { keeper: 5 } })).toBe(false);
+        expect(ratedForStrategy({})).toBe(false);
+        expect(ratedForStrategy(null)).toBe(false);
     });
 });

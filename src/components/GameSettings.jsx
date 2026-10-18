@@ -28,6 +28,8 @@ export function GameSettings({
   onGenerateLineup,
   isGenerating,
   playerCount = 0,
+  ratedPlayerCount = 0,
+  availablePlayerCount = 0,
   onOpenCustomFormation,
   savedGameCount = 0,
   onLoadSavedGame,
@@ -233,6 +235,16 @@ export function GameSettings({
           <p className="text-xs text-muted-foreground sm:pt-6" id="lineupStrategyDescription">
             {STRATEGY_DESCRIPTIONS[lineupStrategy] || STRATEGY_DESCRIPTIONS.balanced}{' '}
             Uses player ratings. Everyone still rotates through defense and offense, so a focus shifts strength rather than stacking one end.
+            {availablePlayerCount > 0 && ratedPlayerCount === 0 && (
+              <span className="block mt-1 font-medium text-foreground" id="lineupStrategyRatingsHint">
+                No player here is rated yet, so every strategy gives the same lineup. Rate players with the button beside each name on the roster.
+              </span>
+            )}
+            {ratedPlayerCount > 0 && ratedPlayerCount < availablePlayerCount && (
+              <span className="block mt-1" id="lineupStrategyRatingsHint">
+                {ratedPlayerCount} of {availablePlayerCount} players are rated; the rest count as 3 stars.
+              </span>
+            )}
           </p>
         </div>
 
