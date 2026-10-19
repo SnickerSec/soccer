@@ -175,6 +175,9 @@ export default function App() {
   });
   const [lineup, setLineup] = useState(() => storedLineup?.lineup || null);
   const [isGenerating, setIsGenerating] = useState(false);
+  // State would be a render late: a second tap in the same frame still sees
+  // isGenerating false, so the guard against running twice is a ref.
+  const generatingRef = useRef(false);
 
   // Game History / Season
   const [gameHistory, setGameHistory] = useState(() => {
@@ -1003,7 +1006,14 @@ export default function App() {
   };
 
   // Lineup generation
+  //
+  // Resolves once the lineup is set, for a caller that needs it (opening the
+  // matchday screen). A call while one is running is ignored: a second tap used
+  // to queue a whole second run, which drew the captains again and replaced the
+  // lineup the coach had just been shown.
   const handleGenerateLineup = () => {
+    if (generatingRef.current) return Promise.resolve();
+
     const curPlayers = (playersRef.current && playersRef.current.length > 0) ? playersRef.current : players;
     const curSettings = settingsRef.current || settings;
 
@@ -1018,61 +1028,76 @@ export default function App() {
       return;
     }
 
+    generatingRef.current = true;
     setIsGenerating(true);
 
-    try {
-      const positions = getPositionsForFormation(curSettings.fieldPlayers, curSettings.formation);
-      const stats = calculatePlayerStats(curPlayers, gameHistory);
+    // The generator runs on the main thread and takes most of a second on a
+    // phone when the roster cannot pass every rule, so it waits until the
+    // "Generating..." state has been painted. Called straight away, React never
+    // got to render it: the button looked like it had ignored the tap. The
+    // animation-frame callback runs before the next paint and a timeout queued
+    // from it runs after; a hidden page gets no frames, so it skips the wait.
+    return new Promise((resolve) => {
+      const run = () => {
+        try {
+          const positions = getPositionsForFormation(curSettings.fieldPlayers, curSettings.formation);
+          const stats = calculatePlayerStats(curPlayers, gameHistory);
 
-      // Select 2 team captains from active players (favoring players who have served as captain least)
-      const statsMap = stats || {};
-      const activeCandidates = [...activePlayers]
-        .map((p) => ({
-          name: p.name,
-          captainCount: statsMap[p.name]?.captainGames || 0,
-          randomKey: Math.random(),
-        }))
-        .sort((a, b) => {
-          if (a.captainCount !== b.captainCount) return a.captainCount - b.captainCount;
-          return a.randomKey - b.randomKey;
-        });
+          // Select 2 team captains from active players (favoring players who have served as captain least)
+          const statsMap = stats || {};
+          const activeCandidates = [...activePlayers]
+            .map((p) => ({
+              name: p.name,
+              captainCount: statsMap[p.name]?.captainGames || 0,
+              randomKey: Math.random(),
+            }))
+            .sort((a, b) => {
+              if (a.captainCount !== b.captainCount) return a.captainCount - b.captainCount;
+              return a.randomKey - b.randomKey;
+            });
 
-      const selectedCaptains = activeCandidates.slice(0, 2).map((c) => c.name);
-      if (selectedCaptains.length > 0) {
-        setCaptains(selectedCaptains);
-      }
+          const selectedCaptains = activeCandidates.slice(0, 2).map((c) => c.name);
+          if (selectedCaptains.length > 0) {
+            setCaptains(selectedCaptains);
+          }
 
-      const result = generateLineup({
-        players: JSON.parse(JSON.stringify(activePlayers)),
-        positions,
-        playersOnField: curSettings.fieldPlayers,
-        quarters: curSettings.quarters || 4,
-        maxAttempts: CONSTANTS.MAX_GENERATION_ATTEMPTS,
-        seasonStats: stats,
-        keeperPlaysThree: curSettings.keeperPlaysThree,
-        strategy: curSettings.lineupStrategy,
-      });
+          const result = generateLineup({
+            players: JSON.parse(JSON.stringify(activePlayers)),
+            positions,
+            playersOnField: curSettings.fieldPlayers,
+            quarters: curSettings.quarters || 4,
+            maxAttempts: CONSTANTS.MAX_GENERATION_ATTEMPTS,
+            seasonStats: stats,
+            keeperPlaysThree: curSettings.keeperPlaysThree,
+            strategy: curSettings.lineupStrategy,
+          });
 
-      if (result && result.lineup) {
-        setLineup({
-          quarters: result.lineup,
-          warnings: result.validation || [],
-          formation: curSettings.formation,
-          fieldPlayers: curSettings.fieldPlayers,
-          playerStats: result.players || [],
-        });
-        // "Balanced" is a strategy now, so it is not how every lineup is described.
-        const focus = { defense: ' with a defense focus', offense: ' with an offense focus' }[curSettings.lineupStrategy] || '';
-        toast.success(`Generated lineup${focus}!`);
-      } else {
-        toast.error('Failed to generate a valid lineup rotation');
-      }
-    } catch (err) {
-      console.error('Lineup generation error:', err);
-      toast.error('An error occurred during lineup generation');
-    } finally {
-      setIsGenerating(false);
-    }
+          if (result && result.lineup) {
+            setLineup({
+              quarters: result.lineup,
+              warnings: result.validation || [],
+              formation: curSettings.formation,
+              fieldPlayers: curSettings.fieldPlayers,
+              playerStats: result.players || [],
+            });
+            // "Balanced" is a strategy now, so it is not how every lineup is described.
+            const focus = { defense: ' with a defense focus', offense: ' with an offense focus' }[curSettings.lineupStrategy] || '';
+            toast.success(`Generated lineup${focus}!`);
+          } else {
+            toast.error('Failed to generate a valid lineup rotation');
+          }
+        } catch (err) {
+          console.error('Lineup generation error:', err);
+          toast.error('An error occurred during lineup generation');
+        } finally {
+          generatingRef.current = false;
+          setIsGenerating(false);
+          resolve();
+        }
+      };
+      if (document.hidden) run();
+      else requestAnimationFrame(() => setTimeout(run, 0));
+    });
   };
 
   // Lineup Action Handlers
@@ -1578,9 +1603,11 @@ export default function App() {
     toast.info(`Match against ${fixture.opponent} selected. Lineup ready for review!`);
   };
 
-  const handleLaunchMatchdayForFixture = (fixture) => {
+  const handleLaunchMatchdayForFixture = async (fixture) => {
+    // Awaited: generation now resolves after a frame, and the matchday screen
+    // opened before then would have no lineup to run.
     if (!lineup) {
-      handleGenerateLineup();
+      await handleGenerateLineup();
     }
     setMatchdayFixture(fixture);
     setIsMatchdayOpen(true);

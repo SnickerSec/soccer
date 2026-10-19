@@ -1016,6 +1016,16 @@ export function generateLineup(data, { onProgress } = {}) {
     let bestValidationCount = Infinity;
     let bestValidation = [];
     let bestSpread = Infinity;
+
+    // Where retrying can stop short of a clean lineup. With nobody sitting the
+    // forced imbalances are arithmetic — each one a single "imbalance of 2",
+    // spread 4 — so a lineup with that many issues and that spread is as good
+    // as any attempt can be. Without this, a full turnout ran all 500 attempts
+    // every time, the better part of a second on a phone, to find nothing
+    // better than its first good one.
+    const floor = quarters % 2 === 0 ? unavoidableImbalance(positions, players.length, quarters).count : 0;
+    const atFloor = () => bestValidationCount === 0
+        || (floor > 0 && bestValidationCount <= floor && bestSpread <= floor * 4);
     let lineup = [];
     let bestPlayers = null;
 
@@ -1073,7 +1083,7 @@ export function generateLineup(data, { onProgress } = {}) {
             onProgress?.(attempts, validation.length);
         }
 
-    } while (validation.length > 0 && attempts < maxAttempts);
+    } while (!atFloor() && attempts < maxAttempts);
 
     // The best attempt's own issues, not `validation`, which by now belongs to
     // the last attempt. Returning that put the notices of a discarded lineup

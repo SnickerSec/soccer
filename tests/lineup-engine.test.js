@@ -865,6 +865,19 @@ describe('unavoidableImbalance', () => {
 
     // The note tells the coach the generator could do no better, so it must
     // only ever name the minimum the generator actually reaches.
+    // Retrying cannot beat arithmetic, so the generator stops once it gets
+    // there rather than spending all of its attempts — most of a second on a
+    // phone — on lineups no better than the one it already has.
+    test.each(['3-3', '2-3-1'])('stops retrying once the minimum is reached (%s)', (formation) => {
+        const attempts = [];
+        for (let run = 0; run < 10; run++) {
+            const result = generate(7, { formation, rated: true });
+            expect(result.validation).toHaveLength(2);
+            attempts.push(result.attempts);
+        }
+        expect(Math.max(...attempts)).toBeLessThan(MAX_ATTEMPTS);
+    });
+
     test.each([
         [7, '3-3'], [7, '2-3-1'], [7, '3-2-1'], [7, '2-2-2'],
         [6, '3-3'], [9, '2-3-3'], [11, '4-4-2']

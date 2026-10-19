@@ -115,7 +115,9 @@ export function GameSettings({
             id="generateLineup"
             size="default"
             onClick={onGenerateLineup}
-            className="flex w-full shrink-0 items-center justify-center gap-1.5 shadow-sm sm:w-auto"
+            disabled={isGenerating}
+            aria-busy={isGenerating || undefined}
+            className="flex w-full shrink-0 items-center justify-center gap-1.5 shadow-sm sm:w-auto disabled:opacity-80"
             aria-label="Generate lineup based on current players and settings"
           >
             {isGenerating ? (
