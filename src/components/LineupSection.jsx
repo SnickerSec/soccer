@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { FieldVisualization } from './FieldVisualization';
 import { getPositionsForFormation } from '@/modules/formations';
-import { sittingInQuarter } from '@/modules/lineup-engine';
+import { sittingInQuarter, unavoidableImbalance } from '@/modules/lineup-engine';
 import { quarterLineStrength, LINES } from '@/modules/line-strength';
 import { SUMMARY_HEADERS, summaryCells } from '@/modules/player-summary';
 import { cn } from '@/lib/utils';
@@ -138,6 +138,22 @@ export function LineupSection({
     lineup.formation || '2-3-1'
   );
 
+  // When nobody sits, some D/O imbalances are arithmetic, not the generator's
+  // doing — say so, or a coach with exactly seven reads them as a bug.
+  const fieldedNames = new Set(
+    quarters.flatMap((q) =>
+      Object.values(q?.positions || {})
+        .map((value) => (typeof value === 'string' ? value : value?.name))
+        .filter(Boolean)
+    )
+  );
+  const nobodySat = quarters.every((q) => sittingInQuarter(q, playerStats).length === 0);
+  const forcedImbalance = nobodySat
+    ? unavoidableImbalance(canonicalPositions, fieldedNames.size, quarters.length)
+    : { count: 0 };
+  const imbalanceWarningCount = warnings.filter((w) => w.includes('D/O imbalance')).length;
+  const explainImbalance = forcedImbalance.count > 0 && imbalanceWarningCount > 0;
+
   const describeSlot = (slot) => {
     if (!slot) return '';
     const resting = String(slot.position).startsWith('Sitting:');
@@ -238,6 +254,20 @@ export function LineupSection({
               {warnings.map((warn, i) => (
                 <div key={i} className="font-medium">• {warn}</div>
               ))}
+              {explainImbalance && (
+                <p id="unavoidableImbalanceNote" className="mt-2 border-t border-amber-500/20 pt-2">
+                  <strong className="font-semibold">
+                    {forcedImbalance.count === imbalanceWarningCount
+                      ? `${imbalanceWarningCount === 1 ? 'This imbalance' : `These ${imbalanceWarningCount} imbalances`} can't be avoided.`
+                      : `${forcedImbalance.count} of the ${imbalanceWarningCount} imbalances can't be avoided.`}
+                  </strong>{' '}
+                  With {forcedImbalance.players} players nobody sits, and {lineup.formation} has{' '}
+                  {forcedImbalance.defensiveTotal} quarters at the back to share ({forcedImbalance.defensivePerQuarter} a
+                  quarter, keeper included) where an even split for everyone uses {forcedImbalance.evenTotal}. So{' '}
+                  {forcedImbalance.count === 1 ? 'one player has' : `${forcedImbalance.count} players have`} to play{' '}
+                  {forcedImbalance.forcedDefensive} {forcedImbalance.forcedDefensive === 1 ? 'quarter' : 'quarters'} at the back.
+                </p>
+              )}
             </AlertDescription>
           </Alert>
         )}

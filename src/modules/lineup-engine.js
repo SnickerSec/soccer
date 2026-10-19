@@ -951,6 +951,62 @@ export function validateLineup(players, quarters, { keeperPlaysThree = false } =
     return issues;
 }
 
+/**
+ * How many D/O imbalances a lineup cannot avoid, when nobody sits.
+ *
+ * With exactly as many players as positions every player plays every quarter,
+ * so the split is fixed by arithmetic rather than by the generator. Four
+ * quarters split evenly is two at each end; 3-3 has four defensive spots a
+ * quarter (the keeper counts, as it does in validateLineup) — sixteen across
+ * the game, where seven even splits use fourteen — so two players must take a
+ * third defensive quarter however the lineup is drawn. Each player off an even
+ * split by one absorbs one of the surplus.
+ *
+ * Returns `{ count: 0 }` whenever someone sits: a sitting player's quarters
+ * are what the generator balances with, and nothing is forced.
+ */
+export function unavoidableImbalance(positions, playerCount, quarters = 4) {
+    const players = positions.length;
+    if (players === 0 || playerCount !== players) return { count: 0 };
+
+    const defensivePerQuarter = positions.filter(p => p.includes('Back') || p === 'Keeper').length;
+    const defensiveTotal = defensivePerQuarter * quarters;
+    // The defensive quarters a player may have and stay within one of even.
+    const lowest = Math.ceil((quarters - 1) / 2);
+    const highest = Math.floor((quarters + 1) / 2);
+
+    const surplus = defensiveTotal - players * highest;
+    const shortfall = players * lowest - defensiveTotal;
+    const count = Math.max(surplus, shortfall, 0);
+    if (count === 0 || count > players) return { count: 0 };
+
+    return {
+        count,
+        players,
+        quarters,
+        defensivePerQuarter,
+        defensiveTotal,
+        evenTotal: players * (surplus > 0 ? highest : lowest),
+        // What each of the `count` players ends up with at the back.
+        forcedDefensive: surplus > 0 ? highest + 1 : lowest - 1,
+    };
+}
+
+/**
+ * How unevenly a lineup splits defense and attack, for breaking ties between
+ * attempts with the same number of issues. Squared, so one player at D:4 / O:0
+ * — two issues, "imbalance of 4" and "never played offense" — scores worse
+ * than two at D:3 / O:1, which is also two issues. Counting issues alone could
+ * not tell them apart, and with seven on a 7v7 field it handed back the one
+ * player who never got to attack.
+ */
+function imbalanceSpread(players) {
+    return players.reduce((sum, p) => {
+        const gap = (p.defensiveQuarters || 0) - (p.offensiveQuarters || 0);
+        return sum + gap * gap;
+    }, 0);
+}
+
 export function generateLineup(data, { onProgress } = {}) {
     const { players, positions, playersOnField, quarters, maxAttempts, seasonStats, keeperPlaysThree = false, strategy = 'balanced' } = data;
 
@@ -959,6 +1015,7 @@ export function generateLineup(data, { onProgress } = {}) {
     let bestLineup = null;
     let bestValidationCount = Infinity;
     let bestValidation = [];
+    let bestSpread = Infinity;
     let lineup = [];
     let bestPlayers = null;
 
@@ -987,7 +1044,9 @@ export function generateLineup(data, { onProgress } = {}) {
 
         validation = validateLineup(players, quarters, { keeperPlaysThree });
 
-        if (validation.length < bestValidationCount) {
+        const spread = imbalanceSpread(players);
+        if (validation.length < bestValidationCount
+            || (validation.length === bestValidationCount && spread < bestSpread)) {
             // Only an attempt worth keeping is rearranged. A move never adds a
             // rotation problem, so this cannot cost the attempt its place, and
             // a roster that can never pass does not pay for it 500 times.
@@ -996,10 +1055,18 @@ export function generateLineup(data, { onProgress } = {}) {
             );
             validation = validateLineup(players, quarters, { keeperPlaysThree });
 
-            bestValidationCount = validation.length;
-            bestValidation = validation;
-            bestLineup = JSON.parse(JSON.stringify(lineup));
-            bestPlayers = JSON.parse(JSON.stringify(players));
+            // Checked again after the strategy pass: it never adds an issue,
+            // but its trades can move the split, and an attempt that only won
+            // on the tiebreak must not displace a better one by losing it.
+            const finalSpread = imbalanceSpread(players);
+            if (validation.length < bestValidationCount
+                || (validation.length === bestValidationCount && finalSpread < bestSpread)) {
+                bestValidationCount = validation.length;
+                bestValidation = validation;
+                bestSpread = finalSpread;
+                bestLineup = JSON.parse(JSON.stringify(lineup));
+                bestPlayers = JSON.parse(JSON.stringify(players));
+            }
         }
 
         if (attempts % PROGRESS_INTERVAL === 0) {

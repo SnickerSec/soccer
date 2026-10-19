@@ -11,7 +11,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { generateLineup, validateLineup, determineSittingSchedule, sittingInQuarter } from '../src/modules/lineup-engine.js';
+import { generateLineup, validateLineup, determineSittingSchedule, sittingInQuarter, unavoidableImbalance } from '../src/modules/lineup-engine.js';
 import { getPositionsForFormation, isDefensivePosition } from '../src/modules/formations.js';
 
 const QUARTERS = 4;
@@ -838,6 +838,45 @@ describe('the issues reported with a lineup', () => {
 
             expect(result.validation.length).toBeGreaterThan(0);
             expect(result.validation).toEqual(validateLineup(result.players, QUARTERS));
+        }
+    });
+});
+
+describe('unavoidableImbalance', () => {
+    const positions = (formation, field = 7) => getPositionsForFormation(field, formation);
+
+    test('3-3 with seven: sixteen quarters at the back where even splits use fourteen', () => {
+        expect(unavoidableImbalance(positions('3-3'), 7)).toEqual({
+            count: 2, players: 7, quarters: 4,
+            defensivePerQuarter: 4, defensiveTotal: 16, evenTotal: 14, forcedDefensive: 3
+        });
+    });
+
+    test('2-3-1 with seven: too few at the back, so two players get only one', () => {
+        expect(unavoidableImbalance(positions('2-3-1'), 7)).toMatchObject({
+            count: 2, defensiveTotal: 12, evenTotal: 14, forcedDefensive: 1
+        });
+    });
+
+    test('nothing is forced once somebody sits', () => {
+        expect(unavoidableImbalance(positions('3-3'), 8).count).toBe(0);
+        expect(unavoidableImbalance(positions('2-3-1'), 12).count).toBe(0);
+    });
+
+    // The note tells the coach the generator could do no better, so it must
+    // only ever name the minimum the generator actually reaches.
+    test.each([
+        [7, '3-3'], [7, '2-3-1'], [7, '3-2-1'], [7, '2-2-2'],
+        [6, '3-3'], [9, '2-3-3'], [11, '4-4-2']
+    ])('is what the generator reaches with exactly %i (%s)', (field, formation) => {
+        const forced = unavoidableImbalance(positions(formation, field), field).count;
+        for (let run = 0; run < 5; run++) {
+            const result = generate(field, { playersOnField: field, formation, rated: true });
+            const imbalances = result.validation.filter((w) => w.includes('D/O imbalance'));
+            expect(imbalances).toHaveLength(forced);
+            // Spread over that many players at one quarter each, rather than
+            // one player who never attacks.
+            imbalances.forEach((w) => expect(w).toContain('imbalance of 2'));
         }
     });
 });
