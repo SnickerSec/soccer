@@ -68,6 +68,14 @@ holds a PostgreSQL advisory lock for the whole run, so a second run waits for
 the first and says so. A checkout on an older commit does not take the lock, so
 give a worktree its own database if it might run alongside another.
 
+Housekeeping is in-process rather than a separate job. connect-pg-simple
+prunes expired sessions every fifteen minutes and autovacuum handles dead
+tuples; `server/maintenance.js` deletes invites whose link expired unspent, at
+startup and every six hours, since nothing else ever removed them. Its DELETE
+requires `user_id IS NULL` as well as `joined_at IS NULL`, so a row that names a
+person is never touched — `tests/integration/maintenance.test.js` fails
+without that guard. It runs only when `DATABASE_URL` is set.
+
 If `postgres://localhost/...` asks for a password, the local server accepts
 peer authentication over its socket instead:
 `TEST_DATABASE_URL="postgres:///soccer_test?host=/var/run/postgresql"`.

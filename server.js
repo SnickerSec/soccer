@@ -10,6 +10,7 @@ import { csrfSync } from 'csrf-sync';
 import { configurePassport } from './server/auth.js';
 import pool from './server/db.js';
 import { canonicalRedirect } from './server/canonical-host.js';
+import { scheduleMaintenance } from './server/maintenance.js';
 
 // Route imports
 import authRoutes from './server/routes/auth.js';
@@ -179,3 +180,9 @@ app.listen(PORT, () => {
     console.log(`Shinguard running on port ${PORT}`);
     console.log(`Open http://localhost:${PORT} in your browser`);
 });
+
+// Only with a database to tidy: the e2e server runs without one, and every run
+// would log a failed connection.
+if (process.env.DATABASE_URL) {
+    scheduleMaintenance(pool);
+}
