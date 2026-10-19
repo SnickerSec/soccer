@@ -7,6 +7,7 @@ import {
   getFormationDescription,
 } from '@/modules/formations';
 import { History, Play, Sparkles } from 'lucide-react';
+import { InfoTip } from '@/components/InfoTip';
 
 const STRATEGY_DESCRIPTIONS = {
   balanced: 'Spreads your stronger players evenly across defense, midfield and attack each quarter.',
@@ -37,19 +38,21 @@ export function GameSettings({
   const availableFormations = getFormationsForFieldSize(fieldPlayers);
   const formationDesc = getFormationDescription(fieldPlayers, formation);
 
+  // The division's rules, without a "10U Rules:" prefix — the tooltip they sit
+  // in already leads with the division.
   const getAgeRules = () => {
     switch (ageDivision) {
       case '10U':
-        return '10U Rules: 7v7 format with build-out line. No heading allowed. Offside enforced with build-out line. Substitutions at quarters.';
+        return '7v7 with a build-out line, which also governs offside. No heading.';
       case '12U':
-        return '12U Rules: 9v9 format. No heading allowed. Standard offside rules apply. Substitutions at quarters.';
+        return '9v9. No heading. Standard offside.';
       case '14U':
-        return '14U Rules: 11v11 format. Heading permitted. Full standard soccer rules apply.';
+        return '11v11. Heading permitted. Full standard rules.';
       case '16U':
       case '19U':
-        return `${ageDivision} Rules: 11v11 format. High school age competition. Full standard soccer rules apply.`;
+        return '11v11, high school age. Full standard rules.';
       default:
-        return 'Standard AYSO fair rotation rules: every player plays at least 50% of the game.';
+        return 'Every player plays at least half the game.';
     }
   };
 
@@ -58,9 +61,16 @@ export function GameSettings({
 
   // Every column's label sits in a row of the same fixed height. A bare inline
   // label takes the line height of the div around it (24px), while Formation's
-  // row, which also holds "+ Custom", and the Quarters span came out at 16px —
-  // so the first two selects sat lower than the last two.
+  // row, which also holds "+ Custom", came out at 16px — so the selects did
+  // not line up.
   const labelRowClasses = 'flex h-5 items-center justify-between';
+  const labelClasses = 'text-xs font-medium text-muted-foreground';
+  const labelGroupClasses = 'flex items-center gap-1.5';
+  const legendClasses = 'mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
+
+  const ageRules = `${getAgeRules()} Four quarters, with substitutions between them.`;
+  const strategyDesc = `${STRATEGY_DESCRIPTIONS[lineupStrategy] || STRATEGY_DESCRIPTIONS.balanced} Uses player ratings; everyone still rotates through every line.`;
+  const keeperRuleDesc = 'Only players on for 3+ quarters keep goal, so nobody who sits twice also spends a quarter in goal.';
 
   return (
     <Card className="settings-section shadow-sm">
@@ -79,7 +89,7 @@ export function GameSettings({
         <div className="min-w-0">
           <CardTitle className="text-base font-semibold">Game Settings</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Configure division, field size, and tactical formation
+            Match format, and how the generator places your players
           </p>
         </div>
         <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
@@ -113,166 +123,181 @@ export function GameSettings({
         </div>
       </CardHeader>
 
-      <CardContent className="pt-4 space-y-4">
-        {/* Settings Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Age Division */}
-          <div className="space-y-1.5">
-            <div className={labelRowClasses}>
-              <label htmlFor="ageDivision" className="text-xs font-medium text-muted-foreground">
-                Age Division:
-              </label>
-            </div>
-            <select
-              id="ageDivision"
-              aria-label="Select age division"
-              value={ageDivision}
-              onChange={(e) => onAgeDivisionChange(e.target.value)}
-              className={selectClasses}
-            >
-              <option value="10U">10U (Under 10)</option>
-              <option value="12U">12U (Under 12)</option>
-              <option value="14U">14U (Under 14)</option>
-              <option value="16U">16U (Under 16)</option>
-              <option value="19U">19U (Under 19)</option>
-            </select>
-          </div>
-
-          {/* Players on Field */}
-          <div className="space-y-1.5">
-            <div className={labelRowClasses}>
-              <label htmlFor="fieldPlayers" className="text-xs font-medium text-muted-foreground">
-                Players on Field:
-              </label>
-            </div>
-            <select
-              id="fieldPlayers"
-              aria-label="Select number of players on the field"
-              value={fieldPlayers}
-              onChange={(e) => onFieldPlayersChange(parseInt(e.target.value, 10))}
-              className={selectClasses}
-            >
-              {ageDivision === '10U' && (
-                <>
-                  <option value={7}>7v7 (Standard)</option>
-                  <option value={6}>6v6 (Small-sided)</option>
-                </>
-              )}
-              {ageDivision === '12U' && (
-                <option value={9}>9v9 (Standard)</option>
-              )}
-              {(ageDivision === '14U' || ageDivision === '16U' || ageDivision === '19U') && (
-                <option value={11}>11v11 (Standard)</option>
-              )}
-            </select>
-          </div>
-
-          {/* Formation */}
-          <div className="space-y-1.5">
-            <div className={labelRowClasses}>
-              <label htmlFor="formation" className="text-xs font-medium text-muted-foreground">
-                Formation:
-              </label>
-              <button
-                type="button"
-                id="openCustomFormation"
-                onClick={onOpenCustomFormation}
-                className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+      {/*
+        The explanations live in tooltips behind an (i) beside each label, so the
+        card is the controls and nothing else. Each is also kept in the DOM,
+        visually hidden, as its control's aria-describedby — a screen reader
+        hears it on focusing the select, without having to find the button.
+      */}
+      <CardContent className="pt-4 space-y-5">
+        <fieldset>
+          <legend className={legendClasses}>Match format</legend>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <div className={labelRowClasses}>
+                <div className={labelGroupClasses}>
+                  <label htmlFor="ageDivision" className={labelClasses}>
+                    Age division
+                  </label>
+                  <InfoTip label={`About ${ageDivision} rules`}>
+                    <strong className="font-semibold">{ageDivision}:</strong> {ageRules}
+                  </InfoTip>
+                </div>
+              </div>
+              <select
+                id="ageDivision"
+                aria-describedby="ageRules"
+                value={ageDivision}
+                onChange={(e) => onAgeDivisionChange(e.target.value)}
+                className={selectClasses}
               >
-                + Custom
-              </button>
+                <option value="10U">10U (Under 10)</option>
+                <option value="12U">12U (Under 12)</option>
+                <option value="14U">14U (Under 14)</option>
+                <option value="16U">16U (Under 16)</option>
+                <option value="19U">19U (Under 19)</option>
+              </select>
+              <span id="ageRules" className="sr-only">{ageRules}</span>
             </div>
-            <select
-              id="formation"
-              aria-label="Select formation for the lineup"
-              value={formation}
-              onChange={(e) => onFormationChange(e.target.value)}
-              className={selectClasses}
-            >
-              {availableFormations.map((formKey) => {
-                const f = FORMATIONS[formKey];
-                return (
-                  <option key={formKey} value={formKey}>
-                    {f ? `${formKey} (${f.name})` : formKey}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
 
-          {/* Quarters */}
-          <div className="space-y-1.5">
-            <div className={labelRowClasses}>
-              <span className="text-xs font-medium text-muted-foreground">
-                Quarters:
+            <div className="space-y-1.5">
+              <div className={labelRowClasses}>
+                <label htmlFor="fieldPlayers" className={labelClasses}>
+                  Players on field
+                </label>
+              </div>
+              <select
+                id="fieldPlayers"
+                value={fieldPlayers}
+                onChange={(e) => onFieldPlayersChange(parseInt(e.target.value, 10))}
+                className={selectClasses}
+              >
+                {ageDivision === '10U' && (
+                  <>
+                    <option value={7}>7v7 (Standard)</option>
+                    <option value={6}>6v6 (Small-sided)</option>
+                  </>
+                )}
+                {ageDivision === '12U' && (
+                  <option value={9}>9v9 (Standard)</option>
+                )}
+                {(ageDivision === '14U' || ageDivision === '16U' || ageDivision === '19U') && (
+                  <option value={11}>11v11 (Standard)</option>
+                )}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className={labelRowClasses}>
+                <div className={labelGroupClasses}>
+                  <label htmlFor="formation" className={labelClasses}>
+                    Formation
+                  </label>
+                  <InfoTip label={`About the ${formation} formation`}>
+                    <strong className="font-semibold">{formation}:</strong> {formationDesc}
+                  </InfoTip>
+                </div>
+                <button
+                  type="button"
+                  id="openCustomFormation"
+                  onClick={onOpenCustomFormation}
+                  className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                >
+                  + Custom
+                </button>
+              </div>
+              <select
+                id="formation"
+                aria-describedby="formationDescription"
+                value={formation}
+                onChange={(e) => onFormationChange(e.target.value)}
+                className={selectClasses}
+              >
+                {availableFormations.map((formKey) => {
+                  const f = FORMATIONS[formKey];
+                  return (
+                    <option key={formKey} value={formKey}>
+                      {f ? `${formKey} (${f.name})` : formKey}
+                    </option>
+                  );
+                })}
+              </select>
+              <span id="formationDescription" className="sr-only">
+                {formation}: {formationDesc}
               </span>
             </div>
-            <div className="h-9 px-3 flex items-center rounded-md border border-input bg-muted/30 text-xs font-medium shadow-sm">
-              4 (AYSO Standard)
+          </div>
+        </fieldset>
+
+        {/* The rule is on the fieldset's parent: a fieldset's own border is
+            drawn through its legend. */}
+        <div className="border-t pt-4">
+          <fieldset>
+            <legend className={legendClasses}>Lineup rules</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <div className={labelRowClasses}>
+                  <div className={labelGroupClasses}>
+                    <label htmlFor="lineupStrategy" className={labelClasses}>
+                      Strategy
+                    </label>
+                    <InfoTip label="About lineup strategies">{strategyDesc}</InfoTip>
+                  </div>
+                </div>
+                <select
+                  id="lineupStrategy"
+                  aria-describedby="lineupStrategyDescription"
+                  value={lineupStrategy}
+                  onChange={(e) => onLineupStrategyChange?.(e.target.value)}
+                  className={selectClasses}
+                >
+                  <option value="balanced">Balanced</option>
+                  <option value="defense">Defense focus</option>
+                  <option value="offense">Offense focus</option>
+                </select>
+                <span id="lineupStrategyDescription" className="sr-only">{strategyDesc}</span>
+                {/* Not a tooltip: this is about the roster as it stands, and a
+                    coach has to see it to know the strategy is doing nothing. */}
+                {availablePlayerCount > 0 && ratedPlayerCount === 0 && (
+                  <p className="text-xs font-medium text-foreground" id="lineupStrategyRatingsHint">
+                    No player here is rated yet, so every strategy gives the same lineup. Rate players with the button beside each name on the roster.
+                  </p>
+                )}
+                {ratedPlayerCount > 0 && ratedPlayerCount < availablePlayerCount && (
+                  <p className="text-xs text-muted-foreground" id="lineupStrategyRatingsHint">
+                    {ratedPlayerCount} of {availablePlayerCount} players are rated; the rest count as 3 stars.
+                  </p>
+                )}
+              </div>
+
+              {/* An empty label row on wider screens, so the checkbox lines up
+                  with the select beside it. */}
+              <div className="space-y-1.5 sm:col-span-2">
+                <div className={`${labelRowClasses} hidden sm:flex`} aria-hidden="true" />
+                <div className="flex items-center gap-1.5">
+                  {/* The whole row is the tap target; the checkbox stays small.
+                      The (i) sits outside the label so tapping it does not
+                      toggle the rule. */}
+                  <label
+                    htmlFor="keeperPlaysThree"
+                    className="-ml-2 flex min-h-11 sm:min-h-9 items-center gap-3 rounded-md px-2 text-xs font-medium text-foreground cursor-pointer transition-colors hover:bg-muted/40"
+                  >
+                    <input
+                      type="checkbox"
+                      id="keeperPlaysThree"
+                      aria-describedby="keeperPlaysThreeDescription"
+                      checked={keeperPlaysThree}
+                      onChange={(e) => onKeeperPlaysThreeChange?.(e.target.checked)}
+                      className="h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                    />
+                    Goalie must play 3+ quarters
+                  </label>
+                  <InfoTip label="About the goalie rule">{keeperRuleDesc}</InfoTip>
+                  <span id="keeperPlaysThreeDescription" className="sr-only">{keeperRuleDesc}</span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,12rem)_1fr] sm:items-center gap-1.5 sm:gap-4">
-          <div className="space-y-1.5">
-            <div className={labelRowClasses}>
-              <label htmlFor="lineupStrategy" className="text-xs font-medium text-muted-foreground">
-                Lineup Strategy:
-              </label>
-            </div>
-            <select
-              id="lineupStrategy"
-              aria-label="Select how player ratings shape the lineup"
-              value={lineupStrategy}
-              onChange={(e) => onLineupStrategyChange?.(e.target.value)}
-              className={selectClasses}
-            >
-              <option value="balanced">Balanced</option>
-              <option value="defense">Defense focus</option>
-              <option value="offense">Offense focus</option>
-            </select>
-          </div>
-          <p className="text-xs text-muted-foreground sm:pt-6" id="lineupStrategyDescription">
-            {STRATEGY_DESCRIPTIONS[lineupStrategy] || STRATEGY_DESCRIPTIONS.balanced}{' '}
-            Uses player ratings. Everyone still rotates through defense and offense, so a focus shifts strength rather than stacking one end.
-            {availablePlayerCount > 0 && ratedPlayerCount === 0 && (
-              <span className="block mt-1 font-medium text-foreground" id="lineupStrategyRatingsHint">
-                No player here is rated yet, so every strategy gives the same lineup. Rate players with the button beside each name on the roster.
-              </span>
-            )}
-            {ratedPlayerCount > 0 && ratedPlayerCount < availablePlayerCount && (
-              <span className="block mt-1" id="lineupStrategyRatingsHint">
-                {ratedPlayerCount} of {availablePlayerCount} players are rated; the rest count as 3 stars.
-              </span>
-            )}
-          </p>
-        </div>
-
-        <label htmlFor="keeperPlaysThree" className="flex items-start gap-2 text-xs cursor-pointer">
-          <input
-            type="checkbox"
-            id="keeperPlaysThree"
-            checked={keeperPlaysThree}
-            onChange={(e) => onKeeperPlaysThreeChange?.(e.target.checked)}
-            className="mt-0.5 h-4 w-4 cursor-pointer accent-primary"
-          />
-          <span>
-            <span className="font-medium text-foreground">Goalie must play 3+ quarters</span>
-            <span className="block text-muted-foreground">
-              A player sitting two quarters won't be put in goal, so nobody spends half their game resting and a quarter of it in goal.
-            </span>
-          </span>
-        </label>
-
-        {/* Formation & Age Rules descriptions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
-          <div className="p-3 rounded-md bg-muted/40 border text-muted-foreground" id="formationDescription">
-            <strong className="text-foreground">{formation} Formation: </strong>
-            {formationDesc}
-          </div>
-          <div className="p-3 rounded-md bg-muted/40 border text-muted-foreground" id="ageRules">
-            {getAgeRules()}
-          </div>
+          </fieldset>
         </div>
       </CardContent>
     </Card>
