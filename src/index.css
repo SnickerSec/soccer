@@ -452,6 +452,13 @@
   border-top: 0.75pt dashed #999;
 }
 
+.print-unavailable {
+  margin: 10pt 0 0;
+  padding-top: 4pt;
+  font-size: 9pt;
+  border-top: 1pt solid #000;
+}
+
 @media print {
   @page {
     size: letter portrait;

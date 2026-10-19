@@ -74,3 +74,41 @@ export function printableQuarters(lineup, players = [], captains = []) {
         };
     });
 }
+
+/**
+ * Who is not playing today, for the foot of the sheet: the roster's absent and
+ * injured players, each with their number. Without it the paper is silent on
+ * a player missing from every quarter, and the coach is asked about them by
+ * whoever is reading it.
+ *
+ * The roster's status is as of now, not as of the lineup, so anyone the lineup
+ * fields or rests is left out — a player marked absent after it was generated
+ * must not be printed as both in goal and not here.
+ */
+export function unavailablePlayers(lineup, players = []) {
+    const none = { absent: [], injured: [] };
+    if (!lineup || !Array.isArray(lineup.quarters) || lineup.quarters.length === 0) {
+        return none;
+    }
+
+    const inLineup = new Set();
+    lineup.quarters.forEach((quarter) => {
+        Object.values(quarter?.positions || {}).forEach((value) => {
+            const name = typeof value === 'string' ? value : value?.name;
+            if (name) inLineup.add(name);
+        });
+        (Array.isArray(quarter?.sitting) ? quarter.sitting : []).forEach((value) => {
+            const name = typeof value === 'string' ? value : value?.name;
+            if (name) inLineup.add(name);
+        });
+    });
+
+    const numbers = numbersByName(players);
+    return (players || []).reduce((out, player) => {
+        if (!player?.name || inLineup.has(player.name)) return out;
+        if (player.status === 'absent' || player.status === 'injured') {
+            out[player.status].push(entryFor(player.name, numbers, []));
+        }
+        return out;
+    }, { absent: [], injured: [] });
+}

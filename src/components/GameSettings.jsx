@@ -66,7 +66,12 @@ export function GameSettings({
   const labelRowClasses = 'flex h-5 items-center justify-between';
   const labelClasses = 'text-xs font-medium text-muted-foreground';
   const labelGroupClasses = 'flex items-center gap-1.5';
-  const legendClasses = 'mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
+  // On a wide screen every control fits on one row, so the group headings go
+  // (kept for screen readers) and a rule between the groups stands in for them.
+  const legendClasses = 'mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground lg:sr-only';
+  // Each column is as wide as its select's longest option, not a third of the
+  // card: "3-3" in a 340px box was mostly dead space.
+  const columnClasses = 'space-y-1.5 lg:w-max';
 
   const ageRules = `${getAgeRules()} Four quarters, with substitutions between them.`;
   const strategyDesc = `${STRATEGY_DESCRIPTIONS[lineupStrategy] || STRATEGY_DESCRIPTIONS.balanced} Uses player ratings; everyone still rotates through every line.`;
@@ -129,11 +134,11 @@ export function GameSettings({
         visually hidden, as its control's aria-describedby — a screen reader
         hears it on focusing the select, without having to find the button.
       */}
-      <CardContent className="pt-4 space-y-5">
+      <CardContent className="pt-4 space-y-5 lg:flex lg:flex-wrap lg:items-end lg:gap-x-8 lg:gap-y-3 lg:space-y-0">
         <fieldset>
           <legend className={legendClasses}>Match format</legend>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:flex lg:items-end">
+            <div className={columnClasses}>
               <div className={labelRowClasses}>
                 <div className={labelGroupClasses}>
                   <label htmlFor="ageDivision" className={labelClasses}>
@@ -160,7 +165,7 @@ export function GameSettings({
               <span id="ageRules" className="sr-only">{ageRules}</span>
             </div>
 
-            <div className="space-y-1.5">
+            <div className={columnClasses}>
               <div className={labelRowClasses}>
                 <label htmlFor="fieldPlayers" className={labelClasses}>
                   Players on field
@@ -187,8 +192,8 @@ export function GameSettings({
               </select>
             </div>
 
-            <div className="space-y-1.5">
-              <div className={labelRowClasses}>
+            <div className={columnClasses}>
+              <div className={`${labelRowClasses} lg:gap-4`}>
                 <div className={labelGroupClasses}>
                   <label htmlFor="formation" className={labelClasses}>
                     Formation
@@ -231,11 +236,11 @@ export function GameSettings({
 
         {/* The rule is on the fieldset's parent: a fieldset's own border is
             drawn through its legend. */}
-        <div className="border-t pt-4">
+        <div className="border-t pt-4 lg:flex lg:items-end lg:self-stretch lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
           <fieldset>
             <legend className={legendClasses}>Lineup rules</legend>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:flex lg:items-end">
+              <div className={columnClasses}>
                 <div className={labelRowClasses}>
                   <div className={labelGroupClasses}>
                     <label htmlFor="lineupStrategy" className={labelClasses}>
@@ -256,23 +261,11 @@ export function GameSettings({
                   <option value="offense">Offense focus</option>
                 </select>
                 <span id="lineupStrategyDescription" className="sr-only">{strategyDesc}</span>
-                {/* Not a tooltip: this is about the roster as it stands, and a
-                    coach has to see it to know the strategy is doing nothing. */}
-                {availablePlayerCount > 0 && ratedPlayerCount === 0 && (
-                  <p className="text-xs font-medium text-foreground" id="lineupStrategyRatingsHint">
-                    No player here is rated yet, so every strategy gives the same lineup. Rate players with the button beside each name on the roster.
-                  </p>
-                )}
-                {ratedPlayerCount > 0 && ratedPlayerCount < availablePlayerCount && (
-                  <p className="text-xs text-muted-foreground" id="lineupStrategyRatingsHint">
-                    {ratedPlayerCount} of {availablePlayerCount} players are rated; the rest count as 3 stars.
-                  </p>
-                )}
               </div>
 
               {/* An empty label row on wider screens, so the checkbox lines up
                   with the select beside it. */}
-              <div className="space-y-1.5 sm:col-span-2">
+              <div className="space-y-1.5 sm:col-span-2 lg:w-max">
                 <div className={`${labelRowClasses} hidden sm:flex`} aria-hidden="true" />
                 <div className="flex items-center gap-1.5">
                   {/* The whole row is the tap target; the checkbox stays small.
@@ -299,6 +292,21 @@ export function GameSettings({
             </div>
           </fieldset>
         </div>
+
+        {/* Not a tooltip: this is about the roster as it stands, and a coach
+            has to see it to know the strategy is doing nothing. Outside the
+            row, so on a wide screen it takes a line of its own rather than
+            pushing the Strategy select out of line with the rest. */}
+        {availablePlayerCount > 0 && ratedPlayerCount === 0 && (
+          <p className="text-xs font-medium text-foreground lg:basis-full" id="lineupStrategyRatingsHint">
+            No player here is rated yet, so every strategy gives the same lineup. Rate players with the button beside each name on the roster.
+          </p>
+        )}
+        {ratedPlayerCount > 0 && ratedPlayerCount < availablePlayerCount && (
+          <p className="text-xs text-muted-foreground lg:basis-full" id="lineupStrategyRatingsHint">
+            {ratedPlayerCount} of {availablePlayerCount} players are rated; the rest count as 3 stars.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

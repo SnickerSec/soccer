@@ -1,5 +1,5 @@
 import React from 'react';
-import { printableQuarters } from '@/modules/print-lineup';
+import { printableQuarters, unavailablePlayers } from '@/modules/print-lineup';
 import { parseLocalDate } from '@/modules/schedule';
 
 /**
@@ -19,6 +19,14 @@ export function PrintSheet({
   date,
 }) {
   const quarters = printableQuarters(lineup, players, captains);
+  const unavailable = unavailablePlayers(lineup, players);
+  const withNumber = (entry) => (entry.number != null ? `#${entry.number} ${entry.name}` : entry.name);
+  const notPlaying = [
+    ['Absent', unavailable.absent],
+    ['Injured', unavailable.injured],
+  ]
+    .filter(([, list]) => list.length > 0)
+    .map(([label, list]) => `${label} — ${list.map(withNumber).join(', ')}`);
 
   const printedOn = parseLocalDate(date || undefined).toLocaleDateString('en-US', {
     month: 'short',
@@ -78,6 +86,12 @@ export function PrintSheet({
           </section>
         ))}
       </div>
+
+      {notPlaying.length > 0 && (
+        <p className="print-unavailable" id="printUnavailable">
+          <strong>Not playing:</strong> {notPlaying.join(' · ')}
+        </p>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@
  */
 
 import { describe, test, expect } from '@jest/globals';
-import { printableQuarters } from '../src/modules/print-lineup.js';
+import { printableQuarters, unavailablePlayers } from '../src/modules/print-lineup.js';
 
 const roster = [
     { name: 'Ana', number: 7 },
@@ -106,5 +106,45 @@ describe('printableQuarters', () => {
 
     test('survives a roster that was never passed', () => {
         expect(printableQuarters(lineup())[0].rows[0]).toMatchObject({ name: 'Ana', number: null });
+    });
+});
+
+describe('unavailablePlayers', () => {
+    const game = {
+        fieldPlayers: 7,
+        formation: '2-3-1',
+        quarters: [{ quarter: 1, positions: { Keeper: 'Ana', 'Left Back': 'Bo' }, sitting: ['Cy'] }]
+    };
+
+    test('lists the absent and the injured, with their numbers', () => {
+        const players = [
+            { name: 'Ana', number: 7 },
+            { name: 'Bo' },
+            { name: 'Cy' },
+            { name: 'Dee', number: 3, status: 'absent' },
+            { name: 'Eli', status: 'absent' },
+            { name: 'Fay', number: 9, status: 'injured' }
+        ];
+        expect(unavailablePlayers(game, players)).toEqual({
+            absent: [
+                { name: 'Dee', number: 3, isCaptain: false },
+                { name: 'Eli', number: null, isCaptain: false }
+            ],
+            injured: [{ name: 'Fay', number: 9, isCaptain: false }]
+        });
+    });
+
+    // Status is as of now: marked absent after the lineup was made, a player
+    // already in it must not print as both playing and not here.
+    test('leaves out anyone the lineup fields or rests', () => {
+        const players = [
+            { name: 'Ana', status: 'absent' },
+            { name: 'Cy', status: 'injured' }
+        ];
+        expect(unavailablePlayers(game, players)).toEqual({ absent: [], injured: [] });
+    });
+
+    test('prints nothing without a lineup', () => {
+        expect(unavailablePlayers(null, [{ name: 'Dee', status: 'absent' }])).toEqual({ absent: [], injured: [] });
     });
 });

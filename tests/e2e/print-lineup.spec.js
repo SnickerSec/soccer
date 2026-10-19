@@ -63,4 +63,30 @@ test.describe('Printing the lineup', () => {
 
         expect(height).toBeLessThan(10.1 * 96);
     });
+
+    test('lists who is absent or injured', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        const statuses = page.locator('#playerList .player-status-select');
+        const absent = await statuses.nth(0).getAttribute('data-player');
+        const injured = await statuses.nth(1).getAttribute('data-player');
+        await statuses.nth(0).selectOption('absent');
+        await statuses.nth(1).selectOption('injured');
+
+        await page.click('#generateLineup');
+        await expect(page.locator('.action-buttons-inline')).toBeVisible({ timeout: 20000 });
+        await page.emulateMedia({ media: 'print' });
+
+        const line = page.locator('#printUnavailable');
+        await expect(line).toBeVisible();
+        await expect(line).toContainText(`Absent — `);
+        await expect(line).toContainText(absent || '');
+        await expect(line).toContainText(`Injured — `);
+        await expect(line).toContainText(injured || '');
+    });
+
+    test('says nothing about absences when everyone is there', async ({ page }) => {
+        await printPreview(page);
+        await expect(page.locator('#printUnavailable')).toHaveCount(0);
+    });
 });
