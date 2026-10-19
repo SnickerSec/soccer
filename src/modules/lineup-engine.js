@@ -958,6 +958,7 @@ export function generateLineup(data, { onProgress } = {}) {
     let validation = [];
     let bestLineup = null;
     let bestValidationCount = Infinity;
+    let bestValidation = [];
     let lineup = [];
     let bestPlayers = null;
 
@@ -996,6 +997,7 @@ export function generateLineup(data, { onProgress } = {}) {
             validation = validateLineup(players, quarters, { keeperPlaysThree });
 
             bestValidationCount = validation.length;
+            bestValidation = validation;
             bestLineup = JSON.parse(JSON.stringify(lineup));
             bestPlayers = JSON.parse(JSON.stringify(players));
         }
@@ -1006,8 +1008,13 @@ export function generateLineup(data, { onProgress } = {}) {
 
     } while (validation.length > 0 && attempts < maxAttempts);
 
+    // The best attempt's own issues, not `validation`, which by now belongs to
+    // the last attempt. Returning that put the notices of a discarded lineup
+    // under the one being shown: with seven players on a 7v7 field, where two
+    // imbalances are unavoidable, the coach was shown five, naming players
+    // whose lineup was fine.
     if (validation.length > 0 && bestLineup) {
-        return { lineup: bestLineup, validation, attempts, players: bestPlayers };
+        return { lineup: bestLineup, validation: bestValidation, attempts, players: bestPlayers };
     }
 
     return { lineup, validation, attempts, players };

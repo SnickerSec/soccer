@@ -825,3 +825,19 @@ describe('lineup strategy', () => {
         }
     });
 });
+
+describe('the issues reported with a lineup', () => {
+    // Seven players on a 7v7 field: nobody sits, so every player has four
+    // quarters to split and the slot counts cannot split evenly — two
+    // imbalances are unavoidable, every attempt fails, and the generator
+    // returns its best. It used to return the best lineup with the *last*
+    // attempt's issues, which named other players and usually more of them.
+    test.each(['3-3', '2-3-1'])('describe the lineup returned, when none passes (%s)', (formation) => {
+        for (let run = 0; run < 10; run++) {
+            const result = generate(7, { formation, rated: true });
+
+            expect(result.validation.length).toBeGreaterThan(0);
+            expect(result.validation).toEqual(validateLineup(result.players, QUARTERS));
+        }
+    });
+});
