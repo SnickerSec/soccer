@@ -48,4 +48,31 @@ test.describe('Generate lineup feedback', () => {
 
         await expect(page.getByText('Generated lineup!')).toHaveCount(1);
     });
+    test('on a phone, Generate brings the lineup into view', async ({ page }) => {
+        // The roster and Game Settings sit between the button and the lineup,
+        // so a tap that worked used to leave the coach looking at a toast with
+        // the lineup two screens further down.
+        await page.setViewportSize({ width: 390, height: 844 });
+        await loadDemo(page);
+        await page.locator('#generateLineup').scrollIntoViewIfNeeded();
+        await expect(page.locator('#lineupDisplay h2')).not.toBeInViewport();
+
+        await page.click('#generateLineup');
+
+        await expect(page.locator('#lineupDisplay h2')).toBeInViewport({ timeout: 20000 });
+    });
+
+    test('a lineup nobody asked to see does not move the page', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await loadDemo(page);
+        await page.click('#generateLineup');
+        await expect(page.locator('#lineupDisplay h2')).toBeInViewport({ timeout: 20000 });
+
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+        await page.locator('body').click({ position: { x: 1, y: 1 } });
+        await page.keyboard.press('Control+g');
+        await expect(page.getByText('Generated lineup!')).toHaveCount(2, { timeout: 20000 });
+
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    });
 });

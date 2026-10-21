@@ -178,6 +178,21 @@ export default function App() {
   // State would be a render late: a second tap in the same frame still sees
   // isGenerating false, so the guard against running twice is a ref.
   const generatingRef = useRef(false);
+  // On a phone the roster and Game Settings sit between the Generate button
+  // and the lineup, so a tap that worked showed only a toast: the lineup was
+  // two screens further down. A lineup the coach asked for is scrolled to once
+  // it has rendered. A swap, an undo or Regenerate (which is on the lineup
+  // already) changes the lineup without asking to be taken anywhere.
+  const revealLineupRef = useRef(false);
+  useEffect(() => {
+    if (!lineup || !revealLineupRef.current) return;
+    revealLineupRef.current = false;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById('lineupDisplay')?.scrollIntoView({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }, [lineup]);
 
   // Game History / Season
   const [gameHistory, setGameHistory] = useState(() => {
@@ -1011,7 +1026,7 @@ export default function App() {
   // matchday screen). A call while one is running is ignored: a second tap used
   // to queue a whole second run, which drew the captains again and replaced the
   // lineup the coach had just been shown.
-  const handleGenerateLineup = () => {
+  const handleGenerateLineup = ({ reveal = false } = {}) => {
     if (generatingRef.current) return Promise.resolve();
 
     const curPlayers = (playersRef.current && playersRef.current.length > 0) ? playersRef.current : players;
@@ -1073,6 +1088,7 @@ export default function App() {
           });
 
           if (result && result.lineup) {
+            revealLineupRef.current = reveal === true;
             setLineup({
               quarters: result.lineup,
               warnings: result.validation || [],
@@ -1598,7 +1614,7 @@ export default function App() {
   const handleGenerateLineupForFixture = (fixture) => {
     setActiveTab('roster');
     if (!lineup) {
-      handleGenerateLineup();
+      handleGenerateLineup({ reveal: true });
     }
     toast.info(`Match against ${fixture.opponent} selected. Lineup ready for review!`);
   };
@@ -1770,7 +1786,7 @@ export default function App() {
             onKeeperPlaysThreeChange={(keeperPlaysThree) => {
               updateSettings({ keeperPlaysThree });
             }}
-            onGenerateLineup={handleGenerateLineup}
+            onGenerateLineup={() => handleGenerateLineup({ reveal: true })}
             isGenerating={isGenerating}
             playerCount={players.length}
             availablePlayerCount={players.filter(isAvailable).length}
