@@ -34,10 +34,29 @@ import { getPositionsForFormation } from '@/modules/formations';
 import { sittingInQuarter, unavoidableImbalance } from '@/modules/lineup-engine';
 import { quarterLineStrength, LINES } from '@/modules/line-strength';
 import { SUMMARY_HEADERS, summaryCells } from '@/modules/player-summary';
+import { safeGetFromStorage, safeSetToStorage } from '@/modules/storage';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 let activeDragSlot = null;
+
+const VIEW_MODE_KEY = 'shinguard_lineup_view';
+const VIEW_MODES = ['all', 'table', 'pitch'];
+
+/**
+ * On a phone the quarters stack, and Combined drew each one twice: the list,
+ * then a ~500px pitch showing the same seven players by shirt number alone.
+ * Four of those put Quarter 1 some 3,000px down a 7,600px page. The list is
+ * the half a coach can read names off and swap in, so it is what a phone
+ * starts on; the pitch is one tap away, and whichever the coach picks is kept.
+ * Above md the quarters sit side by side and Combined has the room.
+ */
+function initialViewMode() {
+  const stored = safeGetFromStorage(VIEW_MODE_KEY);
+  if (VIEW_MODES.includes(stored)) return stored;
+  const phone = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches;
+  return phone ? 'table' : 'all';
+}
 
 export function LineupSection({
   lineup,
@@ -55,7 +74,11 @@ export function LineupSection({
   onOpenMatchday,
   onExportPdf,
 }) {
-  const [viewMode, setViewMode] = useState('all'); // 'all', 'table', 'pitch'
+  const [viewMode, setViewModeState] = useState(initialViewMode); // 'all', 'table', 'pitch'
+  const setViewMode = (mode) => {
+    setViewModeState(mode);
+    safeSetToStorage(VIEW_MODE_KEY, mode);
+  };
   const [mobileQuarter, setMobileQuarter] = useState('all'); // 'all', 1, 2, 3, 4
   const [showAllActions, setShowAllActions] = useState(false); // phone only; see the bar below
   const [pendingSwap, setPendingSwap] = useState(null); // { quarter, position, player }
@@ -203,6 +226,7 @@ export function LineupSection({
             type="button"
             variant={viewMode === 'all' ? 'default' : 'ghost'}
             size="sm"
+            aria-pressed={viewMode === 'all'}
             onClick={() => setViewMode('all')}
             className="text-xs h-7 px-2.5 flex items-center gap-1.5 cursor-pointer"
           >
@@ -213,6 +237,7 @@ export function LineupSection({
             type="button"
             variant={viewMode === 'table' ? 'default' : 'ghost'}
             size="sm"
+            aria-pressed={viewMode === 'table'}
             onClick={() => setViewMode('table')}
             className="text-xs h-7 px-2.5 flex items-center gap-1.5 cursor-pointer"
           >
@@ -223,6 +248,7 @@ export function LineupSection({
             type="button"
             variant={viewMode === 'pitch' ? 'default' : 'ghost'}
             size="sm"
+            aria-pressed={viewMode === 'pitch'}
             onClick={() => setViewMode('pitch')}
             className="text-xs h-7 px-2.5 flex items-center gap-1.5 cursor-pointer"
           >
