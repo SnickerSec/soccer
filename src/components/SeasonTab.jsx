@@ -407,7 +407,10 @@ export function SeasonTab({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[180px]">Player</TableHead>
+                    {/* Ten columns are twice a phone's width. Pinning the
+                        names keeps a row's numbers attached to somebody once
+                        the coach swipes across to GK or Sit. */}
+                    <TableHead className="w-[180px] sticky left-0 z-20 bg-card border-r">Player</TableHead>
                     <TableHead className="text-center">Attendance</TableHead>
                     <TableHead className="text-center">Games</TableHead>
                     <TableHead className="text-center">Captain</TableHead>
@@ -422,7 +425,7 @@ export function SeasonTab({
                 <TableBody>
                   {Object.entries(stats).map(([playerName, playerStat]) => (
                     <TableRow key={playerName}>
-                      <TableCell className="font-medium text-xs">
+                      <TableCell className="sticky left-0 z-10 bg-card border-r font-medium text-xs">
                         {playerName}
                       </TableCell>
                       <TableCell className="text-center text-xs">
