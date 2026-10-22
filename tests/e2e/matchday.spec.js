@@ -193,3 +193,36 @@ test('a lineup reopened from Game History still has a bench to sub from', async 
     await expect(dialog.getByText('Sub for:')).toBeVisible();
     expect(await dialog.getByText('Sub for:').locator('..').getByRole('button').count()).toBe(3);
 });
+
+/**
+ * Radix focuses the first control in a dialog, and here that was the opponent
+ * field, holding the literal value 'Opponent' selected. On Android the keyboard
+ * came up over the clock and score at kickoff, and the first key a coach
+ * pressed replaced the name.
+ */
+test.describe('Opening a match on a phone', () => {
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+    test('lands on the clock, not the opponent field', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#generateLineup');
+        await page.locator('#openMatchday').tap();
+
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByRole('button', { name: /Start/ })).toBeFocused();
+
+        const opponent = dialog.getByRole('textbox', { name: 'Opponent name' });
+        await expect(opponent).toHaveValue('');
+        await expect(opponent).toHaveAttribute('placeholder', 'Opponent');
+        // Still named on the scoreboard while the field is empty
+        await expect(dialog.getByRole('button', { name: 'Increase Opponent score' })).toBeVisible();
+
+        await opponent.fill('Rovers');
+        await expect(dialog.getByRole('button', { name: 'Increase Rovers score' })).toBeVisible();
+        await dialog.getByRole('button', { name: /Save Game Record/i }).click();
+
+        await page.click('#season-tab-btn');
+        await expect(page.locator('#gameHistoryList')).toContainText('vs Rovers (0-0)');
+    });
+});

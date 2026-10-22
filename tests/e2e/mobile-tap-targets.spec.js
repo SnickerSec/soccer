@@ -169,6 +169,9 @@ test.describe('Mobile tap targets', () => {
         await page.goto('/');
         await page.click('#demoButton');
         await page.click('#generateLineup');
+        // Generating is asynchronous; measured before the quarters render,
+        // the "full" page is the short one and the comparison fails.
+        await expect(page.locator('.quarter-lineup')).toHaveCount(4);
 
         const full = await page.evaluate(() => document.documentElement.scrollHeight);
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));

@@ -52,7 +52,12 @@ export function MatchdayDialog({
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
-  const [opponentName, setOpponentName] = useState(fixture?.opponent || initialOpponent || 'Opponent');
+  // Empty unless a fixture names them: 'Opponent' is the field's placeholder
+  // and what the scoreboard and the saved game fall back to, not a value. As a
+  // value it was selected on open, so the first key a coach pressed replaced it.
+  const [opponentName, setOpponentName] = useState(fixture?.opponent || initialOpponent || '');
+  const opponentLabel = opponentName || 'Opponent';
+  const startButtonRef = useRef(null);
   const [events, setEvents] = useState([]);
   const [selectedFieldPlayer, setSelectedFieldPlayer] = useState(null);
   const [activeLineup, setActiveLineup] = useState(lineup);
@@ -207,7 +212,7 @@ export function MatchdayDialog({
     // rejected — and no date, leaving Game History showing it as "Recent".
     if (onSaveGame) {
       onSaveGame({
-        name: `vs ${opponentName || 'Opponent'} (${homeScore}-${awayScore})`,
+        name: `vs ${opponentLabel} (${homeScore}-${awayScore})`,
         date: fixture?.gameDate || todayLocalDate(),
         // As played, subs and all — not the lineup this dialog was opened with
         quarters: activeLineup.quarters,
@@ -219,7 +224,16 @@ export function MatchdayDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-4 sm:p-6 overflow-hidden bg-card text-foreground">
+      {/* Radix focuses the first control on open, which was the opponent
+          field — on Android that raised the keyboard over the clock and score
+          at kickoff. The clock is what a coach reaches for first. */}
+      <DialogContent
+        className="max-w-4xl max-h-[92vh] flex flex-col p-4 sm:p-6 overflow-hidden bg-card text-foreground"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          startButtonRef.current?.focus();
+        }}
+      >
         {/* Header */}
         {/* Wraps to its own rows on a phone. Held in one rigid row it overflowed
             once the controls were clamped to 44px: the whistle button was pushed
@@ -235,6 +249,7 @@ export function MatchdayDialog({
                 onChange={(e) => setOpponentName(e.target.value)}
                 className="h-7 w-32 sm:w-28 text-xs font-semibold inline-block p-1"
                 placeholder="Opponent"
+                aria-label="Opponent name"
               />
             </DialogTitle>
           </div>
@@ -313,7 +328,7 @@ export function MatchdayDialog({
 
               <div className="text-center">
                 <p className="text-[11px] font-semibold text-muted-foreground truncate max-w-[80px]">
-                  {opponentName}
+                  {opponentLabel}
                 </p>
                 <div className="flex items-center gap-1.5 justify-center mt-1">
                   <Button
@@ -322,8 +337,8 @@ export function MatchdayDialog({
                     size="sm"
                     className="h-6 w-6 p-0 rounded-full"
                     onClick={() => setAwayScore(Math.max(0, awayScore - 1))}
-                    aria-label={`Decrease ${opponentName} score`}
-                    title={`Decrease ${opponentName} score`}
+                    aria-label={`Decrease ${opponentLabel} score`}
+                    title={`Decrease ${opponentLabel} score`}
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
@@ -336,8 +351,8 @@ export function MatchdayDialog({
                     size="sm"
                     className="h-6 w-6 p-0 rounded-full"
                     onClick={() => setAwayScore(awayScore + 1)}
-                    aria-label={`Increase ${opponentName} score`}
-                    title={`Increase ${opponentName} score`}
+                    aria-label={`Increase ${opponentLabel} score`}
+                    title={`Increase ${opponentLabel} score`}
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
@@ -376,6 +391,7 @@ export function MatchdayDialog({
 
               <div className="flex items-center gap-2 mt-1">
                 <Button
+                  ref={startButtonRef}
                   type="button"
                   variant={isRunning ? 'destructive' : 'default'}
                   size="sm"
