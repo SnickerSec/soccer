@@ -241,7 +241,7 @@ describe('evaluation-pdf module', () => {
             });
 
             // Fetched template and two custom fonts
-            expect(global.fetch).toHaveBeenCalledWith('/assets/Player Evaluation Form 2025.pdf');
+            expect(global.fetch).toHaveBeenCalledWith('/assets/Player Evaluation Form 2026.pdf');
             expect(global.fetch).toHaveBeenCalledWith('/assets/fonts/LiberationSans-Regular.ttf');
             expect(global.fetch).toHaveBeenCalledWith('/assets/Autography-DOLnW.otf');
 

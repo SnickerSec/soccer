@@ -1,7 +1,7 @@
 /**
  * AYSO Player Evaluation Form PDF generation.
  *
- * Fills the template at /assets/Player Evaluation Form 2025.pdf with the roster,
+ * Fills the template at /assets/Player Evaluation Form 2026.pdf with the roster,
  * ratings and comments, then triggers a download.
  *
  * This module owns the pdf-lib interaction and nothing about the UI: it throws
@@ -17,7 +17,7 @@ let pdfTemplateCache = null;
 
 const PDF_LIB_URL = '/vendor/pdf-lib.min.js';
 const FONTKIT_URL = '/vendor/fontkit.umd.min.js';
-const TEMPLATE_URL = '/assets/Player Evaluation Form 2025.pdf';
+const TEMPLATE_URL = '/assets/Player Evaluation Form 2026.pdf';
 const SIGNATURE_FONT_URL = '/assets/Autography-DOLnW.otf';
 
 /**
@@ -35,7 +35,7 @@ const SIGNATURE_FONT_URL = '/assets/Autography-DOLnW.otf';
  */
 const BODY_FONT_URL = '/assets/fonts/LiberationSans-Regular.ttf';
 
-/** Layout measured against the 2025 template. PDF origin is bottom-left. */
+/** Layout measured against the 2025 template; the 2026 one moved nothing. PDF origin is bottom-left. */
 const LAYOUT = {
     fontSize: 11,
     header: {
