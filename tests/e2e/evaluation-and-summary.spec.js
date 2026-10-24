@@ -68,6 +68,33 @@ test.describe('Evaluation form', () => {
         await expect(page.locator('#comment-0')).toHaveValue('Strong in midfield');
     });
 
+    test('the coach and team details are still there after a reload', async ({ page }) => {
+        await page.goto('/');
+        await openTab(page);
+
+        await page.fill('#coachName', 'Pat Lee');
+        await page.fill('#assistantCoach', 'Sam Ortiz');
+        await page.locator('#assistantCoach').blur();
+        await page.locator('#division').selectOption('U8');
+        await page.locator('#gender').selectOption('Girls');
+
+        await page.reload();
+        await openTab(page);
+
+        await expect(page.locator('#coachName')).toHaveValue('Pat Lee');
+        await expect(page.locator('#assistantCoach')).toHaveValue('Sam Ortiz');
+        await expect(page.locator('#division')).toHaveValue('U8');
+        await expect(page.locator('#gender')).toHaveValue('Girls');
+    });
+
+    test('the division follows the team\'s until one is picked', async ({ page }) => {
+        await page.goto('/');
+        await openTab(page);
+
+        // A fresh device is 10U
+        await expect(page.locator('#division')).toHaveValue('U10');
+    });
+
     test('each field names its player, not just "Rating"', async ({ page }) => {
         await rosterWith(page, ['Ana', 'Ben']);
         await openTab(page);

@@ -1868,6 +1868,8 @@ export default function App() {
           <EvaluationTab
             players={players}
             onUpdatePlayer={handleUpdatePlayer}
+            settings={settings}
+            onUpdateSettings={updateSettings}
           />
         </div>
       </main>

@@ -128,6 +128,14 @@ describe('validateTeamSettings', () => {
         expect(validateTeamSettings({ ageDivision: 42 })).toMatch(/Age division/);
     });
 
+    test('the evaluation header is checked against what the form offers', () => {
+        expect(validateTeamSettings({ evaluation: { coachName: 'Pat', assistantCoach: '', division: '', gender: 'Coed' } })).toBeNull();
+        expect(validateTeamSettings({ evaluation: { division: 'U99' } })).toMatch(/division/);
+        expect(validateTeamSettings({ evaluation: { gender: 'Mixed' } })).toMatch(/gender/);
+        expect(validateTeamSettings({ evaluation: { coachName: 'x'.repeat(61) } })).toMatch(/Coach name/);
+        expect(validateTeamSettings({ evaluation: 'Pat' })).toMatch(/evaluation/);
+    });
+
     test('anything that is not an object at all is refused', () => {
         expect(validateTeamSettings(null)).toMatch(/settings object/);
         expect(validateTeamSettings([])).toMatch(/settings object/);

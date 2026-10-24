@@ -3,7 +3,8 @@
  *
  * Two kinds, kept apart on purpose. /api/settings is the coach: their theme
  * and which team they were last looking at. /api/teams/:teamId/settings is how
- * the team plays — division, field size, formation, quarters, who may keep —
+ * the team plays — division, field size, formation, quarters, who may keep,
+ * and the header of its evaluation form —
  * which belongs to the team, because two coaches sharing a side want the same
  * answer and a coach running two sides wants a different one for each.
  */
@@ -16,6 +17,33 @@ const router = Router();
 
 /** Mirrors LINEUP_STRATEGIES in src/modules/lineup-engine.js. */
 const LINEUP_STRATEGIES = ['balanced', 'defense', 'offense'];
+
+/** Mirror EVALUATION_* in src/modules/team-settings.js. */
+const EVALUATION_DIVISIONS = ['U6', 'U8', 'U10', 'U12', 'U14', 'U16', 'U19'];
+const EVALUATION_GENDERS = ['Boys', 'Girls', 'Coed'];
+const EVALUATION_NAME_MAX = 60;
+
+function validateEvaluation(evaluation) {
+    if (typeof evaluation !== 'object' || Array.isArray(evaluation)) {
+        return 'evaluation must be an object';
+    }
+    const { coachName, assistantCoach, division, gender } = evaluation;
+    for (const [label, value] of [['Coach name', coachName], ['Assistant coach', assistantCoach]]) {
+        if (value !== undefined && value !== null
+            && (typeof value !== 'string' || value.length > EVALUATION_NAME_MAX)) {
+            return `${label} must be text under ${EVALUATION_NAME_MAX} characters`;
+        }
+    }
+    // Empty means "follow the team's age division".
+    if (division !== undefined && division !== null && division !== ''
+        && !EVALUATION_DIVISIONS.includes(division)) {
+        return `Evaluation division must be one of ${EVALUATION_DIVISIONS.join(', ')}`;
+    }
+    if (gender !== undefined && gender !== null && !EVALUATION_GENDERS.includes(gender)) {
+        return `Evaluation gender must be one of ${EVALUATION_GENDERS.join(', ')}`;
+    }
+    return null;
+}
 
 /** The team's play settings as the API exposes them. */
 export function mapTeamSettings(row) {
@@ -41,7 +69,7 @@ export function validateTeamSettings(settings) {
         return 'A settings object is required';
     }
 
-    const { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree, lineupStrategy } = settings;
+    const { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree, lineupStrategy, evaluation } = settings;
 
     // Divisions are not enumerated here: POST /api/teams does not enumerate
     // them either, and a second list on the server would be one more thing to
@@ -76,6 +104,10 @@ export function validateTeamSettings(settings) {
     if (lineupStrategy !== undefined && lineupStrategy !== null
         && !LINEUP_STRATEGIES.includes(lineupStrategy)) {
         return `lineupStrategy must be one of ${LINEUP_STRATEGIES.join(', ')}`;
+    }
+
+    if (evaluation !== undefined && evaluation !== null) {
+        return validateEvaluation(evaluation);
     }
 
     return null;

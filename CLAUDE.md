@@ -720,6 +720,13 @@ one taken from the back line, which fell from 3.0 to 2.0 in simulation. Keeper
 ratings already decide among the players whose turn it is, under every
 strategy, so a coach who wants a strong keeper rates keeping.
 
+The evaluation form's header — coach, assistant coach, division, gender —
+rides in the same `teams.settings` as `evaluation`, so it is filled in once a
+season rather than on every device. Its division is the form's own list (U6
+and U8 included, which the lineup has no division for); left empty it follows
+the team's age division, 10U reading as U10. The names save on blur rather
+than per keystroke, which would be a push per letter.
+
 The coach's theme is the one thing here that stays per-user. It is adopted from
 `user_settings.theme` only on a device with no preference of its own — a phone
 being signed into for the first time — and pushed whenever it changes after

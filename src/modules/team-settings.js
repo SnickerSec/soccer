@@ -32,8 +32,41 @@ export const DEFAULT_SETTINGS = {
     // Where the player ratings send the stronger players: spread evenly over
     // the field, or towards the back or the front. Unrated rosters play the
     // same whichever is picked.
-    lineupStrategy: 'balanced'
+    lineupStrategy: 'balanced',
+    // The header of the AYSO Player Evaluation Form. It belongs to the team
+    // like the rest: the form is filled in once a season, often by whichever
+    // coach gets to it, and retyping it on every device was the alternative.
+    // An empty division means "follow the team's age division".
+    evaluation: { coachName: '', assistantCoach: '', division: '', gender: 'Boys' }
 };
+
+/** What the evaluation form offers; mirrored in server/routes/settings.js. */
+export const EVALUATION_DIVISIONS = ['U6', 'U8', 'U10', 'U12', 'U14', 'U16', 'U19'];
+export const EVALUATION_GENDERS = ['Boys', 'Girls', 'Coed'];
+export const EVALUATION_NAME_MAX = 60;
+
+function normalizeEvaluation(raw) {
+    const source = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+    const name = value => (typeof value === 'string' ? value.slice(0, EVALUATION_NAME_MAX) : '');
+    return {
+        coachName: name(source.coachName),
+        assistantCoach: name(source.assistantCoach),
+        division: EVALUATION_DIVISIONS.includes(source.division) ? source.division : '',
+        gender: EVALUATION_GENDERS.includes(source.gender) ? source.gender : DEFAULT_SETTINGS.evaluation.gender
+    };
+}
+
+/**
+ * The form's division: the one the coach picked, else the team's own — 10U
+ * reads as U10 on the form.
+ */
+export function evaluationDivision(settings) {
+    const picked = settings?.evaluation?.division;
+    if (EVALUATION_DIVISIONS.includes(picked)) return picked;
+    const fromTeam = /^(\d+)U$/.exec(settings?.ageDivision || '');
+    const derived = fromTeam ? `U${fromTeam[1]}` : null;
+    return EVALUATION_DIVISIONS.includes(derived) ? derived : 'U10';
+}
 
 /**
  * Coerce anything into a usable settings object, key by key.
@@ -72,11 +105,14 @@ export function normalizeSettings(raw) {
         ? source.lineupStrategy
         : DEFAULT_SETTINGS.lineupStrategy;
 
-    return { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree, lineupStrategy };
+    const evaluation = normalizeEvaluation(source.evaluation);
+
+    return { ageDivision, fieldPlayers, formation, quarters, keeperPlaysThree, lineupStrategy, evaluation };
 }
 
 /**
- * True when two settings objects would play the same game.
+ * True when two settings objects would play the same game and fill in the
+ * same evaluation form.
  *
  * The push is skipped when nothing moved, so adopting the server's copy on a
  * sync does not bounce straight back at it.
@@ -84,5 +120,7 @@ export function normalizeSettings(raw) {
 export function sameSettings(a, b) {
     const left = normalizeSettings(a);
     const right = normalizeSettings(b);
-    return Object.keys(DEFAULT_SETTINGS).every(key => left[key] === right[key]);
+    return Object.keys(DEFAULT_SETTINGS).every(key => (key === 'evaluation'
+        ? Object.keys(DEFAULT_SETTINGS.evaluation).every(field => left.evaluation[field] === right.evaluation[field])
+        : left[key] === right[key]));
 }

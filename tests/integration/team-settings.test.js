@@ -67,6 +67,17 @@ describeDb('team settings against PostgreSQL', () => {
         });
     });
 
+    test('the evaluation form header travels with the team', async () => {
+        const evaluation = { coachName: 'Pat Lee', assistantCoach: 'Sam Ortiz', division: 'U8', gender: 'Girls' };
+        await request(app)
+            .put(`/api/teams/${team.id}/settings`)
+            .send({ formation: '3-2-3', evaluation })
+            .expect(200);
+
+        const res = await request(app).get(`/api/teams/${team.id}/settings`);
+        expect(res.body.data).toMatchObject({ formation: '3-2-3', evaluation });
+    });
+
     test('a partial write keeps the settings it does not mention', async () => {
         await request(app)
             .put(`/api/teams/${team.id}/settings`)

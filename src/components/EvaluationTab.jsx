@@ -1,19 +1,38 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FileText, Sparkles } from 'lucide-react';
 import { generateEvaluationPdf } from '@/modules/evaluation-pdf';
+import { DEFAULT_SETTINGS, EVALUATION_DIVISIONS, EVALUATION_GENDERS, EVALUATION_NAME_MAX, evaluationDivision } from '@/modules/team-settings';
 import { showNotification } from '@/modules/notifications';
 import { toast } from 'sonner';
 
-export function EvaluationTab({ players = [], onUpdatePlayer }) {
-  const [coachName, setCoachName] = useState('');
-  const [assistantCoach, setAssistantCoach] = useState('');
-  const [division, setDivision] = useState('U10');
-  const [gender, setGender] = useState('Boys');
+/**
+ * The form's header is saved with the team's settings, so it is there next
+ * time and on the other coaches' devices. The names are drafts while they are
+ * typed and saved on blur — a push per keystroke would be a request per
+ * letter — and the selects save as they change.
+ */
+export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdateSettings }) {
+  const saved = settings?.evaluation || DEFAULT_SETTINGS.evaluation;
+  const division = evaluationDivision(settings);
+  const gender = saved.gender;
+  const [coachName, setCoachName] = useState(saved.coachName);
+  const [assistantCoach, setAssistantCoach] = useState(saved.assistantCoach);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // A pull or a team switch replaces what is saved; show it.
+  useEffect(() => { setCoachName(saved.coachName); }, [saved.coachName]);
+  useEffect(() => { setAssistantCoach(saved.assistantCoach); }, [saved.assistantCoach]);
+
+  const saveEvaluation = (patch) => {
+    if (!onUpdateSettings) return;
+    const next = { ...saved, ...patch };
+    const changed = Object.keys(next).some((key) => next[key] !== saved[key]);
+    if (changed) onUpdateSettings({ evaluation: next });
+  };
 
   const handleRatingChange = (idx, ratingVal) => {
     const player = players[idx];
@@ -38,6 +57,8 @@ export function EvaluationTab({ players = [], onUpdatePlayer }) {
       return;
     }
 
+    // Clicking the button blurs a name being typed, but save it regardless.
+    saveEvaluation({ coachName, assistantCoach });
     setIsGenerating(true);
     try {
       const evalPlayers = players.map((p) => {
@@ -97,7 +118,9 @@ export function EvaluationTab({ players = [], onUpdatePlayer }) {
                 id="coachName"
                 placeholder="Enter coach name"
                 value={coachName}
+                maxLength={EVALUATION_NAME_MAX}
                 onChange={(e) => setCoachName(e.target.value)}
+                onBlur={() => saveEvaluation({ coachName })}
                 className="text-xs h-9"
               />
             </div>
@@ -111,7 +134,9 @@ export function EvaluationTab({ players = [], onUpdatePlayer }) {
                 id="assistantCoach"
                 placeholder="Enter assistant coach name"
                 value={assistantCoach}
+                maxLength={EVALUATION_NAME_MAX}
                 onChange={(e) => setAssistantCoach(e.target.value)}
+                onBlur={() => saveEvaluation({ assistantCoach })}
                 className="text-xs h-9"
               />
             </div>
@@ -123,16 +148,12 @@ export function EvaluationTab({ players = [], onUpdatePlayer }) {
               <select
                 id="division"
                 value={division}
-                onChange={(e) => setDivision(e.target.value)}
+                onChange={(e) => saveEvaluation({ division: e.target.value })}
                 className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground cursor-pointer"
               >
-                <option value="U6">U6</option>
-                <option value="U8">U8</option>
-                <option value="U10">U10</option>
-                <option value="U12">U12</option>
-                <option value="U14">U14</option>
-                <option value="U16">U16</option>
-                <option value="U19">U19</option>
+                {EVALUATION_DIVISIONS.map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
               </select>
             </div>
 
@@ -143,12 +164,12 @@ export function EvaluationTab({ players = [], onUpdatePlayer }) {
               <select
                 id="gender"
                 value={gender}
-                onChange={(e) => setGender(e.target.value)}
+                onChange={(e) => saveEvaluation({ gender: e.target.value })}
                 className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground cursor-pointer"
               >
-                <option value="Boys">Boys</option>
-                <option value="Girls">Girls</option>
-                <option value="Coed">Coed</option>
+                {EVALUATION_GENDERS.map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
               </select>
             </div>
           </div>

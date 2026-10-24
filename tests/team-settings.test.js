@@ -24,7 +24,7 @@ jest.unstable_mockModule('../src/modules/storage.js', () => ({
     clearTeamScopedData: () => {}
 }));
 
-const { normalizeSettings, sameSettings, DEFAULT_SETTINGS } =
+const { normalizeSettings, sameSettings, DEFAULT_SETTINGS, evaluationDivision } =
     await import('../src/modules/team-settings.js');
 
 /** A custom formation as this device would have stored it. */
@@ -42,7 +42,7 @@ describe('normalizeSettings', () => {
     test('a complete, valid set is left as it is', () => {
         expect(normalizeSettings({
             ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4
-        })).toEqual({ ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: false, lineupStrategy: 'balanced' });
+        })).toEqual({ ageDivision: '12U', fieldPlayers: 9, formation: '3-2-3', quarters: 4, keeperPlaysThree: false, lineupStrategy: 'balanced', evaluation: DEFAULT_SETTINGS.evaluation });
     });
 
     test('the keeper rule is on only when stored as true', () => {
@@ -73,7 +73,7 @@ describe('normalizeSettings', () => {
         const result = normalizeSettings({ ageDivision: '10U', teamName: 'Sharks' });
 
         expect(Object.keys(result).sort()).toEqual(
-            ['ageDivision', 'fieldPlayers', 'formation', 'keeperPlaysThree', 'lineupStrategy', 'quarters']
+            ['ageDivision', 'evaluation', 'fieldPlayers', 'formation', 'keeperPlaysThree', 'lineupStrategy', 'quarters']
         );
     });
 
@@ -147,7 +147,33 @@ describe('sameSettings', () => {
         )).toBe(false);
     });
 
+    test('a coach name typed into the evaluation form is a change worth pushing', () => {
+        expect(sameSettings({}, { evaluation: { coachName: 'Pat Lee' } })).toBe(false);
+    });
+
     test('what a fresh device holds matches the defaults, so nothing is migrated for it', () => {
         expect(sameSettings({}, DEFAULT_SETTINGS)).toBe(true);
+    });
+});
+
+describe('the evaluation form header', () => {
+    test('a stored header comes back as written', () => {
+        const evaluation = { coachName: 'Pat Lee', assistantCoach: 'Sam Ortiz', division: 'U8', gender: 'Girls' };
+        expect(normalizeSettings({ evaluation }).evaluation).toEqual(evaluation);
+    });
+
+    test('a header nobody has filled in yet is blank names, the team\'s division, and Boys', () => {
+        expect(normalizeSettings({}).evaluation).toEqual(DEFAULT_SETTINGS.evaluation);
+    });
+
+    test('values the form cannot show fall back field by field', () => {
+        expect(normalizeSettings({
+            evaluation: { coachName: 7, assistantCoach: 'Sam', division: 'U99', gender: 'Mixed' }
+        }).evaluation).toEqual({ coachName: '', assistantCoach: 'Sam', division: '', gender: 'Boys' });
+    });
+
+    test('the form follows the team\'s division until the coach picks one', () => {
+        expect(evaluationDivision(normalizeSettings({ ageDivision: '12U' }))).toBe('U12');
+        expect(evaluationDivision(normalizeSettings({ ageDivision: '12U', evaluation: { division: 'U14' } }))).toBe('U14');
     });
 });
