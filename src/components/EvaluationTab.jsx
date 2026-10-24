@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Sparkles } from 'lucide-react';
+import { Check, CloudOff, FileText, Loader2, Pencil, Sparkles, TriangleAlert } from 'lucide-react';
 import { generateEvaluationPdf, EVALUATION_FORM_SLOTS } from '@/modules/evaluation-pdf';
 import { DEFAULT_SETTINGS, EVALUATION_DIVISIONS, EVALUATION_GENDERS, EVALUATION_NAME_MAX, evaluationDivision } from '@/modules/team-settings';
 import { showNotification } from '@/modules/notifications';
+import { evaluationSaveStatus } from '@/modules/evaluation-save-status';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 /**
@@ -15,13 +17,85 @@ import { toast } from 'sonner';
  * typed and saved on blur — a push per keystroke would be a request per
  * letter — and the selects save as they change.
  */
-export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdateSettings }) {
+const STATUS_ICONS = { editing: Pencil, pending: Loader2, saved: Check, local: CloudOff, error: TriangleAlert };
+
+function SaveStatus({ status }) {
+  const Icon = STATUS_ICONS[status.tone];
+  return (
+    <div
+      id="evaluationSaveStatus"
+      role="status"
+      aria-live="polite"
+      data-tone={status.tone}
+      className={cn(
+        'sticky top-0 z-10 -mx-1 px-3 py-2 rounded-md border bg-card/95 backdrop-blur flex items-center gap-2 text-xs shadow-sm',
+        status.tone === 'saved' && 'text-success',
+        status.tone === 'error' && 'text-destructive',
+        status.tone !== 'saved' && status.tone !== 'error' && 'text-muted-foreground'
+      )}
+    >
+      <Icon className={cn('h-3.5 w-3.5 shrink-0', status.tone === 'pending' && 'animate-spin')} aria-hidden="true" />
+      <span>{status.label}</span>
+    </div>
+  );
+}
+
+/**
+ * A comment is a draft while it is typed and saved on blur or Enter. Saving
+ * per keystroke sent the whole roster to the server once per letter, and
+ * every one of those writes could collide with another coach's edit.
+ */
+function CommentInput({ player, idx, onCommit, onEditingChange }) {
+  const saved = player.comments || '';
+  const [draft, setDraft] = useState(saved);
+  useEffect(() => { setDraft(saved); }, [saved]);
+  useEffect(() => { onEditingChange(`comment-${idx}`, draft !== saved); }, [draft, saved, idx, onEditingChange]);
+  useEffect(() => () => onEditingChange(`comment-${idx}`, false), [idx, onEditingChange]);
+
+  return (
+    <Input
+      type="text"
+      id={`comment-${idx}`}
+      aria-label={`Comments for ${player.name}`}
+      placeholder="Coach comments (strengths, growth areas...)"
+      maxLength={50}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { if (draft !== saved) onCommit(idx, draft); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      className="h-8 text-xs"
+    />
+  );
+}
+
+export function EvaluationTab({
+  players = [], onUpdatePlayer, settings, onUpdateSettings,
+  signedIn = false, canWrite = true, syncStatus,
+}) {
   const saved = settings?.evaluation || DEFAULT_SETTINGS.evaluation;
   const division = evaluationDivision(settings);
   const gender = saved.gender;
   const [coachName, setCoachName] = useState(saved.coachName);
   const [assistantCoach, setAssistantCoach] = useState(saved.assistantCoach);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [editingFields, setEditingFields] = useState(() => new Set());
+
+  const handleEditingChange = useCallback((key, editing) => {
+    setEditingFields((current) => {
+      if (current.has(key) === editing) return current;
+      const next = new Set(current);
+      if (editing) next.add(key); else next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const headerEditing = coachName !== saved.coachName || assistantCoach !== saved.assistantCoach;
+  const status = evaluationSaveStatus({
+    editing: headerEditing || editingFields.size > 0,
+    signedIn,
+    canWrite,
+    syncStatus,
+  });
 
   // A pull or a team switch replaces what is saved; show it.
   useEffect(() => { setCoachName(saved.coachName); }, [saved.coachName]);
@@ -109,6 +183,8 @@ export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdate
 
   return (
     <div className="space-y-6">
+      <SaveStatus status={status} />
+
       {/* Form Details Card */}
       <Card className="shadow-sm">
         <CardHeader className="py-3 px-4 border-b bg-muted/20">
@@ -207,7 +283,6 @@ export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdate
             <div className="divide-y divide-border" id="evaluationPlayerList">
               {players.map((player, idx) => {
                 const currentRating = player.overallRating != null ? String(player.overallRating) : '';
-                const currentComments = player.comments || '';
 
                 return (
                   <div
@@ -247,16 +322,11 @@ export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdate
                       </div>
 
                       <div className="flex-1 min-w-[200px]">
-                        <Input
-                          type="text"
-                          id={`comment-${idx}`}
-                          aria-label={`Comments for ${player.name}`}
-                          placeholder="Coach comments (strengths, growth areas...)"
-                          maxLength={50}
-                          value={currentComments}
-                          onChange={(e) => handleCommentChange(idx, e.target.value)}
-                          onBlur={(e) => handleCommentChange(idx, e.target.value)}
-                          className="h-8 text-xs"
+                        <CommentInput
+                          player={player}
+                          idx={idx}
+                          onCommit={handleCommentChange}
+                          onEditingChange={handleEditingChange}
                         />
                       </div>
                     </div>

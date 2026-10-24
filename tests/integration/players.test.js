@@ -62,6 +62,31 @@ describeDb('player routes against PostgreSQL', () => {
             expect(ana.preferred_positions).toEqual(['Forward', 'Mid']);
         });
 
+        test('an evaluation comment is stored and read back', async () => {
+            await request(app).post(`/api/teams/${team.id}/players`)
+                .send({ players: [{ name: 'Ana', comments: 'Great first touch' }] })
+                .expect(200);
+
+            const res = await request(app).get(`/api/teams/${team.id}/players`);
+            expect(res.body.data[0].comments).toBe('Great first touch');
+        });
+
+        test('a build that sends no comments keeps the stored one, and an empty one clears it', async () => {
+            const save = (player) => request(app).post(`/api/teams/${team.id}/players`)
+                .send({ players: [player] }).expect(200);
+
+            await save({ name: 'Ana', comments: 'Great first touch' });
+            // An older build knows nothing of comments, and must not erase them
+            await save({ name: 'Ana', number: 7 });
+            let [ana] = await readRoster(team);
+            expect(ana.comments).toBe('Great first touch');
+            expect(ana.number).toBe(7);
+
+            await save({ name: 'Ana', number: 7, comments: '' });
+            [ana] = await readRoster(team);
+            expect(ana.comments).toBe('');
+        });
+
         test('writes a whole roster in one multi-row statement', async () => {
             const players = Array.from({ length: 18 }, (_, i) => ({ name: `Player ${i}`, number: i }));
 

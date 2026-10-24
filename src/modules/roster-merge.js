@@ -25,7 +25,7 @@
  */
 const FIELDS = [
     'number', 'isCaptain', 'mustRest', 'noKeeper', 'status',
-    'preferredPositions', 'overallRating', 'positionalRatings'
+    'preferredPositions', 'overallRating', 'positionalRatings', 'comments'
 ];
 
 function byName(players) {
@@ -44,6 +44,9 @@ function differs(a, b) {
         const left = a[field];
         const right = b[field];
         if (left === right) return false;
+        // The server answers '' for a player with no comment, where a roster
+        // that never had one carries nothing at all
+        if (field === 'comments') return (left || '') !== (right || '');
         // Arrays (preferredPositions) and objects (positionalRatings) need a
         // value comparison; both are small and JSON-safe.
         if (typeof left === 'object' || typeof right === 'object') {

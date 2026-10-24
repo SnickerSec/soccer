@@ -112,6 +112,25 @@ describe('mergeRosters', () => {
         expect(merged.find(p => p.name === 'Ana').number).toBe(8);
     });
 
+    test('a comment edited on both sides differently is a conflict', () => {
+        const base = [player('Ana')];
+        const local = [player('Ana', { comments: 'Great first touch' })];
+        const remote = [player('Ana', { comments: 'Works hard' })];
+
+        expect(mergeRosters({ base, local, remote }).conflicts).toEqual(['Ana']);
+    });
+
+    test('no comment and an empty one are the same thing', () => {
+        // The server answers '' where a roster that never had one carries nothing
+        const base = [player('Ana', { comments: '' })];
+        const local = [player('Ana', { number: 7 })];
+        const remote = [player('Ana', { comments: '' })];
+
+        const { merged, conflicts } = mergeRosters({ base, local, remote });
+        expect(conflicts).toEqual([]);
+        expect(merged.find(p => p.name === 'Ana').number).toBe(7);
+    });
+
     test('says nothing when both sides made the identical edit', () => {
         const base = [player('Ana')];
         const local = [player('Ana', { number: 7 })];

@@ -1870,6 +1870,9 @@ export default function App() {
             onUpdatePlayer={handleUpdatePlayer}
             settings={settings}
             onUpdateSettings={updateSettings}
+            signedIn={Boolean(currentUser && currentTeam)}
+            canWrite={currentTeam?.role !== 'viewer'}
+            syncStatus={syncStatus}
           />
         </div>
       </main>

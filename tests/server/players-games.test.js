@@ -319,6 +319,16 @@ describe('POST /api/teams/:teamId/players validation', () => {
         expect(connect).not.toHaveBeenCalled();
     });
 
+    test('rejects a comment the column would refuse', async () => {
+        memberOfTeamAs('coach');
+
+        const res = await post({ players: [{ name: 'Ana', comments: 'a'.repeat(501) }] });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/comments/);
+        expect(connect).not.toHaveBeenCalled();
+    });
+
     test('rejects a name over 255 characters', async () => {
         memberOfTeamAs('coach');
 
@@ -431,9 +441,9 @@ describe('POST /api/teams/:teamId/players write', () => {
         await post({ players: [{ name: 'Ana' }, { name: 'Bo' }] });
 
         const values = query.mock.calls[1][1];
-        // [teamId, then 10 params per player]; sort_order is the 8th of each
+        // [teamId, then 11 params per player]; sort_order is the 8th of each
         expect(values[8]).toBe(0);
-        expect(values[18]).toBe(1);
+        expect(values[19]).toBe(1);
     });
 
     test('honours an explicit sortOrder', async () => {
@@ -452,12 +462,12 @@ describe('POST /api/teams/:teamId/players write', () => {
         await post({ players: [{ name: 'Ana', number: 1 }, { name: 'Bo' }, { name: 'Ana', number: 9 }] });
 
         const values = query.mock.calls[1][1];
-        const names = [values[1], values[11], values[21]];
+        const names = [values[1], values[12], values[23]];
         expect(names).toEqual(['Ana', 'Bo', undefined]);
         // The surviving Ana is the later one...
         expect(values[2]).toBe(9);
         // ...and Bo keeps the sort_order its original position implied
-        expect(values[18]).toBe(1);
+        expect(values[19]).toBe(1);
     });
 
     test('returns the roster in the order it was sent', async () => {

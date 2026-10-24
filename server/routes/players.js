@@ -16,7 +16,10 @@ const router = Router();
  */
 const MAX_PLAYERS = 100;
 
-const PLAYER_COLUMNS = 'team_id, name, number, is_captain, must_rest, no_keeper, status, preferred_positions, sort_order, overall_rating, positional_ratings';
+/** Matches the CHECK on players.comments. */
+const MAX_COMMENT_LENGTH = 500;
+
+const PLAYER_COLUMNS = 'team_id, name, number, is_captain, must_rest, no_keeper, status, preferred_positions, sort_order, overall_rating, positional_ratings, comments';
 
 /** A players row as the API exposes it. */
 function mapPlayer(p) {
@@ -31,7 +34,8 @@ function mapPlayer(p) {
         preferredPositions: p.preferred_positions || [],
         sortOrder: p.sort_order,
         overallRating: p.overall_rating,
-        positionalRatings: p.positional_ratings || {}
+        positionalRatings: p.positional_ratings || {},
+        comments: p.comments || ''
     };
 }
 
@@ -73,6 +77,10 @@ function validatePlayers(players) {
             (typeof p.positionalRatings !== 'object' || Array.isArray(p.positionalRatings))) {
             return 'Positional ratings must be an object';
         }
+        if (p.comments !== undefined && p.comments !== null &&
+            (typeof p.comments !== 'string' || p.comments.length > MAX_COMMENT_LENGTH)) {
+            return `Player comments must be text under ${MAX_COMMENT_LENGTH} characters`;
+        }
     }
 
     return null;
@@ -105,8 +113,8 @@ function dedupeByName(players) {
  */
 function upsertPlayersSql(players) {
     const tuples = players.map((_, i) => {
-        const n = i * 10 + 1;
-        return `($1, $${n + 1}, $${n + 2}, $${n + 3}, $${n + 4}, $${n + 5}, $${n + 6}, $${n + 7}, $${n + 8}, $${n + 9}, $${n + 10})`;
+        const n = i * 11 + 1;
+        return `($1, $${n + 1}, $${n + 2}, $${n + 3}, $${n + 4}, $${n + 5}, $${n + 6}, $${n + 7}, $${n + 8}, $${n + 9}, $${n + 10}, $${n + 11})`;
     });
 
     return `INSERT INTO players (${PLAYER_COLUMNS})
@@ -120,7 +128,9 @@ function upsertPlayersSql(players) {
                 preferred_positions = EXCLUDED.preferred_positions,
                 sort_order = EXCLUDED.sort_order,
                 overall_rating = EXCLUDED.overall_rating,
-                positional_ratings = EXCLUDED.positional_ratings
+                positional_ratings = EXCLUDED.positional_ratings,
+                -- NULL is a build that does not send comments; keep what is stored
+                comments = COALESCE(EXCLUDED.comments, players.comments)
             RETURNING *`;
 }
 
@@ -139,7 +149,8 @@ function upsertPlayersValues(players, teamId) {
             p.preferredPositions || [],
             p.sortOrder,
             p.overallRating || null,
-            JSON.stringify(p.positionalRatings || {})
+            JSON.stringify(p.positionalRatings || {}),
+            typeof p.comments === 'string' ? p.comments : null
         );
     }
 

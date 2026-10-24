@@ -782,6 +782,26 @@ Renames are not undoable. The undo stack holds players, captains and settings
 but not the game history, so undoing a rename would restore the old name to the
 roster while the games kept the new one. Renaming back is the exact inverse.
 
+### Evaluation comments and the save status
+
+A player's evaluation comment is part of the roster now — `players.comments`,
+sent with every roster write. It used to live on the device only, and since a
+pull replaces the local roster with the server's, a signed-in coach lost every
+comment at the next sync. The upsert keeps the stored comment when a write
+sends `null`, which is what a build that predates the column sends; `''` is a
+comment deliberately cleared.
+
+A comment is a draft while it is typed and is committed on blur or Enter. Each
+roster edit is a whole-roster PUT that bumps `roster_version`, so committing
+per keystroke sent the roster once per letter and gave another coach's edit a
+collision to lose at every one.
+
+The status line at the top of the Evaluation tab is `evaluationSaveStatus` in
+`src/modules/evaluation-save-status.js`. It must never say "saved" about
+something that is only on this device: signed out, a viewer, offline and a
+failed write each say so in their own words, and a field still being typed in
+reads as editing whatever the sync engine is doing.
+
 ### Key Features & Constraints
 The lineup generator enforces AYSO "Everyone Plays" rules:
 - No player sits more than 1 quarter consecutively
