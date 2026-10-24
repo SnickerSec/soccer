@@ -95,6 +95,32 @@ test.describe('Evaluation form', () => {
         await expect(page.locator('#division')).toHaveValue('U10');
     });
 
+    test('says how many players are unrated, and stops once they are rated', async ({ page }) => {
+        await rosterWith(page, ['Ana', 'Ben']);
+        await openTab(page);
+
+        await expect(page.locator('#evaluationUnratedNote')).toContainText('2 players have no rating yet');
+        await page.locator('#rating-0').selectOption('4');
+        await expect(page.locator('#evaluationUnratedNote')).toContainText('1 player has no rating yet');
+        await page.locator('#rating-1').selectOption('2');
+        await expect(page.locator('#evaluationUnratedNote')).toHaveCount(0);
+    });
+
+    test('warns before generating when the roster will not fit on one form', async ({ page }) => {
+        const names = Array.from({ length: 21 }, (_, i) => `Player ${i + 1}`);
+        await rosterWith(page, names);
+        await openTab(page);
+
+        await expect(page.locator('#evaluationOverflowNote')).toContainText('room for 20 players; the last 1');
+    });
+
+    test('a roster that fits gets no overflow warning', async ({ page }) => {
+        await rosterWith(page, ['Ana', 'Ben']);
+        await openTab(page);
+
+        await expect(page.locator('#evaluationOverflowNote')).toHaveCount(0);
+    });
+
     test('each field names its player, not just "Rating"', async ({ page }) => {
         await rosterWith(page, ['Ana', 'Ben']);
         await openTab(page);

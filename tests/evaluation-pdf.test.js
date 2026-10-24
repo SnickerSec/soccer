@@ -307,6 +307,46 @@ describe('evaluation-pdf module', () => {
             expect(drawnTexts).toContain(truncated);
         });
 
+        test('a player nobody rated gets an empty rating box, not a 3', async () => {
+            const { generateEvaluationPdf } = await import('../src/modules/evaluation-pdf.js');
+
+            await generateEvaluationPdf({
+                players: [{ name: 'Ana Rated', rating: 4 }, { name: 'Ben Unrated', rating: null }],
+                coachName: 'Coach', assistantCoach: '', division: 'U10', gender: 'Boys',
+            });
+
+            const drawn = mockPage1.drawText.mock.calls.map((c) => c[0]);
+            expect(drawn).toContain('4');
+            expect(drawn).not.toContain('3');
+            expect(drawn).not.toContain('null');
+        });
+
+        test('players past the twentieth slot are reported, not silently dropped', async () => {
+            const { generateEvaluationPdf, EVALUATION_FORM_SLOTS } = await import('../src/modules/evaluation-pdf.js');
+            expect(EVALUATION_FORM_SLOTS).toBe(20);
+
+            const players = Array.from({ length: 22 }, (_, i) => ({
+                name: `Kid ${String.fromCharCode(65 + i)}${String.fromCharCode(65 + i)}`, rating: 3,
+            }));
+            const result = await generateEvaluationPdf({
+                players, coachName: 'Coach', assistantCoach: '', division: 'U14', gender: 'Boys',
+            });
+
+            // Sorted by last name, so the last two alphabetically miss out
+            expect(result.leftOffNames).toEqual(['Kid UU', 'Kid VV']);
+            const drawnPage2 = mockPage2.drawText.mock.calls.map((c) => c[0]);
+            expect(drawnPage2).toContain('Kid TT');
+            expect(drawnPage2).not.toContain('Kid UU');
+        });
+
+        test('a roster that fits leaves nobody off', async () => {
+            const { generateEvaluationPdf } = await import('../src/modules/evaluation-pdf.js');
+            const result = await generateEvaluationPdf({
+                players: [{ name: 'Ana Smith' }], coachName: '', assistantCoach: '', division: 'U10', gender: 'Boys',
+            });
+            expect(result.leftOffNames).toEqual([]);
+        });
+
         test('identifies undrawable names when font has no glyphs for them', async () => {
             const { generateEvaluationPdf } = await import('../src/modules/evaluation-pdf.js');
 

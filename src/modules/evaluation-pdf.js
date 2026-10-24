@@ -59,6 +59,13 @@ const LAYOUT = {
     }
 };
 
+/**
+ * How many players the template has room for: two pages of ten. A roster
+ * longer than that cannot all go on one form, and the caller has to say who
+ * was left off rather than let the form look complete.
+ */
+export const EVALUATION_FORM_SLOTS = LAYOUT.players.perPage * 2;
+
 function loadScript(src) {
     return new Promise((resolve, reject) => {
         const existing = document.querySelector(`script[src="${src}"]`);
@@ -229,10 +236,15 @@ function sortByLastName(players) {
  * Requires loadPdfLibraries() to have resolved first. Throws if the template,
  * fonts or PDF generation fail — the caller decides how to report that.
  *
- * Returns `{ undrawableNames }`: names the embedded font has no glyph for, drawn
- * as empty boxes. The form is still produced, since one such name should not
- * cost the rest of the team their forms, but the caller has to say so — a form
- * that looks complete with a name missing is worse than one that reports it.
+ * Returns `{ undrawableNames, leftOffNames }`. The first are names the
+ * embedded font has no glyph for, drawn as empty boxes; the second, players
+ * past the template's last slot, not drawn at all. The form is still produced
+ * in both cases, since one such name should not cost the rest of the team
+ * their forms, but the caller has to say so — a form that looks complete with
+ * a name missing is worse than one that reports it.
+ *
+ * A player with no rating gets an empty rating box. The league reads the
+ * number as the coach's judgement, so nothing here supplies one.
  */
 export async function generateEvaluationPdf({ players, coachName, assistantCoach, division, gender }) {
     await loadPdfLibraries();
@@ -281,7 +293,7 @@ export async function generateEvaluationPdf({ players, coachName, assistantCoach
 
     // The template has two pages of ten slots each
     const sortedPlayers = sortByLastName(players);
-    const maxPlayers = layout.perPage * Math.min(pages.length, 2);
+    const maxPlayers = Math.min(EVALUATION_FORM_SLOTS, layout.perPage * pages.length);
 
     for (let i = 0; i < sortedPlayers.length && i < maxPlayers; i++) {
         const player = sortedPlayers[i];
@@ -325,7 +337,10 @@ export async function generateEvaluationPdf({ players, coachName, assistantCoach
 
     URL.revokeObjectURL(url);
 
-    return { undrawableNames: undrawable };
+    return {
+        undrawableNames: undrawable,
+        leftOffNames: sortedPlayers.slice(maxPlayers).map(p => p.name)
+    };
 }
 
 /** Maps a generation failure to something a coach can act on. */

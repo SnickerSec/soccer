@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FileText, Sparkles } from 'lucide-react';
-import { generateEvaluationPdf } from '@/modules/evaluation-pdf';
+import { generateEvaluationPdf, EVALUATION_FORM_SLOTS } from '@/modules/evaluation-pdf';
 import { DEFAULT_SETTINGS, EVALUATION_DIVISIONS, EVALUATION_GENDERS, EVALUATION_NAME_MAX, evaluationDivision } from '@/modules/team-settings';
 import { showNotification } from '@/modules/notifications';
 import { toast } from 'sonner';
@@ -65,12 +65,14 @@ export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdate
         return {
           name: p.name,
           number: p.number,
-          rating: p.overallRating || 3,
+          // Unrated stays blank: a 3 here would tell the league "Average"
+          // about a player the coach never judged.
+          rating: p.overallRating ?? null,
           comment: p.comments || '',
         };
       });
 
-      const { undrawableNames } = await generateEvaluationPdf({
+      const { undrawableNames, leftOffNames } = await generateEvaluationPdf({
         coachName,
         assistantCoach,
         division,
@@ -78,8 +80,16 @@ export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdate
         players: evalPlayers,
       });
 
+      const problems = [];
+      if (leftOffNames && leftOffNames.length > 0) {
+        problems.push(`The form has room for ${EVALUATION_FORM_SLOTS} players, so ${leftOffNames.join(', ')} ${leftOffNames.length === 1 ? 'is' : 'are'} not on it. Please add them to a second form by hand.`);
+      }
       if (undrawableNames && undrawableNames.length > 0) {
-        const msg = `Note: The following names could not be printed: ${undrawableNames.join(', ')}. Please write them in by hand.`;
+        problems.push(`The following names could not be printed: ${undrawableNames.join(', ')}. Please write them in by hand.`);
+      }
+
+      if (problems.length > 0) {
+        const msg = `Note: ${problems.join(' ')}`;
         showNotification(msg, 'warning');
         toast.warning(msg);
       } else {
@@ -93,6 +103,9 @@ export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdate
       setIsGenerating(false);
     }
   };
+
+  const unratedCount = players.filter((p) => p.overallRating == null).length;
+  const overflowCount = Math.max(0, players.length - EVALUATION_FORM_SLOTS);
 
   return (
     <div className="space-y-6">
@@ -275,6 +288,16 @@ export function EvaluationTab({ players = [], onUpdatePlayer, settings, onUpdate
         <p className="text-xs text-muted-foreground">
           Players will be automatically sorted alphabetically by last name in the AYSO PDF template.
         </p>
+        {unratedCount > 0 && (
+          <p className="text-xs text-muted-foreground" id="evaluationUnratedNote">
+            {unratedCount === 1 ? '1 player has' : `${unratedCount} players have`} no rating yet; the rating box will be left blank.
+          </p>
+        )}
+        {overflowCount > 0 && (
+          <p className="text-xs text-warning" id="evaluationOverflowNote">
+            The form has room for {EVALUATION_FORM_SLOTS} players; the last {overflowCount} by last name will not fit.
+          </p>
+        )}
       </div>
     </div>
   );
