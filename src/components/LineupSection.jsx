@@ -76,6 +76,8 @@ export function LineupSection({
   // A lineup someone else shared: shown, not edited. Nothing here may change
   // it, and nothing may claim it was checked — it came in a link.
   readOnly = false,
+  // A Live Match on this device that was started and not finished
+  matchInProgress = false,
 }) {
   const [viewMode, setViewModeState] = useState(initialViewMode); // 'all', 'table', 'pitch'
   const setViewMode = (mode) => {
@@ -348,7 +350,7 @@ export function LineupSection({
           className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground font-semibold shadow-sm btn-matchday cursor-pointer"
         >
           <Play className="h-3.5 w-3.5 fill-current" />
-          Live Match
+          {matchInProgress ? 'Resume Match' : 'Live Match'}
         </Button>
 
         <Button

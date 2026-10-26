@@ -825,6 +825,31 @@ which drops the actions, swapping, the rotation toggles and the compliance
 verdict (the link carries no warnings, so "compliant" would be unchecked).
 Closing it takes `?lineup=` out of the address so a reload does not reopen it.
 
+### The Live Match clock and a match in progress
+
+The quarter clock is the moment the quarter ends, not a count of ticks —
+`src/modules/match-clock.js`. It used to take a second off per `setInterval`
+tick, and a phone throttles timers when its screen locks and iOS suspends the
+page, so a quarter left in a pocket came back paused and its whistle never
+went. What is left is worked out from `Date.now()` whenever the dialog looks,
+on a 250ms tick and on `visibilitychange`. The whistle fires from an effect
+that sees the clock run out, not from inside a state update React may run
+twice. A screen wake lock is held while the clock runs, and asked for again
+on return, since the browser drops it whenever the page is hidden.
+
+The match itself — lineup as subbed, quarter, clock, score, goals, opponent,
+fixture — is kept in `shinguard_live_match` by `src/modules/live-match.js`,
+because it lived in the dialog's state alone and a reload, which iOS does to
+a backgrounded tab unprompted, ended it. It is written only once the match has
+started, so opening the dialog to look leaves nothing; it is stamped with the
+team and lapses after four hours; finishing clears it, and discarding takes a
+second tap. Reopening the dialog resumes it rather than starting again from
+the lineup on screen — closing mid-match used to undo every sub. After a
+reload the Live Match button reads Resume Match and a toast offers it.
+
+The e2e spec drives this with Playwright's clock, whose `setSystemTime` moves
+the time on without firing a timer — what a locked phone does to the page.
+
 ### Key Features & Constraints
 The lineup generator enforces AYSO "Everyone Plays" rules:
 - No player sits more than 1 quarter consecutively

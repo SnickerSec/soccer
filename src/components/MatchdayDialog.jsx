@@ -30,7 +30,12 @@ import { FieldVisualization } from '@/components/FieldVisualization';
 import { playWhistleSound } from '@/modules/whistle-audio';
 import { todayLocalDate } from '@/modules/schedule';
 import { sittingInQuarter } from '@/modules/lineup-engine';
+import {
+  freshClock, displaySeconds, startClock, pauseClock, hasExpired, minuteOfQuarter,
+} from '@/modules/match-clock';
+import { saveLiveMatch, loadLiveMatch, clearLiveMatch } from '@/modules/live-match';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export function MatchdayDialog({
   isOpen,
@@ -39,6 +44,7 @@ export function MatchdayDialog({
   players = [],
   captains = [],
   teamName = 'Our Team',
+  teamId = null,
   ageDivision = '10U',
   initialOpponent = '',
   fixture = null,
@@ -47,8 +53,11 @@ export function MatchdayDialog({
   const defaultMinutes = ageDivision === '10U' ? 12.5 : ageDivision === '12U' ? 15 : 10;
   const [quarterMinutes, setQuarterMinutes] = useState(defaultMinutes);
   const [activeQuarter, setActiveQuarter] = useState(1);
-  const [secondsRemaining, setSecondsRemaining] = useState(Math.round(defaultMinutes * 60));
-  const [isRunning, setIsRunning] = useState(false);
+  const [clock, setClock] = useState(() => freshClock(defaultMinutes));
+  // Re-rendered on a tick while the clock runs; the time shown is worked out
+  // from this and the clock's end time, never counted down.
+  const [now, setNow] = useState(() => Date.now());
+  const [clockStarted, setClockStarted] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
@@ -61,39 +70,123 @@ export function MatchdayDialog({
   const [events, setEvents] = useState([]);
   const [selectedFieldPlayer, setSelectedFieldPlayer] = useState(null);
   const [activeLineup, setActiveLineup] = useState(lineup);
+  const [matchFixture, setMatchFixture] = useState(fixture);
+  const [resumed, setResumed] = useState(false);
+  // Discarding takes a second tap: one stray touch mid-game was the score.
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
-  // Sync lineup and opponent when opened
-  useEffect(() => {
-    if (lineup) {
-      setActiveLineup(JSON.parse(JSON.stringify(lineup)));
-    }
-    if (fixture?.opponent || initialOpponent) {
-      setOpponentName(fixture?.opponent || initialOpponent);
-    }
-  }, [lineup, isOpen, fixture, initialOpponent]);
+  const isRunning = clock.running;
+  const secondsRemaining = displaySeconds(clock, now);
 
-  // Timer interval
+  // On open: the match in progress if there is one, else a fresh one from the
+  // lineup on screen. Closing the dialog mid-match used to keep the score but
+  // reset the lineup, so every sub was undone by reopening it.
   useEffect(() => {
-    let interval = null;
-    if (isRunning && secondsRemaining > 0) {
-      interval = setInterval(() => {
-        setSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            if (soundEnabled) {
-              playWhistleSound();
-            }
-            toast.info(`Quarter ${activeQuarter} time expired!`);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (!isOpen) return;
+    const saved = loadLiveMatch(teamId);
+    const at = Date.now();
+    setNow(at);
+    setSelectedFieldPlayer(null);
+    if (saved) {
+      setActiveLineup(saved.lineup);
+      setQuarterMinutes(saved.quarterMinutes);
+      setActiveQuarter(saved.activeQuarter);
+      setClock(saved.clock);
+      setClockStarted(Boolean(saved.clockStarted));
+      setSoundEnabled(saved.soundEnabled !== false);
+      setHomeScore(saved.homeScore || 0);
+      setAwayScore(saved.awayScore || 0);
+      setOpponentName(saved.opponentName || '');
+      setEvents(Array.isArray(saved.events) ? saved.events : []);
+      setMatchFixture(saved.fixture || null);
+      setResumed(true);
+      return;
     }
+    setActiveLineup(lineup ? JSON.parse(JSON.stringify(lineup)) : lineup);
+    setQuarterMinutes(defaultMinutes);
+    setActiveQuarter(1);
+    setClock(freshClock(defaultMinutes));
+    setClockStarted(false);
+    setHomeScore(0);
+    setAwayScore(0);
+    setOpponentName(fixture?.opponent || initialOpponent || '');
+    setEvents([]);
+    setMatchFixture(fixture);
+    setResumed(false);
+    // Only on opening: the props are read as they are at that moment
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Kept on the device as it changes, so a reload does not end the match.
+  // saveLiveMatch writes nothing until the match has started.
+  useEffect(() => {
+    if (!isOpen || !activeLineup?.quarters) return;
+    saveLiveMatch({
+      teamId,
+      lineup: activeLineup,
+      quarterMinutes,
+      activeQuarter,
+      clock,
+      clockStarted,
+      soundEnabled,
+      homeScore,
+      awayScore,
+      opponentName,
+      events,
+      fixture: matchFixture
+        ? { id: matchFixture.id, opponent: matchFixture.opponent, gameDate: matchFixture.gameDate }
+        : null,
+    });
+  }, [isOpen, teamId, activeLineup, quarterMinutes, activeQuarter, clock, clockStarted,
+      soundEnabled, homeScore, awayScore, opponentName, events, matchFixture]);
+
+  // While the clock runs, look at the time often enough to show it, and at
+  // once when the page comes back from a locked screen or another app.
+  useEffect(() => {
+    if (!isOpen || !isRunning) return undefined;
+    const look = () => setNow(Date.now());
+    const interval = setInterval(look, 250);
+    document.addEventListener('visibilitychange', look);
     return () => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', look);
     };
-  }, [isRunning, secondsRemaining, soundEnabled, activeQuarter]);
+  }, [isOpen, isRunning]);
+
+  // The whistle, once, when a running quarter reaches zero. Here rather than
+  // inside a state update, which React may run twice.
+  useEffect(() => {
+    if (!hasExpired(clock, now)) return;
+    setClock(pauseClock(clock, now));
+    if (soundEnabled) playWhistleSound();
+    toast.info(`Quarter ${activeQuarter} time expired!`);
+  }, [clock, now, soundEnabled, activeQuarter]);
+
+  // Keep the screen on while the clock runs. A phone that locks after thirty
+  // seconds puts the clock out of sight, and on iOS stops the page. The lock
+  // is dropped whenever the page is hidden, so it is asked for again on return.
+  useEffect(() => {
+    if (!isOpen || !isRunning || !navigator.wakeLock?.request) return undefined;
+    let sentinel = null;
+    let cancelled = false;
+    const acquire = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        if (cancelled) lock.release().catch(() => {});
+        else sentinel = lock;
+      } catch {
+        // Refused (battery saver, an iframe): the clock is still right.
+      }
+    };
+    acquire();
+    document.addEventListener('visibilitychange', acquire);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', acquire);
+      sentinel?.release().catch(() => {});
+    };
+  }, [isOpen, isRunning]);
 
   if (!isOpen || !activeLineup || !activeLineup.quarters) return null;
 
@@ -114,32 +207,56 @@ export function MatchdayDialog({
   };
 
   const handleTogglePlay = () => {
-    if (!isRunning && secondsRemaining === 0) {
-      setSecondsRemaining(Math.round(quarterMinutes * 60));
+    const at = Date.now();
+    setNow(at);
+    if (isRunning) {
+      setClock(pauseClock(clock, at));
+      return;
     }
-    setIsRunning(!isRunning);
+    const from = displaySeconds(clock, at) === 0 ? freshClock(quarterMinutes) : clock;
+    setClock(startClock(from, at));
+    setClockStarted(true);
   };
 
   const handleResetQuarterTimer = () => {
-    setIsRunning(false);
-    setSecondsRemaining(Math.round(quarterMinutes * 60));
+    setClock(freshClock(quarterMinutes));
   };
 
   const handleSelectQuarter = (qNum) => {
     setActiveQuarter(qNum);
-    setIsRunning(false);
-    setSecondsRemaining(Math.round(quarterMinutes * 60));
+    setClock(freshClock(quarterMinutes));
   };
 
   const handleNextQuarter = () => {
     if (activeQuarter < 4) {
       const nextQ = activeQuarter + 1;
       setActiveQuarter(nextQ);
-      setIsRunning(false);
-      setSecondsRemaining(Math.round(quarterMinutes * 60));
+      setClock(freshClock(quarterMinutes));
       if (soundEnabled) playWhistleSound();
       toast.success(`Switched to Quarter ${nextQ}`);
     }
+  };
+
+  /** Throw the match in progress away and start again from the lineup. */
+  const handleDiscardMatch = () => {
+    if (!confirmingDiscard) {
+      setConfirmingDiscard(true);
+      return;
+    }
+    setConfirmingDiscard(false);
+    clearLiveMatch();
+    setActiveLineup(lineup ? JSON.parse(JSON.stringify(lineup)) : lineup);
+    setActiveQuarter(1);
+    setClock(freshClock(quarterMinutes));
+    setClockStarted(false);
+    setHomeScore(0);
+    setAwayScore(0);
+    setEvents([]);
+    // The match this dialog was opened for, not the one being thrown away
+    setMatchFixture(fixture);
+    setOpponentName(fixture?.opponent || initialOpponent || '');
+    setResumed(false);
+    toast.info('Match discarded');
   };
 
   const handleRecordGoal = (playerName) => {
@@ -147,7 +264,7 @@ export function MatchdayDialog({
     const event = {
       id: Date.now(),
       quarter: activeQuarter,
-      minute: Math.ceil((quarterMinutes * 60 - secondsRemaining) / 60) || 1,
+      minute: minuteOfQuarter(clock, quarterMinutes, Date.now()),
       type: 'goal',
       player: playerName,
     };
@@ -197,7 +314,7 @@ export function MatchdayDialog({
     const event = {
       id: Date.now(),
       quarter: activeQuarter,
-      minute: Math.ceil((quarterMinutes * 60 - secondsRemaining) / 60) || 1,
+      minute: minuteOfQuarter(clock, quarterMinutes, Date.now()),
       type: 'sub',
       description: `Sub: ${benchPlayerName} in for ${fieldPlayerName}`,
     };
@@ -213,11 +330,12 @@ export function MatchdayDialog({
     if (onSaveGame) {
       onSaveGame({
         name: `vs ${opponentLabel} (${homeScore}-${awayScore})`,
-        date: fixture?.gameDate || todayLocalDate(),
+        date: matchFixture?.gameDate || todayLocalDate(),
         // As played, subs and all — not the lineup this dialog was opened with
         quarters: activeLineup.quarters,
       });
     }
+    clearLiveMatch();
     toast.success('Match completed and game saved!');
     onClose();
   };
@@ -284,6 +402,30 @@ export function MatchdayDialog({
           </div>
         </DialogHeader>
 
+        {resumed && (
+          <div
+            id="liveMatchResumed"
+            role="status"
+            className="mt-2 flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs"
+          >
+            <span>
+              <span className="font-semibold">Match resumed</span>
+              <span className="text-muted-foreground"> — Q{activeQuarter}, {homeScore}–{awayScore}</span>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              id="discardLiveMatch"
+              onClick={handleDiscardMatch}
+              onBlur={() => setConfirmingDiscard(false)}
+              className={cn('h-7 px-2 text-xs', confirmingDiscard ? 'text-destructive font-semibold' : 'text-muted-foreground')}
+            >
+              {confirmingDiscard ? 'Tap again to discard' : 'Discard'}
+            </Button>
+          </div>
+        )}
+
         {/* Body Content */}
         <ScrollArea className="flex-1 min-h-0 py-2 pr-3">
           <div className="space-y-4">
@@ -307,7 +449,7 @@ export function MatchdayDialog({
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
-                  <span className="text-2xl font-black w-8 text-center text-foreground">
+                  <span id="matchHomeScore" className="text-2xl font-black w-8 text-center text-foreground">
                     {homeScore}
                   </span>
                   <Button
@@ -342,7 +484,7 @@ export function MatchdayDialog({
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
-                  <span className="text-2xl font-black w-8 text-center text-foreground">
+                  <span id="matchAwayScore" className="text-2xl font-black w-8 text-center text-foreground">
                     {awayScore}
                   </span>
                   <Button
@@ -378,6 +520,7 @@ export function MatchdayDialog({
               </div>
 
               <div
+                id="matchClock"
                 className={`font-mono text-3xl sm:text-4xl font-black tracking-wider my-1 ${
                   secondsRemaining === 0
                     ? 'text-destructive animate-pulse'

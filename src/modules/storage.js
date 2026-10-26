@@ -48,7 +48,8 @@ const TEAM_SCOPED_KEYS = [
     'ayso_sync_queue',
     'ayso_migration_status',
     'ayso_current_team',
-    'ayso_current_lineup'
+    'ayso_current_lineup',
+    'shinguard_live_match'
 ];
 
 export function clearTeamScopedData() {

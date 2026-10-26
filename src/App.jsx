@@ -7,6 +7,7 @@ import { SeasonTab } from '@/components/SeasonTab';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { EvaluationTab } from '@/components/EvaluationTab';
 import { SharedLineupNotice } from '@/components/SharedLineupNotice';
+import { loadLiveMatch } from '@/modules/live-match';
 import { TeamModal } from '@/components/TeamModal';
 import { SaveGameModal } from '@/components/SaveGameModal';
 import { LoadGameDialog } from '@/components/LoadGameDialog';
@@ -234,6 +235,11 @@ export default function App() {
   // saved nowhere: it used to be loaded as this device's roster, captains and
   // formation, which replaced theirs.
   const [sharedView, setSharedView] = useState(null);
+  // A Live Match started on this device and not finished. The dialog keeps
+  // it in storage; this is only whether there is one, for the button label
+  // and the offer to resume after a reload.
+  const [liveMatchInProgress, setLiveMatchInProgress] = useState(false);
+  const offeredResumeRef = useRef(false);
   const [confirmDialog, setConfirmDialog] = useState(null);
 
   // Undo / Redo History
@@ -523,6 +529,30 @@ export default function App() {
       setInviteToken(token);
     }
   }, []);
+
+  // Re-read when the team settles or changes and whenever the dialog closes,
+  // which is when a match is finished, discarded or set aside.
+  useEffect(() => {
+    if (isMatchdayOpen) return;
+    const inProgress = Boolean(loadLiveMatch(currentTeam?.id ?? null));
+    setLiveMatchInProgress(inProgress);
+    // Once per page load: a reload mid-match lands on the Lineup tab with
+    // the dialog shut, and a coach should not have to know where to look.
+    if (inProgress && !offeredResumeRef.current) {
+      offeredResumeRef.current = true;
+      toast('A match is in progress', {
+        id: 'resume-live-match',
+        duration: 15000,
+        action: {
+          label: 'Resume',
+          onClick: () => {
+            setMatchdayFixture(null);
+            setIsMatchdayOpen(true);
+          },
+        },
+      });
+    }
+  }, [currentTeam, isMatchdayOpen]);
 
   /** Leave a shared lineup, and take it out of the address so a reload does not reopen it. */
   const closeSharedView = useCallback(() => {
@@ -1838,6 +1868,7 @@ export default function App() {
               setIsMatchdayOpen(true);
             }}
             onExportPdf={handleExportPdf}
+            matchInProgress={liveMatchInProgress}
           />
           </>
           )}
@@ -1953,6 +1984,7 @@ export default function App() {
         players={players}
         captains={captains}
         teamName={currentTeam?.name || 'Our Team'}
+        teamId={currentTeam?.id ?? null}
         ageDivision={settings.ageDivision}
         fixture={matchdayFixture}
         onSaveGame={handleSaveGame}
