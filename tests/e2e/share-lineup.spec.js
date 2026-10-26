@@ -63,8 +63,54 @@ test.describe('Sharing a lineup', () => {
         await page.goto(link);
         await expect(page.locator('.quarter-lineup').first()).toBeVisible({ timeout: 20000 });
 
-        const roster = await page.locator('#playerList').innerText();
-        expect(roster).toContain('D’Angelo');
+        await expect(page.locator('#lineupDisplay')).toContainText('D’Angelo');
+    });
+
+    test('opening a link leaves this device\'s own roster and lineup alone', async ({ page }) => {
+        // The coach who receives it has a side of their own. Opening a link
+        // used to load its roster as theirs and save it, and signed out there
+        // was no other copy.
+        await generateWith(page);
+        const link = await shareAndReadLink(page);
+
+        await page.evaluate(() => localStorage.clear());
+        await page.goto('/');
+        for (const name of ['Mine One', 'Mine Two']) {
+            await page.fill('#playerName', name);
+            await page.click('#addPlayer');
+        }
+        const before = await page.evaluate(() => ({
+            players: localStorage.getItem('ayso_players'),
+            settings: localStorage.getItem('ayso_settings'),
+            lineup: localStorage.getItem('ayso_current_lineup'),
+        }));
+
+        await page.goto(link);
+        await expect(page.locator('#sharedLineupNotice')).toBeVisible();
+        await expect(page.locator('.quarter-lineup').first()).toBeVisible({ timeout: 20000 });
+        // Shown, not editable: no actions, no swapping, no rotation toggles
+        await expect(page.locator('[data-action="saveGame"]')).toHaveCount(0);
+        await expect(page.locator('#lineup-swap-hint')).toHaveCount(0);
+        await expect(page.locator('.player-summary')).toHaveCount(0);
+        // Nor a compliance verdict nobody computed
+        await expect(page.locator('#validationMessages')).toHaveCount(0);
+
+        const during = await page.evaluate(() => ({
+            players: localStorage.getItem('ayso_players'),
+            settings: localStorage.getItem('ayso_settings'),
+            lineup: localStorage.getItem('ayso_current_lineup'),
+        }));
+        expect(during).toEqual(before);
+
+        await page.click('#closeSharedLineup');
+        await expect(page.locator('#sharedLineupNotice')).toHaveCount(0);
+        await expect(page.locator('#playerList')).toContainText('Mine One');
+        expect(new URL(page.url()).search).not.toContain('lineup=');
+
+        // A reload does not reopen it
+        await page.reload();
+        await expect(page.locator('#sharedLineupNotice')).toHaveCount(0);
+        await expect(page.locator('#playerList')).toContainText('Mine Two');
     });
 
     test('the link carries no ratings or evaluation comments', async ({ page }) => {

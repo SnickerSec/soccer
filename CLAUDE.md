@@ -795,10 +795,7 @@ Comments never leave the team. `gameRosterSnapshot` drops them, after the
 merge with the engine's `playerStats`, which are roster copies too, and
 `toWireGame`/`toWireGameUpdates` drop them again for games saved locally
 before that. A game is history nothing rewrites, so a copy there would outlive
-the coach clearing the comment. A share link carries `sharePayload` in
-`src/modules/share-link.js` — name, number and status per player, no ratings,
-no comments — and the same narrowing is applied to a link when it is opened,
-since links sent before it carried whole roster rows into the team chat.
+the coach clearing the comment.
 
 A comment is a draft while it is typed and is committed on blur or Enter. Each
 roster edit is a whole-roster PUT that bumps `roster_version`, so committing
@@ -810,6 +807,23 @@ The status line at the top of the Evaluation tab is `evaluationSaveStatus` in
 something that is only on this device: signed out, a viewer, offline and a
 failed write each say so in their own words, and a field still being typed in
 reads as editing whatever the sync engine is doing.
+
+### What a share link carries
+
+A share link carries `sharePayload` in `src/modules/share-link.js` — name,
+number and status per player, no ratings, no comments. It goes into the team
+chat, encoded rather than encrypted, and cannot be recalled. The same
+narrowing is applied to a link when it is opened, since links sent before it
+carried whole roster rows.
+
+Opening a share link shows the lineup and changes nothing. It used to load
+the link's roster, captains and formation as the device's own, and the effects
+that persist them saved the lot — so a coach who opened another team's link
+lost their roster, and signed out there was no other copy. `sharedView` in App
+holds it apart and is persisted nowhere; `LineupSection` takes `readOnly`,
+which drops the actions, swapping, the rotation toggles and the compliance
+verdict (the link carries no warnings, so "compliant" would be unchecked).
+Closing it takes `?lineup=` out of the address so a reload does not reopen it.
 
 ### Key Features & Constraints
 The lineup generator enforces AYSO "Everyone Plays" rules:

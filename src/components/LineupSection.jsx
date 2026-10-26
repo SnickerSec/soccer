@@ -73,6 +73,9 @@ export function LineupSection({
   onToggleNoKeeper,
   onOpenMatchday,
   onExportPdf,
+  // A lineup someone else shared: shown, not edited. Nothing here may change
+  // it, and nothing may claim it was checked — it came in a link.
+  readOnly = false,
 }) {
   const [viewMode, setViewModeState] = useState(initialViewMode); // 'all', 'table', 'pitch'
   const setViewMode = (mode) => {
@@ -192,6 +195,7 @@ export function LineupSection({
   };
 
   const handleToggleSwap = (quarter, position, player) => {
+    if (readOnly) return;
     const prev = pendingSwapRef.current;
     if (!prev) {
       const next = { quarter: Number(quarter), position, player };
@@ -258,7 +262,9 @@ export function LineupSection({
         </div>
       </div>
 
-      {/* Validation Messages */}
+      {/* Validation Messages. Not for a shared lineup: its warnings were not
+          sent, so "compliant" would be a claim nobody checked. */}
+      {!readOnly && (
       <div id="validationMessages" role="status" aria-live="polite">
         {isCompliant ? (
           <Alert variant="success" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100">
@@ -299,7 +305,10 @@ export function LineupSection({
         )}
       </div>
 
+      )}
+
       {/* Swap hint - keyed by generatedAt so it remounts cleanly on regeneration */}
+      {!readOnly && (
       <p
         key={`hint-${lineup.generatedAt || Date.now()}`}
         id="lineup-swap-hint"
@@ -308,6 +317,7 @@ export function LineupSection({
       >
         {getHintText()}
       </p>
+      )}
 
       {/* Sticky matchday bar.
        *
@@ -322,7 +332,12 @@ export function LineupSection({
        * Above md every one of them is visible exactly as before — the desktop
        * layout is dense on purpose and has the room.
        */}
-      <div className="action-buttons-inline sticky top-2 z-30 flex flex-wrap items-center gap-2 p-3 sm:p-4 rounded-lg border bg-card/95 backdrop-blur shadow-md action-buttons">
+      <div className={cn(
+        "action-buttons-inline sticky top-2 z-30 flex flex-wrap items-center gap-2 p-3 sm:p-4 rounded-lg border bg-card/95 backdrop-blur shadow-md action-buttons",
+        // Only the quarter selector is left, and it is a phone control
+        readOnly && "md:hidden"
+      )}>
+        {!readOnly && (<>
         <Button
           type="button"
           variant="default"
@@ -454,6 +469,7 @@ export function LineupSection({
             : <MoreHorizontal className="h-3.5 w-3.5" />}
           More
         </Button>
+        </>)}
 
         {/* The quarter selector, inside the sticky bar rather than below it.
             It is what collapses this page from four stacked quarters to one,
@@ -547,11 +563,11 @@ export function LineupSection({
                         return (
                           <tr
                             key={posName}
-                            draggable={true}
-                            tabIndex={0}
+                            draggable={!readOnly}
+                            tabIndex={readOnly ? undefined : 0}
                             aria-label={describeSlot(slotObj)}
                             aria-selected={isSelected ? 'true' : 'false'}
-                            aria-describedby="lineup-swap-hint"
+                            aria-describedby={readOnly ? undefined : 'lineup-swap-hint'}
                             onClick={() => handleToggleSwap(qNum, posName, playerName)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
@@ -609,7 +625,8 @@ export function LineupSection({
                             className={cn(
                               "draggable-row border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer select-none",
                               isKeeper && "keeper-row bg-amber-500/5 font-medium",
-                              isSelected && "swap-selected bg-primary/10 border-primary font-semibold ring-1 ring-primary"
+                              isSelected && "swap-selected bg-primary/10 border-primary font-semibold ring-1 ring-primary",
+                              readOnly && "cursor-default"
                             )}
                             data-quarter={String(qNum)}
                             data-position={posName}
@@ -650,11 +667,11 @@ export function LineupSection({
                         return (
                           <tr
                             key={`sit-${sitName}-${sIdx}`}
-                            draggable={true}
-                            tabIndex={0}
+                            draggable={!readOnly}
+                            tabIndex={readOnly ? undefined : 0}
                             aria-label={describeSlot(slotObj)}
                             aria-selected={isSelected ? 'true' : 'false'}
-                            aria-describedby="lineup-swap-hint"
+                            aria-describedby={readOnly ? undefined : 'lineup-swap-hint'}
                             onClick={() => handleToggleSwap(qNum, sitPosKey, sitName)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
@@ -711,7 +728,8 @@ export function LineupSection({
                             }}
                             className={cn(
                               "sitting-row draggable-row border-b border-border/50 last:border-0 text-muted-foreground hover:bg-muted/30 transition-colors cursor-pointer select-none",
-                              isSelected && "swap-selected bg-primary/10 border-primary font-semibold ring-1 ring-primary"
+                              isSelected && "swap-selected bg-primary/10 border-primary font-semibold ring-1 ring-primary",
+                              readOnly && "cursor-default"
                             )}
                             data-quarter={String(qNum)}
                             data-position={sitPosKey}
@@ -774,7 +792,9 @@ export function LineupSection({
         </div>
 
       {/* Player Summary Section */}
-      {playerStats.length > 0 && (
+      {/* The rotation rules it sets belong to the roster this lineup was
+          made from, which is not on this device */}
+      {!readOnly && playerStats.length > 0 && (
         <Card className="player-summary overflow-hidden shadow-sm border bg-card">
           <CardHeader className="py-3 px-4 border-b bg-muted/20">
             <CardTitle className="text-sm font-semibold tracking-tight">Player Summary</CardTitle>

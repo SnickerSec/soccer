@@ -6,6 +6,7 @@ import { LineupSection } from '@/components/LineupSection';
 import { SeasonTab } from '@/components/SeasonTab';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { EvaluationTab } from '@/components/EvaluationTab';
+import { SharedLineupNotice } from '@/components/SharedLineupNotice';
 import { TeamModal } from '@/components/TeamModal';
 import { SaveGameModal } from '@/components/SaveGameModal';
 import { LoadGameDialog } from '@/components/LoadGameDialog';
@@ -229,6 +230,10 @@ export default function App() {
   const [notesModalGame, setNotesModalGame] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
+  // A lineup opened from a share link. Held apart from the coach's own and
+  // saved nowhere: it used to be loaded as this device's roster, captains and
+  // formation, which replaced theirs.
+  const [sharedView, setSharedView] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
 
   // Undo / Redo History
@@ -496,30 +501,20 @@ export default function App() {
       const raw = decodeShareData(lineupParam);
       const decoded = raw && raw.quarters ? sharePayload(raw) : null;
       if (decoded) {
-        if (decoded.players && decoded.players.length > 0) {
-          setPlayers(decoded.players);
-        }
-        if (decoded.captains) {
-          setCaptains(decoded.captains);
-        }
-        if (decoded.formation || decoded.fieldPlayers) {
-          const newSettings = {
-            ...settingsRef.current,
+        setSharedView({
+          teamName: decoded.teamName || '',
+          players: decoded.players,
+          captains: Array.isArray(decoded.captains) ? decoded.captains : [],
+          lineup: {
+            quarters: decoded.quarters,
             formation: decoded.formation || settingsRef.current.formation,
             fieldPlayers: decoded.fieldPlayers || settingsRef.current.fieldPlayers,
-          };
-          settingsRef.current = newSettings;
-          setSettings(newSettings);
-        }
-        setLineup({
-          quarters: decoded.quarters,
-          formation: decoded.formation || settingsRef.current.formation,
-          fieldPlayers: decoded.fieldPlayers || settingsRef.current.fieldPlayers,
-          warnings: [],
-          playerStats: decoded.players || playersRef.current,
-          generatedAt: Date.now(),
+            warnings: [],
+            playerStats: decoded.players,
+            generatedAt: Date.now(),
+          },
         });
-        toast.info('Loaded shared game lineup');
+        setActiveTab('roster');
       }
     }
 
@@ -527,6 +522,15 @@ export default function App() {
     if (token) {
       setInviteToken(token);
     }
+  }, []);
+
+  /** Leave a shared lineup, and take it out of the address so a reload does not reopen it. */
+  const closeSharedView = useCallback(() => {
+    setSharedView(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('lineup');
+    url.searchParams.delete('share');
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
   }, []);
 
   // Initialize Auth & Sync
@@ -1746,6 +1750,17 @@ export default function App() {
           id="roster-tab"
           className={cn("player-section space-y-6", activeTab === 'roster' ? "active block" : "hidden")}
         >
+          {sharedView ? (
+            <>
+              <SharedLineupNotice teamName={sharedView.teamName} onClose={closeSharedView} />
+              <LineupSection
+                lineup={sharedView.lineup}
+                captains={sharedView.captains}
+                readOnly
+              />
+            </>
+          ) : (
+          <>
           <RosterTab
             players={players}
             captains={captains}
@@ -1824,6 +1839,8 @@ export default function App() {
             }}
             onExportPdf={handleExportPdf}
           />
+          </>
+          )}
         </div>
 
         {/* Season Tab Panel */}
@@ -1890,10 +1907,10 @@ export default function App() {
 
       {/* What the Print button puts on paper; hidden on screen */}
       <PrintSheet
-        lineup={lineup}
-        players={players}
-        captains={captains}
-        teamName={currentTeam?.name || 'Our Team'}
+        lineup={sharedView ? sharedView.lineup : lineup}
+        players={sharedView ? sharedView.players : players}
+        captains={sharedView ? sharedView.captains : captains}
+        teamName={sharedView ? (sharedView.teamName || 'Shared lineup') : (currentTeam?.name || 'Our Team')}
         ageDivision={settings.ageDivision}
       />
 
