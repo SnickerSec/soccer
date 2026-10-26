@@ -100,7 +100,7 @@ import { normalizeSettings, sameSettings } from '@/modules/team-settings';
 import { generateMatchCardPdf } from '@/modules/match-card-pdf';
 import { extractPlayersFromFile } from '@/modules/roster-importer';
 import { extractFixturesFromFile } from '@/modules/schedule-importer';
-import { buildShareUrl, decodeShareData } from '@/modules/share-link';
+import { buildShareUrl, decodeShareData, sharePayload } from '@/modules/share-link';
 import { toast } from 'sonner';
 
 /** Who the generator is handed: the players who are here. */
@@ -493,8 +493,9 @@ export default function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const lineupParam = urlParams.get('lineup') || urlParams.get('share');
     if (lineupParam) {
-      const decoded = decodeShareData(lineupParam);
-      if (decoded && decoded.quarters) {
+      const raw = decodeShareData(lineupParam);
+      const decoded = raw && raw.quarters ? sharePayload(raw) : null;
+      if (decoded) {
         if (decoded.players && decoded.players.length > 0) {
           setPlayers(decoded.players);
         }
@@ -1144,14 +1145,14 @@ export default function App() {
 
   const handleShareLineup = () => {
     if (!lineup) return;
-    const shareData = {
+    const shareData = sharePayload({
       quarters: lineup.quarters,
       formation: lineup.formation,
       fieldPlayers: lineup.fieldPlayers,
-      players: players,
-      captains: captains,
+      players,
+      captains,
       teamName: currentTeam?.name,
-    };
+    });
     const url = buildShareUrl(shareData, window.location);
     navigator.clipboard.writeText(url).then(() => {
       toast.success('Share link copied to clipboard!');
@@ -1305,18 +1306,25 @@ export default function App() {
       ? playersRef.current
       : players;
 
-    return roster.map((player) => ({
-      ...player,
-      quartersPlayed: [],
-      quartersSitting: [],
-      positionsPlayed: [],
-      offensiveQuarters: 0,
-      defensiveQuarters: 0,
-      goalieQuarter: null,
-      ...(played.get(player.name) || {}),
-      status: player.status || 'available',
-      isCaptain: captains.includes(player.name),
-    }));
+    // The evaluation comment stays on the roster. A game is history that is
+    // never rewritten, so a comment copied into it would outlive the coach
+    // clearing or rewording it. Taken off last: the engine's playerStats are
+    // copies of the roster rows too, so they carry it as well.
+    return roster.map((player) => {
+      const { comments, ...snapshot } = {
+        ...player,
+        quartersPlayed: [],
+        quartersSitting: [],
+        positionsPlayed: [],
+        offensiveQuarters: 0,
+        defensiveQuarters: 0,
+        goalieQuarter: null,
+        ...(played.get(player.name) || {}),
+        status: player.status || 'available',
+        isCaptain: captains.includes(player.name),
+      };
+      return snapshot;
+    });
   };
 
   /**

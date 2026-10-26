@@ -15,6 +15,42 @@
  *   means a share link that works for most teams and silently fails for one.
  */
 
+/**
+ * What a shared lineup says about each player: enough to read it, nothing
+ * else.
+ *
+ * The link goes into the team's group chat, and it is encoded rather than
+ * encrypted — anyone holding it can read every byte, and nobody can take it
+ * back. It used to carry whole roster rows: each child's ratings, the coach's
+ * evaluation comments, who must rest and who may not keep. The lineup needs a
+ * name, a number for the cards, and whether the player is available.
+ */
+const SHARED_PLAYER_FIELDS = ['name', 'number', 'status'];
+
+export function sharedPlayer(player) {
+    const shared = {};
+    for (const field of SHARED_PLAYER_FIELDS) {
+        if (player?.[field] !== undefined) shared[field] = player[field];
+    }
+    return shared;
+}
+
+/**
+ * The payload a share link carries. Used on the way out, and on the way in
+ * too, so a link sent before this existed does not copy another team's
+ * ratings and comments into the device that opens it.
+ */
+export function sharePayload({ quarters, formation, fieldPlayers, players, captains, teamName }) {
+    return {
+        quarters,
+        formation,
+        fieldPlayers,
+        players: Array.isArray(players) ? players.map(sharedPlayer) : [],
+        captains,
+        teamName,
+    };
+}
+
 /** Base64 for arbitrary bytes, chunked so a big roster cannot blow the stack. */
 function bytesToBase64(bytes) {
     const CHUNK = 0x8000;

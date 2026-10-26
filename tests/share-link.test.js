@@ -10,7 +10,7 @@
 
 import { describe, test, expect, beforeAll } from '@jest/globals';
 import {
-    encodeShareData, decodeShareData, buildShareUrl
+    encodeShareData, decodeShareData, buildShareUrl, sharePayload
 } from '../src/modules/share-link.js';
 
 // btoa/atob exist in browsers and in Node 16+, but not in every environment
@@ -116,5 +116,37 @@ describe('buildShareUrl', () => {
         });
 
         expect(url.startsWith('https://roster.example/app/?lineup=')).toBe(true);
+    });
+});
+
+describe('what a share link says about the players', () => {
+    // The link goes into the team chat, and is encoded, not encrypted
+    const roster = [{
+        name: 'Kamu', number: 4, status: 'available',
+        overallRating: 2, positionalRatings: { keeper: 1 },
+        comments: 'Needs to work on his weak foot',
+        mustRest: true, noKeeper: true, preferredPositions: ['Striker'], isCaptain: true,
+    }];
+
+    test('carries the name, number and availability, and nothing else', () => {
+        const payload = sharePayload({ quarters: [], formation: '2-3-1', fieldPlayers: 7, players: roster, captains: ['Kamu'], teamName: 'Tigers' });
+
+        expect(payload.players).toEqual([{ name: 'Kamu', number: 4, status: 'available' }]);
+        expect(payload).toMatchObject({ formation: '2-3-1', fieldPlayers: 7, captains: ['Kamu'], teamName: 'Tigers' });
+    });
+
+    test('a ratings or comment string appears nowhere in the encoded link', () => {
+        const url = buildShareUrl(sharePayload({ quarters: [], players: roster }), { origin: 'https://x', pathname: '/' });
+        const decoded = decodeShareData(new URL(url).searchParams.get('lineup'));
+
+        expect(JSON.stringify(decoded)).not.toMatch(/weak foot|overallRating|positionalRatings|mustRest|noKeeper/);
+    });
+
+    test('a link sent before this is narrowed the same way when it is opened', () => {
+        // An old link carries whole roster rows; opening it must not copy
+        // another team's ratings and comments into this device
+        const old = decodeShareData(encodeShareData({ quarters: [{ quarter: 1 }], players: roster }));
+
+        expect(sharePayload(old).players).toEqual([{ name: 'Kamu', number: 4, status: 'available' }]);
     });
 });

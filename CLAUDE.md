@@ -791,6 +791,15 @@ comment at the next sync. The upsert keeps the stored comment when a write
 sends `null`, which is what a build that predates the column sends; `''` is a
 comment deliberately cleared.
 
+Comments never leave the team. `gameRosterSnapshot` drops them, after the
+merge with the engine's `playerStats`, which are roster copies too, and
+`toWireGame`/`toWireGameUpdates` drop them again for games saved locally
+before that. A game is history nothing rewrites, so a copy there would outlive
+the coach clearing the comment. A share link carries `sharePayload` in
+`src/modules/share-link.js` — name, number and status per player, no ratings,
+no comments — and the same narrowing is applied to a link when it is opened,
+since links sent before it carried whole roster rows into the team chat.
+
 A comment is a draft while it is typed and is committed on blur or Enter. Each
 roster edit is a whole-roster PUT that bumps `roster_version`, so committing
 per keystroke sent the roster once per letter and gave another coach's edit a

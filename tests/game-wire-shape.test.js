@@ -146,6 +146,33 @@ describe('saving a game', () => {
     });
 });
 
+describe('evaluation comments stay off a saved game', () => {
+    // A game is never rewritten, so a comment copied into it would outlive
+    // the coach clearing it. Games saved locally before the snapshot stopped
+    // taking them still hold one.
+    const withComment = () => ({
+        ...localGame(),
+        players: [{ name: 'Alex Kim', status: 'available', comments: 'Shy on the ball', quartersPlayed: [1] }]
+    });
+
+    beforeEach(() => {
+        sent = null;
+        reply = { success: true, data: storedGame(localGame()) };
+    });
+
+    test('a new game is sent without them', async () => {
+        await saveGame('team-1', withComment());
+
+        expect(sent.body.players).toEqual([{ name: 'Alex Kim', status: 'available', quartersPlayed: [1] }]);
+    });
+
+    test('nor does an edit that carries the squad', async () => {
+        await updateGame('game-1', { players: withComment().players });
+
+        expect(sent.body.players[0]).not.toHaveProperty('comments');
+    });
+});
+
 describe('pulling games', () => {
     test('restores the quarters and the settings the app reads', async () => {
         reply = {

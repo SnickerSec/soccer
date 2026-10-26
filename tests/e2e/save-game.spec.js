@@ -57,6 +57,30 @@ test.describe('Save Game', () => {
         await expect(page.locator('#totalGames')).toHaveText('1');
     });
 
+    test('an evaluation comment is not copied into the saved game', async ({ page }) => {
+        // A game is history nothing rewrites, so a copy there would outlive
+        // the coach clearing the comment
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#evaluation-tab-btn');
+        await page.locator('#comment-0').fill('Shy on the ball');
+        await page.locator('#comment-0').press('Enter');
+        await page.click('#roster-tab-btn');
+        await page.click('#generateLineup');
+        await expect(page.locator('.action-buttons-inline')).toBeVisible({ timeout: 20000 });
+
+        await page.locator('.action-buttons-inline [data-action="saveGame"]').click();
+        await page.fill('#saveGameName', 'vs Tigers');
+        await page.click('#confirmSaveGame');
+        await expect(page.locator('#saveGameModal')).toBeHidden();
+
+        const stored = await page.evaluate(() => localStorage.getItem('ayso_lineup_history'));
+        expect(stored).toContain('vs Tigers');
+        expect(stored).not.toContain('Shy on the ball');
+        // The roster still has it
+        expect(await page.evaluate(() => localStorage.getItem('ayso_players'))).toContain('Shy on the ball');
+    });
+
     test('cancelling the modal saves nothing', async ({ page }) => {
         await generateLineup(page);
         await page.locator('.action-buttons-inline [data-action="saveGame"]').click();

@@ -67,6 +67,31 @@ test.describe('Sharing a lineup', () => {
         expect(roster).toContain('D’Angelo');
     });
 
+    test('the link carries no ratings or evaluation comments', async ({ page }) => {
+        // It goes into the team chat, and is encoded rather than encrypted.
+        // The demo roster is rated, so there is something to leak.
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#evaluation-tab-btn');
+        await page.locator('#comment-0').fill('Needs work on his weak foot');
+        await page.locator('#comment-0').press('Enter');
+        await page.click('#roster-tab-btn');
+        await page.click('#generateLineup');
+        await expect(page.locator('.quarter-lineup').first()).toBeVisible({ timeout: 20000 });
+
+        const link = await shareAndReadLink(page);
+        const payload = await page.evaluate((href) => {
+            const value = new URL(href).searchParams.get('lineup');
+            const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+            const bytes = Uint8Array.from(atob(base64 + '='.repeat((4 - base64.length % 4) % 4)), (c) => c.charCodeAt(0));
+            return new TextDecoder().decode(bytes);
+        }, link);
+
+        expect(payload).not.toContain('weak foot');
+        expect(payload).not.toMatch(/overallRating|positionalRatings|mustRest|noKeeper|comments/);
+        expect(JSON.parse(payload).players.length).toBeGreaterThan(0);
+    });
+
     test('the link carries no characters a query string would mangle', async ({ page }) => {
         await generateWith(page, ['D’Angelo']);
 

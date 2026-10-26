@@ -118,6 +118,20 @@ export async function deletePlayer(playerId) {
 // ============================================
 
 /**
+ * A game's squad without the evaluation comments. The roster carries them;
+ * a saved game is never rewritten, so a copy there would outlive the coach
+ * clearing it. Games saved locally before the snapshot stopped taking them
+ * still hold one, and this is what keeps it off the server.
+ */
+function withoutComments(players) {
+    return players.map((player) => {
+        if (!player || typeof player !== 'object' || !('comments' in player)) return player;
+        const { comments, ...rest } = player;
+        return rest;
+    });
+}
+
+/**
  * A saved game has two shapes, and this is where they meet.
  *
  * The client holds one flat: `quarters` for the per-quarter lineup, with the
@@ -137,6 +151,7 @@ function toWireGame(game) {
 
     return {
         ...rest,
+        ...(Array.isArray(game.players) ? { players: withoutComments(game.players) } : {}),
         lineup: quarters ?? game.lineup ?? [],
         settings: {
             ...(game.settings || {}),
@@ -208,6 +223,7 @@ export function toWireGameUpdates(updates = {}) {
     for (const key of ['name', 'date', 'notes', 'captains', 'players']) {
         if (updates[key] !== undefined) wire[key] = updates[key];
     }
+    if (Array.isArray(wire.players)) wire.players = withoutComments(wire.players);
 
     // The client holds the per-quarter lineup as `quarters`; the column is
     // `lineup`. Mapping it here means the offline queue's replay goes through
