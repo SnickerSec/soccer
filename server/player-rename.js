@@ -178,3 +178,44 @@ export function rewriteGameNames(row, map) {
         captains: captains.value
     };
 }
+
+const FIXTURE_DUTY_COLUMNS = ['snack_parent', 'fruit_parent', 'referee_duty', 'field_setup'];
+
+function rewriteDutyValue(value, map) {
+    if (typeof value !== 'string') return { changed: false, value };
+    const trimmed = value.trim();
+    if (map.has(trimmed)) {
+        return { changed: true, value: map.get(trimmed) };
+    }
+    for (const [from, to] of map.entries()) {
+        if (trimmed === `${from}'s Family`) {
+            return { changed: true, value: `${to}'s Family` };
+        }
+        if (trimmed === `${from}\u2019s Family`) {
+            return { changed: true, value: `${to}\u2019s Family` };
+        }
+    }
+    return { changed: false, value };
+}
+
+/**
+ * Applies a set of renames to one `fixtures` row's volunteer duty columns.
+ * Mirrors `renameInFixture` in `src/modules/player-rename.js`.
+ */
+export function rewriteFixtureNames(row, map) {
+    if (!row || typeof row !== 'object') return { changed: false };
+    let changed = false;
+    const rewritten = {};
+    for (const col of FIXTURE_DUTY_COLUMNS) {
+        const res = rewriteDutyValue(row[col], map);
+        if (res.changed) changed = true;
+        rewritten[col] = res.value;
+    }
+    return {
+        changed,
+        snackParent: rewritten.snack_parent,
+        fruitParent: rewritten.fruit_parent,
+        refereeDuty: rewritten.referee_duty,
+        fieldSetup: rewritten.field_setup
+    };
+}

@@ -342,11 +342,15 @@ export function ScheduleTab({
               <Users className="h-6 w-6" />
             </div>
             <div>
-              <div className="text-2xl font-bold tracking-tight">
-                {volunteerStats.assignedPlayers.length}/{players.length || 1}
+              <div className="text-2xl font-bold tracking-tight" id="volunteerFamiliesCount">
+                {players.length === 0
+                  ? '—'
+                  : `${(volunteerStats.assignedRosterPlayers || volunteerStats.assignedPlayers).length}/${players.length}`}
               </div>
               <div className="text-xs text-muted-foreground">
-                Families Participating
+                {players.length === 0
+                  ? 'Families Participating (no players on roster)'
+                  : 'Families Participating'}
               </div>
             </div>
           </CardContent>
@@ -467,12 +471,11 @@ export function ScheduleTab({
             </div>
           </CardHeader>
           <CardContent className="p-4">
-            <ScrollArea className="w-full">
-              <div className="overflow-x-auto">
+            <ScrollArea className="w-full overflow-x-auto" id="volunteerDutyTable">
                 <table className="w-full text-xs text-left min-w-[600px]">
                   <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b">
                     <tr>
-                      <th className="p-2 whitespace-nowrap">Player / Family</th>
+                      <th className="sticky left-0 z-20 bg-card border-r p-2 whitespace-nowrap">Player / Family</th>
                       <th className="p-2 text-center whitespace-nowrap">Halftime Fruit</th>
                       <th className="p-2 text-center whitespace-nowrap">Post-Game Snack</th>
                       <th className="p-2 text-center whitespace-nowrap">Referee / Lines</th>
@@ -484,13 +487,15 @@ export function ScheduleTab({
                 <tbody className="divide-y divide-border">
                   {volunteerStats.playerList.map((playerStat) => (
                     <tr key={playerStat.name} className="hover:bg-muted/30 transition-colors">
-                      <td className="p-2 font-medium text-foreground flex items-center gap-1.5">
-                        {playerStat.name}
-                        {playerStat.totalDuties === 0 && (
-                          <Badge variant="secondary" className="text-[10px] py-0 px-1 font-normal bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                            Needs Duty
-                          </Badge>
-                        )}
+                      <td className="sticky left-0 z-10 bg-card border-r p-2 font-medium text-foreground whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span>{playerStat.name}</span>
+                          {playerStat.totalDuties === 0 && (
+                            <Badge variant="secondary" className="text-[10px] py-0 px-1 font-normal bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                              Needs Duty
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="p-2 text-center">{playerStat.fruitCount || '-'}</td>
                       <td className="p-2 text-center">{playerStat.snackCount || '-'}</td>
@@ -520,7 +525,6 @@ export function ScheduleTab({
                   )}
                 </tbody>
               </table>
-              </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </CardContent>

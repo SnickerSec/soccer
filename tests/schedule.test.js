@@ -265,6 +265,33 @@ describe('calculateVolunteerStats', () => {
         expect(stats.snackCoveragePct).toBe(100);
         expect(stats.fruitCoveragePct).toBe(100);
     });
+
+    test('resolves "<Player>\'s Family" suggestions back to the roster player', () => {
+        const players = [{ name: 'Alex Martinez' }, { name: 'Sam Johnson' }];
+        const fixtures = [
+            {
+                gameDate: '2026-09-12',
+                opponent: 'Tigers',
+                snackParent: "Alex Martinez's Family",
+                fruitParent: 'sam johnson’s family',
+                refereeDuty: 'Coach Dave',
+                status: 'upcoming'
+            }
+        ];
+
+        const stats = calculateVolunteerStats(fixtures, players);
+
+        expect(stats.statsByPlayer['Alex Martinez'].snackCount).toBe(1);
+        expect(stats.statsByPlayer['Alex Martinez'].totalDuties).toBe(1);
+        expect(stats.statsByPlayer['Sam Johnson'].fruitCount).toBe(1);
+        expect(stats.statsByPlayer['Sam Johnson'].totalDuties).toBe(1);
+        expect(stats.statsByPlayer["Alex Martinez's Family"]).toBeUndefined();
+        expect(stats.unassignedPlayers).toHaveLength(0);
+        // Only the 2 roster families count towards assignedRosterPlayers, even
+        // when a non-roster volunteer ("Coach Dave") also took referee duty
+        expect(stats.assignedRosterPlayers).toHaveLength(2);
+        expect(stats.assignedPlayers).toHaveLength(3);
+    });
 });
 
 describe('exportScheduleCsv', () => {

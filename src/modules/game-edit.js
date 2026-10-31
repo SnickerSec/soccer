@@ -110,9 +110,10 @@ export function recalculateGamePlayers(players = [], quarters = [], options = {}
     const quarterList = Array.isArray(quarters) ? quarters : [];
 
     return (players || []).map((player) => {
+        const { comments: _comments, ...rest } = player;
         const status = statuses[player.name] ?? player.status ?? 'available';
         const base = {
-            ...player,
+            ...rest,
             status,
             isCaptain: captains.includes(player.name),
             quartersPlayed: [],

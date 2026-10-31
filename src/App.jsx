@@ -57,6 +57,7 @@ import {
   validateRename,
   renameInGames,
   renameInLineup,
+  renameInFixtures,
 } from '@/modules/player-rename';
 import {
   initAuth,
@@ -890,6 +891,19 @@ export default function App() {
     setCaptains((prev) => prev.map((c) => (c === from ? to : c)));
     setGameHistory((prev) => renameInGames(prev, from, to));
     setLineup((prev) => renameInLineup(prev, from, to));
+    setFixtures((prev) => {
+      const next = renameInFixtures(prev, from, to);
+      if (next !== prev && currentUser && currentTeam) {
+        next.forEach((f, idx) => {
+          if (f !== prev[idx] && f.id) {
+            pushFixtureUpdate(f.id, f).catch(() => {
+              toast.error('Failed to sync match update to cloud');
+            });
+          }
+        });
+      }
+      return next;
+    });
 
     pendingRenamesRef.current.push({ from, to });
     toast.success(`Renamed ${from} to ${to}`);
@@ -1367,11 +1381,21 @@ export default function App() {
    * copy. It used to save the planned lineup regardless, so every sub made at
    * the touchline was missing from Game History and from the season stats.
    */
-  const handleSaveGame = ({ name, date, quarters: playedQuarters }) => {
-    if (!lineup) return;
+  const handleSaveGame = ({
+    name,
+    date,
+    notes = '',
+    quarters: playedQuarters,
+    lineup: playedLineup,
+    fixtureId = null,
+  }) => {
+    // A match resumed after the lineup on screen was cleared still carries its
+    // own lineup snapshot from storage.
+    const baseLineup = lineup || playedLineup;
+    if (!baseLineup) return;
 
-    let quarters = lineup.quarters;
-    let playerStats = lineup.playerStats;
+    let quarters = baseLineup.quarters;
+    let playerStats = baseLineup.playerStats;
     if (playedQuarters) {
       // Recounted from what was played, over the players who were here, the
       // same way a swap recounts — and the screen is brought up to date, so
@@ -1380,7 +1404,7 @@ export default function App() {
       quarters = playedQuarters;
       playerStats = recalculateGamePlayers(present, playedQuarters, { captains });
       setLineup({
-        ...lineup,
+        ...baseLineup,
         quarters,
         playerStats,
         warnings: validateLineup(playerStats, settings.quarters || 4, {
@@ -1395,12 +1419,12 @@ export default function App() {
       date,
       ageDivision: settingsRef.current.ageDivision,
       division: settingsRef.current.ageDivision,
-      formation: lineup.formation || settingsRef.current.formation,
-      fieldPlayers: lineup.fieldPlayers || settingsRef.current.fieldPlayers,
+      formation: baseLineup.formation || settingsRef.current.formation,
+      fieldPlayers: baseLineup.fieldPlayers || settingsRef.current.fieldPlayers,
       quarters,
       players: gameRosterSnapshot(playerStats),
       captains: [...captains],
-      notes: '',
+      notes: notes || '',
       createdAt: new Date().toISOString(),
     };
 
@@ -1409,6 +1433,27 @@ export default function App() {
       safeSetToStorage(CONSTANTS.STORAGE_KEYS.LINEUP_HISTORY, JSON.stringify(updated));
       return updated;
     });
+
+    if (fixtureId) {
+      setFixtures((prev) =>
+        prev.map((f) =>
+          f.id === fixtureId
+            ? { ...f, status: 'completed', gameId: gameEntry.id, updatedAt: new Date().toISOString() }
+            : f
+        )
+      );
+      if (currentUser && currentTeam) {
+        pushFixtureUpdate(fixtureId, { status: 'completed' })
+          .then((res) => {
+            if (res && !res.success && !res.queued && res.error !== 'No team selected') {
+              toast.error(`Match status saved locally only: ${res.error || 'the server refused it'}`);
+            }
+          })
+          .catch(() => {
+            toast.error('Failed to sync match status to cloud');
+          });
+      }
+    }
 
     if (currentUser && currentTeam) {
       // The server issues the id a later edit or delete has to quote, and the
@@ -1429,6 +1474,11 @@ export default function App() {
           setGameHistory((prev) =>
             prev.map((g) => (g.id === gameEntry.id ? { ...g, ...result.data } : g))
           );
+          if (fixtureId) {
+            setFixtures((prev) =>
+              prev.map((f) => (f.id === fixtureId ? { ...f, gameId: result.data.id } : f))
+            );
+          }
         })
         .catch(() => {
           toast.error(`"${name}" could not be synced to cloud: network error`);

@@ -207,6 +207,22 @@ describe('recalculateGamePlayers', () => {
     expect(dev.quartersPlayed).toEqual([2, 3, 4]);
     expect(dev.quartersSitting).toEqual([1]);
   });
+
+  test('strips private evaluation comments from recalculated game snapshots', () => {
+    const game = savedGame();
+    const withComments = game.players.map((p) => ({
+      ...p,
+      comments: p.name === 'Ana' ? 'Needs work on distribution' : '',
+    }));
+    const players = recalculateGamePlayers(withComments, game.quarters, {
+      captains: ['Ana'],
+      statuses: { Eli: 'absent' },
+    });
+
+    players.forEach((p) => {
+      expect(p).not.toHaveProperty('comments');
+    });
+  });
 });
 
 describe('unfilledSlots', () => {

@@ -226,3 +226,69 @@ test.describe('Opening a match on a phone', () => {
         await expect(page.locator('#gameHistoryList')).toContainText('vs Rovers (0-0)');
     });
 });
+
+test.describe('Matchday event notes, schedule completion, and resumed match saving', () => {
+    test('saves logged goals and substitutions into game notes and marks the scheduled match completed', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+
+        // Add a scheduled match and launch Live Matchday from it
+        await page.locator('button[role="tab"]').filter({ hasText: 'Schedule' }).click();
+        await page.getByRole('button', { name: /Add Match/i }).first().click();
+        await page.fill('#opponentName', 'Titans');
+        await page.fill('#gameDate', '2026-09-12');
+        await page.getByRole('button', { name: /Save Match/i }).click();
+
+        await page.getByRole('button', { name: /Live/i }).first().click();
+        const dialog = page.locator('[role="dialog"]');
+        await expect(dialog).toBeVisible();
+
+        // Log a goal in Q1
+        const fieldRow = dialog.locator('.max-h-44 [role="button"]').first();
+        await fieldRow.click();
+        await dialog.getByRole('button', { name: /Goal/i }).click();
+
+        // Save the game record
+        await dialog.getByRole('button', { name: /Save Game Record/i }).click();
+        await expect(dialog).not.toBeVisible();
+
+        // Schedule fixture is now marked Completed
+        await expect(page.getByRole('button', { name: /Completed \(1\)/i })).toBeVisible();
+
+        // Game History entry has the goal recorded in its notes
+        await page.click('#season-tab-btn');
+        await expect(page.locator('#gameHistoryList')).toContainText('vs Titans (1-0)');
+        await expect(page.locator('#gameHistoryList .game-notes')).toContainText("Q1 1' Goal:");
+    });
+
+    test('saves a resumed live match even if the lineup on screen was cleared', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.click('#generateLineup');
+
+        await page.locator('#openMatchday').click();
+        const dialog = page.locator('[role="dialog"]');
+        await expect(dialog).toBeVisible();
+
+        // Record a goal so the match is persisted to shinguard_live_match
+        await dialog.locator('.max-h-44 [role="button"]').first().click();
+        await dialog.getByRole('button', { name: /Goal/i }).click();
+        await dialog.getByRole('button', { name: /Close Match Mode/i }).click();
+
+        // Clear the lineup from localStorage and reload so lineup state is null,
+        // while shinguard_live_match remains in localStorage
+        await page.evaluate(() => {
+            localStorage.removeItem('ayso_current_lineup');
+        });
+        await page.reload();
+
+        // Resume via the toast action and finish the match
+        await page.getByRole('button', { name: 'Resume' }).click();
+        await expect(dialog).toBeVisible();
+        await dialog.getByRole('button', { name: /Save Game Record/i }).click();
+        await expect(dialog).not.toBeVisible();
+
+        await page.click('#season-tab-btn');
+        await expect(page.locator('#gameHistoryList')).toContainText('vs Opponent (1-0)');
+    });
+});

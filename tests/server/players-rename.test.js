@@ -22,7 +22,7 @@ jest.unstable_mockModule('../../server/db.js', () => ({
 }));
 
 const { default: playerRoutes } = await import('../../server/routes/players.js');
-const { validateRenames, renameMap, rewriteGameNames } =
+const { validateRenames, renameMap, rewriteGameNames, rewriteFixtureNames } =
     await import('../../server/player-rename.js');
 const { buildApp, rows, silenceRouteErrorLogging } = await import('../helpers/test-app.js');
 
@@ -170,6 +170,31 @@ describe('rewriteGameNames', () => {
         expect(result.changed).toBe(false);
         expect(result.lineup).toEqual([{ quarter: 1 }, null, { quarter: 2, positions: 'nonsense' }]);
         expect(result.captains).toBeNull();
+    });
+
+    test('rewriteFixtureNames moves volunteer duty names and "<Name>\'s Family"', () => {
+        const changed = rewriteFixtureNames({
+            snack_parent: "Alex Kim's Family",
+            fruit_parent: 'Alex Kim',
+            referee_duty: 'Ben Ortiz',
+            field_setup: null
+        }, map);
+
+        expect(changed).toEqual({
+            changed: true,
+            snackParent: "Alexander Kim's Family",
+            fruitParent: 'Alexander Kim',
+            refereeDuty: 'Ben Ortiz',
+            fieldSetup: null
+        });
+
+        const untouched = rewriteFixtureNames({
+            snack_parent: 'Ben Ortiz',
+            fruit_parent: '',
+            referee_duty: null,
+            field_setup: undefined
+        }, map);
+        expect(untouched.changed).toBe(false);
     });
 });
 

@@ -134,6 +134,23 @@ function upsertPlayersSql(players) {
             RETURNING *`;
 }
 
+function upsertPlayersAndBumpSql(players) {
+    return `WITH upserted AS (${upsertPlayersSql(players)}),
+                 bumped AS (UPDATE teams SET roster_version = roster_version + 1 WHERE id = $1)
+            SELECT * FROM upserted`;
+}
+
+const DELETE_TEAM_PLAYERS_SQL = `
+    WITH deleted AS (DELETE FROM players WHERE team_id = $1)
+    UPDATE teams SET roster_version = roster_version + 1 WHERE id = $1
+`;
+
+const DELETE_PLAYER_BY_ID_SQL = `
+    WITH deleted AS (DELETE FROM players WHERE id = $1 RETURNING team_id)
+    UPDATE teams SET roster_version = roster_version + 1
+    FROM deleted WHERE teams.id = deleted.team_id
+`;
+
 /** The bind parameters matching upsertPlayersSql, in column order. */
 function upsertPlayersValues(players, teamId) {
     const values = [teamId];
@@ -301,7 +318,7 @@ router.post('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req
 
     try {
         const result = await pool.query(
-            upsertPlayersSql(toWrite),
+            upsertPlayersAndBumpSql(toWrite),
             upsertPlayersValues(toWrite, req.params.teamId)
         );
 
@@ -445,7 +462,7 @@ router.put('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req,
 // Delete all players for a team
 router.delete('/api/teams/:teamId/players', requireTeamAccess('coach'), async (req, res) => {
     try {
-        await pool.query('DELETE FROM players WHERE team_id = $1', [req.params.teamId]);
+        await pool.query(DELETE_TEAM_PLAYERS_SQL, [req.params.teamId]);
         res.json({ success: true });
     } catch (error) {
         console.error('Delete all players error:', error);
@@ -479,7 +496,7 @@ router.delete('/api/players/:id', requireAuth, async (req, res) => {
             return res.status(403).json({ success: false, error: 'Insufficient permissions' });
         }
 
-        await pool.query('DELETE FROM players WHERE id = $1', [req.params.id]);
+        await pool.query(DELETE_PLAYER_BY_ID_SQL, [req.params.id]);
         res.json({ success: true });
     } catch (error) {
         console.error('Delete player error:', error);

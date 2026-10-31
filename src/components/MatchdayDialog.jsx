@@ -33,7 +33,7 @@ import { sittingInQuarter } from '@/modules/lineup-engine';
 import {
   freshClock, displaySeconds, startClock, pauseClock, hasExpired, minuteOfQuarter,
 } from '@/modules/match-clock';
-import { saveLiveMatch, loadLiveMatch, clearLiveMatch } from '@/modules/live-match';
+import { saveLiveMatch, loadLiveMatch, clearLiveMatch, formatMatchEvents } from '@/modules/live-match';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -173,7 +173,7 @@ export function MatchdayDialog({
       if (document.visibilityState !== 'visible') return;
       try {
         const lock = await navigator.wakeLock.request('screen');
-        if (cancelled) lock.release().catch(() => {});
+        if (cancelled) lock.release().catch(() => { /* sentinel already released */ });
         else sentinel = lock;
       } catch {
         // Refused (battery saver, an iframe): the clock is still right.
@@ -184,7 +184,7 @@ export function MatchdayDialog({
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', acquire);
-      sentinel?.release().catch(() => {});
+      sentinel?.release().catch(() => { /* sentinel already released */ });
     };
   }, [isOpen, isRunning]);
 
@@ -331,8 +331,11 @@ export function MatchdayDialog({
       onSaveGame({
         name: `vs ${opponentLabel} (${homeScore}-${awayScore})`,
         date: matchFixture?.gameDate || todayLocalDate(),
+        notes: formatMatchEvents(events),
         // As played, subs and all — not the lineup this dialog was opened with
         quarters: activeLineup.quarters,
+        lineup: activeLineup,
+        fixtureId: matchFixture?.id || null,
       });
     }
     clearLiveMatch();

@@ -19,7 +19,7 @@ jest.unstable_mockModule('../src/modules/storage.js', () => ({
     },
 }));
 
-const { saveLiveMatch, loadLiveMatch, clearLiveMatch, hasStarted, LIVE_MATCH_TTL_MS } =
+const { saveLiveMatch, loadLiveMatch, clearLiveMatch, hasStarted, formatMatchEvents, LIVE_MATCH_TTL_MS } =
     await import('../src/modules/live-match.js');
 
 const T0 = 1_700_000_000_000;
@@ -90,5 +90,20 @@ describe('the match in progress', () => {
         expect(loadLiveMatch('team-1', T0)).toBeNull();
         store.shinguard_live_match = 'not json';
         expect(loadLiveMatch('team-1', T0)).toBeNull();
+    });
+});
+
+describe('formatMatchEvents', () => {
+    test('returns an empty string when there are no events', () => {
+        expect(formatMatchEvents([])).toBe('');
+        expect(formatMatchEvents(null)).toBe('');
+    });
+
+    test('formats goals and substitutions chronologically (oldest first)', () => {
+        const events = [
+            { id: 2, quarter: 3, minute: 9, type: 'sub', description: 'Sub: Bo in for Cy' },
+            { id: 1, quarter: 1, minute: 4, type: 'goal', player: 'Ana' },
+        ];
+        expect(formatMatchEvents(events)).toBe("Q1 4' Goal: Ana\nQ3 9' Sub: Bo in for Cy");
     });
 });

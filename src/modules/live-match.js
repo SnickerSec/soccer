@@ -48,3 +48,23 @@ export function loadLiveMatch(teamId, now = Date.now()) {
 export function clearLiveMatch() {
     safeRemoveFromStorage(LIVE_MATCH_KEY);
 }
+
+/**
+ * Formats the live match event log (stored newest-first) into a chronological
+ * summary string for the saved game's notes.
+ */
+export function formatMatchEvents(events) {
+    if (!Array.isArray(events) || events.length === 0) return '';
+    return [...events]
+        .reverse()
+        .map((e) => {
+            if (!e || typeof e !== 'object') return '';
+            const stamp = `Q${e.quarter ?? 1} ${e.minute ?? 1}'`;
+            const detail = e.type === 'goal'
+                ? (e.player ? `Goal: ${e.player}` : '')
+                : (e.description || '');
+            return detail ? `${stamp} ${detail}` : '';
+        })
+        .filter(Boolean)
+        .join('\n');
+}

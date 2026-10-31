@@ -284,8 +284,16 @@ export function calculateVolunteerStats(fixtures = [], players = []) {
     const playerNames = new Set((players || []).map((p) => (typeof p === 'string' ? p : p?.name)).filter(Boolean));
     const stats = {};
 
-    // Initialize stats for known players
+    // FixtureModal's datalist suggests both "<Player>'s Family" and "<Player>".
+    // Resolve either form (case-insensitively, straight or curly apostrophe) to
+    // the roster player so selecting "<Player>'s Family" credits that player's
+    // family rather than creating a second entry while leaving the player at 0.
+    const rosterLookup = new Map();
     playerNames.forEach((name) => {
+        const lower = name.toLowerCase();
+        rosterLookup.set(lower, name);
+        rosterLookup.set(`${lower}'s family`, name);
+        rosterLookup.set(`${lower}\u2019s family`, name);
         stats[name] = {
             name,
             snackCount: 0,
@@ -296,6 +304,29 @@ export function calculateVolunteerStats(fixtures = [], players = []) {
             assignments: []
         };
     });
+
+    const resolveParent = (raw) => {
+        const trimmed = raw.trim();
+        return rosterLookup.get(trimmed.toLowerCase()) || trimmed;
+    };
+
+    const recordDuty = (raw, countKey, duty, dateStr, opponent) => {
+        const parent = resolveParent(raw);
+        if (!stats[parent]) {
+            stats[parent] = {
+                name: parent,
+                snackCount: 0,
+                fruitCount: 0,
+                refereeCount: 0,
+                fieldSetupCount: 0,
+                totalDuties: 0,
+                assignments: []
+            };
+        }
+        stats[parent][countKey]++;
+        stats[parent].totalDuties++;
+        stats[parent].assignments.push({ date: dateStr, duty, opponent });
+    };
 
     let totalSnackAssigned = 0;
     let totalFruitAssigned = 0;
@@ -310,57 +341,34 @@ export function calculateVolunteerStats(fixtures = [], players = []) {
 
         // Snacks
         if (fix.snackParent && fix.snackParent.trim()) {
-            const parent = fix.snackParent.trim();
             totalSnackAssigned++;
-            if (!stats[parent]) {
-                stats[parent] = { name: parent, snackCount: 0, fruitCount: 0, refereeCount: 0, fieldSetupCount: 0, totalDuties: 0, assignments: [] };
-            }
-            stats[parent].snackCount++;
-            stats[parent].totalDuties++;
-            stats[parent].assignments.push({ date: dateStr, duty: 'Snack', opponent });
+            recordDuty(fix.snackParent, 'snackCount', 'Snack', dateStr, opponent);
         } else {
             unassignedSnackFixtures++;
         }
 
         // Fruit
         if (fix.fruitParent && fix.fruitParent.trim()) {
-            const parent = fix.fruitParent.trim();
             totalFruitAssigned++;
-            if (!stats[parent]) {
-                stats[parent] = { name: parent, snackCount: 0, fruitCount: 0, refereeCount: 0, fieldSetupCount: 0, totalDuties: 0, assignments: [] };
-            }
-            stats[parent].fruitCount++;
-            stats[parent].totalDuties++;
-            stats[parent].assignments.push({ date: dateStr, duty: 'Fruit', opponent });
+            recordDuty(fix.fruitParent, 'fruitCount', 'Fruit', dateStr, opponent);
         } else {
             unassignedFruitFixtures++;
         }
 
         // Referee
         if (fix.refereeDuty && fix.refereeDuty.trim()) {
-            const parent = fix.refereeDuty.trim();
-            if (!stats[parent]) {
-                stats[parent] = { name: parent, snackCount: 0, fruitCount: 0, refereeCount: 0, fieldSetupCount: 0, totalDuties: 0, assignments: [] };
-            }
-            stats[parent].refereeCount++;
-            stats[parent].totalDuties++;
-            stats[parent].assignments.push({ date: dateStr, duty: 'Referee', opponent });
+            recordDuty(fix.refereeDuty, 'refereeCount', 'Referee', dateStr, opponent);
         }
 
         // Field Setup
         if (fix.fieldSetup && fix.fieldSetup.trim()) {
-            const parent = fix.fieldSetup.trim();
-            if (!stats[parent]) {
-                stats[parent] = { name: parent, snackCount: 0, fruitCount: 0, refereeCount: 0, fieldSetupCount: 0, totalDuties: 0, assignments: [] };
-            }
-            stats[parent].fieldSetupCount++;
-            stats[parent].totalDuties++;
-            stats[parent].assignments.push({ date: dateStr, duty: 'Field Setup', opponent });
+            recordDuty(fix.fieldSetup, 'fieldSetupCount', 'Field Setup', dateStr, opponent);
         }
     });
 
     const activeList = Object.values(stats);
     const assignedPlayers = activeList.filter((s) => s.totalDuties > 0);
+    const assignedRosterPlayers = activeList.filter((s) => playerNames.has(s.name) && s.totalDuties > 0);
     const unassignedPlayers = activeList.filter((s) => s.totalDuties === 0);
 
     const totalGames = validFixtures.length;
@@ -377,6 +385,7 @@ export function calculateVolunteerStats(fixtures = [], players = []) {
         statsByPlayer: stats,
         playerList: activeList,
         assignedPlayers,
+        assignedRosterPlayers,
         unassignedPlayers,
         totalGames,
         snackCoveragePct,

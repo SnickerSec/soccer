@@ -152,6 +152,43 @@ export function renameInLineup(lineup, from, to) {
     return { ...lineup, quarters, playerStats };
 }
 
+const FIXTURE_DUTY_KEYS = ['snackParent', 'fruitParent', 'refereeDuty', 'fieldSetup'];
+
+function renameDutyValue(value, from, to) {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    if (trimmed === from) return to;
+    if (trimmed === `${from}'s Family`) return `${to}'s Family`;
+    if (trimmed === `${from}\u2019s Family`) return `${to}\u2019s Family`;
+    return value;
+}
+
+/**
+ * Rewrites one scheduled fixture's volunteer duty fields when a player is
+ * renamed, handling both "<Name>" and "<Name>'s Family". Returns the same
+ * fixture object if nothing changed.
+ */
+export function renameInFixture(fixture, from, to) {
+    if (!fixture || typeof fixture !== 'object') return fixture;
+
+    let changed = false;
+    const updates = {};
+    for (const key of FIXTURE_DUTY_KEYS) {
+        const next = renameDutyValue(fixture[key], from, to);
+        if (next !== fixture[key]) {
+            updates[key] = next;
+            changed = true;
+        }
+    }
+
+    return changed ? { ...fixture, ...updates } : fixture;
+}
+
+/** Every scheduled fixture, rewritten if it references the renamed player. */
+export function renameInFixtures(fixtures, from, to) {
+    return mapIfChanged(fixtures, fixture => renameInFixture(fixture, from, to));
+}
+
 /**
  * Decides which renames still apply once a rejected save has been merged.
  *

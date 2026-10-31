@@ -262,5 +262,25 @@ test.describe('Mobile tap targets', () => {
             expect(dim.width).toBeGreaterThanOrEqual(MIN_TAP);
         }
     });
+
+    test('Volunteer Duty Matrix keeps the player/family column pinned on horizontal scroll', async ({ page }) => {
+        await page.goto('/');
+        await page.click('#demoButton');
+        await page.locator('button[role="tab"]').filter({ hasText: 'Schedule' }).click();
+        await page.getByRole('button', { name: /Volunteer Duty Matrix/i }).click();
+
+        const firstCell = page.locator('#volunteerDutyTable tbody tr').first().locator('td').first();
+        await firstCell.scrollIntoViewIfNeeded();
+        const before = (await firstCell.boundingBox()).x;
+
+        await page.locator('#volunteerDutyTable table').evaluate((table) => {
+            const viewport = table.closest('[data-radix-scroll-area-viewport]') || table.parentElement;
+            viewport.scrollLeft = viewport.scrollWidth;
+        });
+
+        const after = await firstCell.boundingBox();
+        expect(Math.round(after.x)).toBe(Math.round(before));
+        await expect(firstCell).toBeInViewport();
+    });
 });
 

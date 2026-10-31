@@ -231,4 +231,36 @@ describeDb('roster concurrency against PostgreSQL', () => {
         // requireTeamAccess rejects a vanished team before the handler runs
         expect([403, 404]).toContain(res.status);
     });
+
+    test('POST /players and DELETE player routes advance roster_version so stale PUTs conflict', async () => {
+        const { body: v0 } = await request(app).get(`/api/teams/${team.id}/players`);
+
+        // Bulk upsert via POST advances version by 1
+        const postRes = await request(app).post(`/api/teams/${team.id}/players`).send({
+            players: [{ name: 'Alex', number: 10 }, { name: 'Blake', number: 11 }]
+        });
+        expect(postRes.status).toBe(200);
+
+        // Stale PUT at v0.version must 409
+        const staleAfterPost = await put(roster('Casey'), v0.version);
+        expect(staleAfterPost.status).toBe(409);
+        expect(staleAfterPost.body.version).toBe(v0.version + 1);
+
+        // Single-player DELETE advances version by 1
+        const alexId = postRes.body.data.find((p) => p.name === 'Alex').id;
+        const delOne = await request(app).delete(`/api/players/${alexId}`);
+        expect(delOne.status).toBe(200);
+
+        const staleAfterDelOne = await put(roster('Casey'), v0.version + 1);
+        expect(staleAfterDelOne.status).toBe(409);
+        expect(staleAfterDelOne.body.version).toBe(v0.version + 2);
+
+        // Team-wide DELETE advances version by 1
+        const delAll = await request(app).delete(`/api/teams/${team.id}/players`);
+        expect(delAll.status).toBe(200);
+
+        const staleAfterDelAll = await put(roster('Casey'), v0.version + 2);
+        expect(staleAfterDelAll.status).toBe(409);
+        expect(staleAfterDelAll.body.version).toBe(v0.version + 3);
+    });
 });

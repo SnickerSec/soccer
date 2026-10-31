@@ -19,6 +19,8 @@ import {
     renameInGame,
     renameInGames,
     renameInLineup,
+    renameInFixture,
+    renameInFixtures,
     surviveMerge
 } from '../src/modules/player-rename.js';
 import { calculatePlayerStats } from '../src/modules/season-stats.js';
@@ -141,6 +143,38 @@ describe('renameInLineup', () => {
 
     test('leaves a null lineup alone — there may be none generated yet', () => {
         expect(renameInLineup(null, 'Alex Kim', 'Alexander Kim')).toBeNull();
+    });
+});
+
+describe('renameInFixtures', () => {
+    test('rewrites both bare player names and "<Player>\'s Family" across volunteer duties', () => {
+        const untouched = { id: 'f2', opponent: 'Lions', snackParent: 'Ben Ortiz' };
+        const fixtures = [
+            {
+                id: 'f1',
+                opponent: 'Tigers',
+                snackParent: "Alex Kim's Family",
+                fruitParent: 'Alex Kim',
+                refereeDuty: 'Ben Ortiz',
+                fieldSetup: 'Alex Kim\u2019s Family'
+            },
+            untouched
+        ];
+
+        const renamed = renameInFixtures(fixtures, 'Alex Kim', 'Alexander Kim');
+
+        expect(renamed[0]).toEqual({
+            id: 'f1',
+            opponent: 'Tigers',
+            snackParent: "Alexander Kim's Family",
+            fruitParent: 'Alexander Kim',
+            refereeDuty: 'Ben Ortiz',
+            fieldSetup: 'Alexander Kim\u2019s Family'
+        });
+        expect(renamed[1]).toBe(untouched);
+        const list = [untouched];
+        expect(renameInFixtures(list, 'Alex Kim', 'Alexander Kim')).toBe(list);
+        expect(renameInFixture(null, 'Alex Kim', 'Alexander Kim')).toBeNull();
     });
 });
 

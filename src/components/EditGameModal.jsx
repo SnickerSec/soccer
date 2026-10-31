@@ -53,7 +53,7 @@ export function EditGameModal({ isOpen, game, players = [], onClose, onSave, onO
     const recordedNames = new Set(recorded.map((p) => p.name));
     const missing = (players || [])
       .filter((p) => !recordedNames.has(p.name))
-      .map((p) => ({
+      .map(({ comments: _comments, ...p }) => ({
         ...p,
         status: 'absent',
         quartersPlayed: [],
