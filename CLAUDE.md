@@ -450,10 +450,17 @@ console's redirect URI, and this list — not a search across the source.
 
 Print used to hand the browser the whole app, which came out as several pages
 of dark-themed navigation. `src/components/PrintSheet.jsx` is what goes on
-paper instead: one page, the four quarter cards, each row a position, a jersey
+paper instead: half a page, the four quarter cards, each row a position, a jersey
 number and a name. It sits in the DOM at all times and is hidden until the
 `@media print` block in `index.css` reveals it, so Ctrl-P and the Print button
 produce the same sheet.
+
+It fits the top half of the page, because a coach folds it in two to carry
+it. That is why it has no header — no team name, division or date — a 0.25in
+top margin and 9pt type: at 11v11 with eighteen on the roster the cards alone
+take about 4.8in, and the fold is 5.5in down. The top margin is not zero
+because most printers cannot print to the paper's edge. `print-lineup.spec.js`
+measures that case at the paper's printable width.
 
 The numbers come from the roster, not the lineup: the engine records
 `positions[position] = player.name` and nothing else, so `printableQuarters` in

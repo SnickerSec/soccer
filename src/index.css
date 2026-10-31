@@ -341,47 +341,27 @@
 /* Print used to hand the browser the whole dark-themed app, which came */
 /* out as several pages of navigation. The sheet below is what a coach  */
 /* actually carries: the four quarter cards, positions, names and the   */
-/* numbers on their backs, on one page.                                 */
+/* numbers on their backs, on the top half of one page — the coach      */
+/* folds it in two, so nothing may sit on or below the crease.          */
 /* ------------------------------------------------------------------ */
 
 .print-sheet {
   display: none;
   color: #000;
-  font-size: 10pt;
-  line-height: 1.25;
-}
-
-.print-sheet-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12pt;
-  border-bottom: 2pt solid #000;
-  padding-bottom: 4pt;
-  margin-bottom: 9pt;
-}
-
-.print-team {
-  font-size: 15pt;
-  font-weight: 700;
-  margin: 0;
-}
-
-.print-sheet-header span {
   font-size: 9pt;
-  white-space: nowrap;
+  line-height: 1.1;
 }
 
 .print-quarters {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10pt;
+  gap: 6pt;
 }
 
 .print-quarter {
   border: 1pt solid #000;
   border-radius: 3pt;
-  padding: 6pt 9pt 7pt;
+  padding: 3pt 7pt 4pt;
   /* A quarter split across the fold is a quarter the coach cannot read. */
   break-inside: avoid;
   page-break-inside: avoid;
@@ -391,10 +371,10 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  font-size: 11.5pt;
+  font-size: 10pt;
   font-weight: 700;
-  margin: 0 0 4pt;
-  padding-bottom: 3pt;
+  margin: 0 0 2pt;
+  padding-bottom: 2pt;
   border-bottom: 0.75pt solid #666;
 }
 
@@ -409,7 +389,7 @@
 }
 
 .print-quarter td {
-  padding: 1.5pt 0;
+  padding: 0.25pt 0;
   vertical-align: baseline;
 }
 
@@ -446,23 +426,25 @@
 }
 
 .print-sitting {
-  margin: 6pt 0 0;
-  padding-top: 4pt;
-  font-size: 9pt;
+  margin: 3pt 0 0;
+  padding-top: 2pt;
+  font-size: 8pt;
   border-top: 0.75pt dashed #999;
 }
 
 .print-unavailable {
-  margin: 10pt 0 0;
-  padding-top: 4pt;
-  font-size: 9pt;
+  margin: 5pt 0 0;
+  padding-top: 2pt;
+  font-size: 8pt;
   border-top: 1pt solid #000;
 }
 
 @media print {
   @page {
     size: letter portrait;
-    margin: 0.45in;
+    /* Not zero at the top: most printers cannot reach the paper's edge, and
+       the first row of the cards would be clipped. */
+    margin: 0.25in 0.35in;
   }
 
   html,

@@ -54,14 +54,37 @@ test.describe('Printing the lineup', () => {
         printed.forEach(n => expect(n.trim()).toMatch(/^#\d+$/));
     });
 
-    test('fits on a single page', async ({ page }) => {
-        await printPreview(page);
+    test('fits above the fold at 11v11 with a full squad', async ({ page }) => {
+        // The coach folds the sheet in half to carry it, so the cards must end
+        // above the crease. 11v11 with eighteen on the roster is the tallest
+        // sheet the app prints: eleven rows a card and seven names sitting.
+        await page.addInitScript(() => {
+            if (sessionStorage.getItem('seeded')) return;
+            sessionStorage.setItem('seeded', '1');
+            const names = ['Isabella Thompson', 'Sophia Rodriguez', 'Alexander Allen', 'Charlotte Moore',
+                'Benjamin Taylor', 'Quinn Rodriguez', 'Emery Williams', 'Avery Thompson', 'Cameron Wilson',
+                'Justice Turner', 'Harley Cooper', 'Amelia Jackson', 'Ethan Williams', 'Liam Anderson',
+                'Noah Martinez', 'William Brown', 'Evelyn Hall', 'Abigail Young'];
+            localStorage.setItem('ayso_players', JSON.stringify(
+                names.map((name, i) => ({ name, number: 10 + i, status: 'available' }))));
+            localStorage.setItem('ayso_settings', JSON.stringify(
+                { ageDivision: '14U', fieldPlayers: 11, formation: '4-2-3-1', quarters: 4 }));
+        });
+        // Letter less the 0.35in side margins, in CSS pixels (96 to the inch),
+        // so names wrap where they would on paper.
+        await page.setViewportSize({ width: Math.round(7.8 * 96), height: 1000 });
+        await page.goto('/');
+        await page.click('#generateLineup');
+        await expect(page.locator('.action-buttons-inline')).toBeVisible({ timeout: 20000 });
+        await page.emulateMedia({ media: 'print' });
 
-        // Letter portrait at 0.45in margins leaves 10.1in of height; the sheet
-        // is measured in CSS pixels, 96 to the inch.
+        await expect(page.locator('#printSheet .print-quarter')).toHaveCount(4);
+        await expect(page.locator('#printSheet .print-quarter').first().locator('.print-position')).toHaveCount(11);
+
+        // The fold is 5.5in down; the page's top margin is 0.25in of that,
+        // and a quarter inch is kept clear of the crease.
         const height = await page.locator('#printSheet').evaluate(el => el.getBoundingClientRect().height);
-
-        expect(height).toBeLessThan(10.1 * 96);
+        expect(height).toBeLessThan((5.5 - 0.25 - 0.25) * 96);
     });
 
     test('lists who is absent or injured', async ({ page }) => {

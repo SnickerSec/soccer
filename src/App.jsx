@@ -1991,8 +1991,6 @@ export default function App() {
         lineup={sharedView ? sharedView.lineup : lineup}
         players={sharedView ? sharedView.players : players}
         captains={sharedView ? sharedView.captains : captains}
-        teamName={sharedView ? (sharedView.teamName || 'Shared lineup') : (currentTeam?.name || 'Our Team')}
-        ageDivision={settings.ageDivision}
       />
 
       {/* Modals & Dialogs */}

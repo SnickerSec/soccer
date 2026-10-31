@@ -1,9 +1,11 @@
 import React from 'react';
 import { printableQuarters, unavailablePlayers } from '@/modules/print-lineup';
-import { parseLocalDate } from '@/modules/schedule';
 
 /**
- * The lineup as one sheet of paper.
+ * The lineup on the top half of one sheet of paper, so the coach can fold it
+ * in two and carry it with nothing lost on the crease. That is why it has no
+ * header and a small type size: the four cards are what the touchline needs,
+ * and at 11v11 there is no room for anything else above the fold.
  *
  * It is in the DOM at all times and hidden until the print stylesheet reveals
  * it (see `.print-sheet` in index.css), so Ctrl-P prints the same page as the
@@ -14,9 +16,6 @@ export function PrintSheet({
   lineup,
   players = [],
   captains = [],
-  teamName = 'Our Team',
-  ageDivision = '10U',
-  date,
 }) {
   const quarters = printableQuarters(lineup, players, captains);
   const unavailable = unavailablePlayers(lineup, players);
@@ -28,23 +27,10 @@ export function PrintSheet({
     .filter(([, list]) => list.length > 0)
     .map(([label, list]) => `${label} — ${list.map(withNumber).join(', ')}`);
 
-  const printedOn = parseLocalDate(date || undefined).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
   return (
     // aria-hidden: the same lineup is already on screen in the quarter cards,
     // and a second copy is only noise to a screen reader.
     <div className="print-sheet" id="printSheet" aria-hidden="true">
-      <div className="print-sheet-header">
-        <div className="print-team">{teamName}</div>
-        <span>
-          {ageDivision} · {lineup?.formation || '2-3-1'} · {printedOn}
-        </span>
-      </div>
-
       {quarters.length === 0 && (
         // Ctrl-P before a lineup exists: the app itself is hidden by the print
         // stylesheet, so say why the page is nearly empty rather than printing
